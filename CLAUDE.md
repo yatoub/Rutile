@@ -8,9 +8,18 @@ Voir `GUIDELINE.md` pour la vision complète et la roadmap priorisée
 
 ## Stack
 
-- Rust 2024, `gtk4` 0.11 (feature `v4_22`), `libadwaita` 0.9 (feature `v1_9`),
-  `vte4` 0.10 (feature `v0_84`) — versions alignées sur `pkg-config
-  --modversion gtk4|libadwaita-1|vte-2.91-gtk4` de la machine de dev.
+- Rust 2024, `gtk4` 0.11 (feature `v4_14`), `libadwaita` 0.9 (feature `v1_4`),
+  `vte4` 0.10 (feature `v0_70`) — **volontairement en dessous** de ce
+  qu'installe `pkg-config` sur la machine de dev (GTK4 4.22 etc.) : la
+  feature `vX_Y` fixe la version MINIMALE système exigée par pkg-config au
+  moment du link, pas la version utilisée. Choisir la version installée
+  localement casse la CI (Ubuntu 24.04 n'a que GTK4 4.14.5 dans ses dépôts
+  apt) — vécu en prod (premier run CI en échec sur
+  `Package 'gtk4' has version '4.14.5', required version is '>= 4.21'`).
+  Les features sont cumulatives (`v4_14` inclut tout ce qui est gagné par
+  `v4_2`..`v4_12`) donc pas de perte d'API réellement utilisée. Toujours
+  choisir la feature en fonction de la plus VIEILLE distro cible, jamais
+  de la machine de dev.
 - Pas de `serde`/`toml`/`zbus` tant qu'ils ne servent pas un besoin réel
   (config, D-Bus/quake mode = v0.2+).
 - `libadwaita` s'importe partout via `use libadwaita as adw;` (le crate
