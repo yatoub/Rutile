@@ -1,0 +1,75 @@
+/* Catppuccin Mocha — styles the libadwaita chrome (headerbar, tab bar,
+   pane dividers). Terminal content colors (fg/bg/ANSI palette) are NOT
+   themeable through CSS — vte4::Terminal::set_colors() in
+   terminal/widget.rs applies the matching Mocha palette there instead. */
+
+window,
+headerbar,
+.background {
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+}
+
+headerbar {
+  background-color: #181825;
+  border-bottom: 1px solid #313244;
+}
+
+tabbox,
+tabbar {
+  background-color: #181825;
+}
+
+tab {
+  color: #a6adc8;
+}
+
+tab:checked {
+  background-color: #313244;
+  color: #cdd6f4;
+}
+
+paned > separator {
+  background-color: #313244;
+  min-width: 2px;
+  min-height: 2px;
+}
+
+paned > separator:hover {
+  background-color: #89b4fa;
+}
+
+.pane-header {
+  background-color: #181825;
+  border-bottom: 1px solid #313244;
+  padding: 2px 4px;
+  min-height: 22px;
+}
+
+.pane-header label {
+  color: #a6adc8;
+  font-size: 0.85em;
+}
+
+.pane-header button {
+  min-width: 20px;
+  min-height: 20px;
+  padding: 2px;
+}
+
+.pane-header button:hover {
+  background-color: #313244;
+}
+
+.pane-sync-excluded {
+  color: #f38ba8;
+}
+
+.session-thumbnail {
+  border: 1px solid #313244;
+  border-radius: 4px;
+}
+
+row:selected .session-thumbnail {
+  border-color: #89b4fa;
+}

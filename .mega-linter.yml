@@ -1,0 +1,23 @@
+APPLY_FIXES: none
+DEFAULT_BRANCH: main
+PRINT_ALPACA: false
+
+# Only run security-relevant linters.
+# RUST_CLIPPY is already enforced by the dedicated lint job.
+ENABLE_LINTERS:
+  # Workflow & shell quality
+  - ACTION_ACTIONLINT
+  - BASH_SHELLCHECK
+  - YAML_YAMLLINT
+  # CVE / vulnerability scanning
+  - REPOSITORY_GRYPE
+  - REPOSITORY_TRIVY
+  # Secret detection (three independent scanners)
+  - REPOSITORY_GITLEAKS
+  - REPOSITORY_SECRETLINT
+  - REPOSITORY_TRUFFLEHOG
+  # Static security analysis
+  - REPOSITORY_SEMGREP
+  - REPOSITORY_CHECKOV
+  # SBOM (informational — does not fail the job)
+  - REPOSITORY_SYFT
