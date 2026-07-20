@@ -1,0 +1,166 @@
+name: Publish to AUR
+
+# Triggered automatically after the Release workflow succeeds,
+# or manually via workflow_dispatch to re-publish an existing tag.
+#
+# Updates two AUR packages in parallel:
+#   rutile      — builds from the released source tarball
+#   rutile-bin  — installs the pre-built rutile-linux-x86_64 binary
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to re-publish (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: read
+
+# A manual re-publish (workflow_dispatch) could otherwise race a run
+# triggered by the Release workflow completing for the same tag.
+concurrency:
+  group: aur-publish-${{ github.event.inputs.tag || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  # ── rutile (source package) ──────────────────────────────────────────────
+
+  aur-source:
+    name: Publish rutile (source)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    # Also run when the completed Release workflow was itself a manual
+    # workflow_dispatch re-publish: a re-publish can rebuild the binary
+    # (overwrite: true on the upload step) with different bytes, which
+    # otherwise leaves the AUR package's checksum stale until the next
+    # tagged release.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'push' ||
+        github.event.workflow_run.event == 'workflow_dispatch'))
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version to publish
+        id: ver
+        uses: ./.github/actions/resolve-release-tag
+        with:
+          input-tag: ${{ github.event.inputs.tag }}
+          head-sha: ${{ github.event.workflow_run.head_sha }}
+          repo: ${{ github.repository }}
+
+      - name: Compute checksum of source archive
+        id: checksum
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          curl -fsSL "https://github.com/yatoub/Rutile/archive/refs/tags/${TAG}.tar.gz" -o archive.tar.gz
+          echo "b2sum=$(b2sum archive.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Patch PKGBUILD
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          B2SUM: ${{ steps.checksum.outputs.b2sum }}
+        run: |
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+          sed -i "s/^b2sums=(.*/b2sums=(${B2SUM})/" PKGBUILD
+
+      - name: Push to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050  # v4.2.0
+        with:
+          pkgname: rutile
+          pkgbuild: ./PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "chore: update to ${{ steps.ver.outputs.tag }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+          allow_empty_commits: false
+
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          github-token: ${{ github.token }}
+          title: "AUR publish (rutile) failed for ${{ steps.ver.outputs.tag || 'unknown' }}"
+          body: "aur-source failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ── rutile-bin (pre-built binary package) ────────────────────────────────
+
+  aur-bin:
+    name: Publish rutile-bin (pre-built)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.event == 'push' ||
+        github.event.workflow_run.event == 'workflow_dispatch'))
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version to publish
+        id: ver
+        uses: ./.github/actions/resolve-release-tag
+        with:
+          input-tag: ${{ github.event.inputs.tag }}
+          head-sha: ${{ github.event.workflow_run.head_sha }}
+          repo: ${{ github.repository }}
+
+      - name: Compute checksums (source archive + Linux binary)
+        id: checksums
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          curl -fsSL "https://github.com/yatoub/Rutile/archive/refs/tags/${TAG}.tar.gz" -o archive.tar.gz
+          curl -fsSL "https://github.com/yatoub/Rutile/releases/download/${TAG}/rutile-linux-x86_64" -o rutile-linux-x86_64
+          echo "src=$(b2sum archive.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "bin=$(b2sum rutile-linux-x86_64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Patch PKGBUILD.bin
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          B2SUM_SRC: ${{ steps.checksums.outputs.src }}
+          B2SUM_BIN: ${{ steps.checksums.outputs.bin }}
+        run: |
+          cp PKGBUILD.bin PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+          sed -i "s/^b2sums=(.*/b2sums=(${B2SUM_SRC})/" PKGBUILD
+          sed -i "s/^b2sums_x86_64=(.*/b2sums_x86_64=(${B2SUM_BIN})/" PKGBUILD
+
+      - name: Push to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050  # v4.2.0
+        with:
+          pkgname: rutile-bin
+          pkgbuild: ./PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "chore: update to ${{ steps.ver.outputs.tag }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+          allow_empty_commits: false
+
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          github-token: ${{ github.token }}
+          title: "AUR publish (rutile-bin) failed for ${{ steps.ver.outputs.tag || 'unknown' }}"
+          body: "aur-bin failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

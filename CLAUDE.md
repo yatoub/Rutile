@@ -226,6 +226,70 @@ pour l'instant — à ajouter plus tard si besoin) :
   vérifié que par lecture/raisonnement (licences du graphe de dépendances
   inspectées via `cargo metadata`), pas exécuté localement — à surveiller
   au premier run CI.
+- **Branche `main` protégée** (configurée via `gh api
+  repos/yatoub/Rutile/branches/main/protection`, pas de fichier dans le
+  repo) : PR obligatoire (`required_pull_request_reviews`,
+  `required_approving_review_count: 0` — pas de review externe exigée,
+  juste le passage par PR), 4 status checks requis (`Lint (fmt +
+  clippy)`, `Tests`, `Security (cargo deny)`, `MegaLinter` — les noms
+  doivent matcher exactement les noms de job dans `ci.yml`), pas de force
+  push ni de suppression de branche, conversations de review à résoudre.
+  `enforce_admins: false` — le propriétaire du repo peut encore pousser
+  directement en cas de besoin (ex. `update-pkgbuild` dans `release.yml`,
+  voir plus bas), ce qui est voulu.
+
+## Packaging (AUR / deb / rpm)
+
+Calqué sur `release.yml`/`aur-publish.yml` de `susshi`, mais **scope réduit
+à Linux uniquement** (contrairement à susshi qui est un outil CLI portable
+avec matrice cross-platform macOS/Windows/musl) : Rutile dépend de
+GTK4/libadwaita/vte4 système, donc un seul target `x86_64-unknown-linux-gnu`
+a du sens pour l'instant.
+
+- `.github/workflows/release.yml` (déclenché par un tag `vX.Y.Z`) :
+  - `build` : binaire Linux x86_64 sur `ubuntu-22.04` (glibc plus ancienne
+    = compatible avec plus de distros que `ubuntu-latest`), publié en
+    asset de la GitHub Release.
+  - `build-deb` : `cargo-deb` (métadonnées dans `[package.metadata.deb]`
+    de `Cargo.toml`), smoke test = installation + `ldd` (vérifie que les
+    libs partagées se résolvent, pas d'exécution réelle du binaire GTK
+    puisqu'il n'y a pas de display dans le runner CI).
+  - `build-rpm` : `rpmbuild` dans un conteneur `fedora:41`, à partir de
+    `rutile.spec`, même style de smoke test.
+  - `update-pkgbuild` : régénère `PKGBUILD`/`PKGBUILD.bin`/`.SRCINFO`/
+    `rutile.spec` (version + b2sums) via `scripts/update-pkgbuild.sh`,
+    commit direct sur `main` — déclenche ensuite `aur-publish.yml`.
+- `.github/workflows/aur-publish.yml` : publie `rutile` (source) et
+  `rutile-bin` (binaire pré-compilé) sur l'AUR via
+  `KSXGitHub/github-actions-deploy-aur`.
+- **Volontairement PAS fait** (à ajouter plus tard si besoin, façon
+  susshi) : hébergement de vrais dépôts APT/DNF (gh-pages + aptly +
+  createrepo_c + signature GPG) — juste des `.deb`/`.rpm` attachés à la
+  Release GitHub pour l'instant. Pas de fichier icône custom pour
+  `resources/rutile.desktop` (utilise l'icône générique
+  `utilities-terminal` du thème système).
+
+### Secrets à configurer avant que `release.yml`/`aur-publish.yml` marchent
+
+Ces workflows sont écrits et syntaxiquement valides, mais **non
+exécutables tant que ces secrets repo ne sont pas ajoutés** (je ne peux
+pas les créer moi-même) :
+
+- `RUTILE_RELEASE_TOKEN` — PAT (fine-grained, contents:write) d'un compte
+  admin du repo. Nécessaire pour que `update-pkgbuild` pousse directement
+  sur `main` (bloqué pour le token `GITHUB_TOKEN` par défaut à cause de la
+  protection de branche — `enforce_admins: false` exempte seulement les
+  vrais comptes admin authentifiés, pas le bot Actions) ET pour que ce
+  push déclenche bien `aur-publish.yml` (les push faits avec
+  `GITHUB_TOKEN` ne déclenchent jamais d'autre workflow, limitation
+  GitHub volontaire anti-boucle infinie).
+- `AUR_USERNAME`, `AUR_EMAIL`, `AUR_SSH_PRIVATE_KEY` — identifiants + clé
+  SSH pour pousser vers `aur.archlinux.org` (paquets `rutile` et
+  `rutile-bin` doivent déjà exister/être réclamés sur l'AUR au préalable).
+
+Sans ces secrets : `build`/`build-deb`/`build-rpm` fonctionneront quand
+même (accrochent les artefacts à la Release GitHub) ; seuls
+`update-pkgbuild` et `aur-publish.yml` échoueront.
 
 ## Environnement de dev (sandbox Claude Code)
 

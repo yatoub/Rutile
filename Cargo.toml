@@ -2,8 +2,29 @@
 name = "rutile"
 version = "0.1.0"
 edition = "2024"
+description = "GNOME-native terminal emulator with recursive split tiling and synchronized input, in Rust/GTK4"
+license = "MIT"
+repository = "https://github.com/yatoub/Rutile"
 
 [dependencies]
 gtk4 = { version = "0.11.4", features = ["v4_14"] }
 libadwaita = { version = "0.9.2", features = ["v1_4"] }
 vte4 = { version = "0.10.0", features = ["v0_70"] }
+
+[package.metadata.deb]
+name = "rutile"
+maintainer = "yatoub <yatoub@users.noreply.github.com>"
+copyright = "2026 yatoub"
+license-file = ["LICENSE", "0"]
+extended-description = """\
+Rutile is a from-scratch Rust/GTK4 rewrite of Tilix, aiming for functional \
+parity on its core value: recursive split tiling, synchronized input \
+across panes, independent multi-session support, and a Catppuccin theme."""
+depends = "libgtk-4-1, libadwaita-1-0, libvte-2.91-gtk4-0"
+section = "x11"
+priority = "optional"
+assets = [
+    ["target/release/rutile", "usr/bin/rutile", "755"],
+    ["resources/rutile.desktop", "usr/share/applications/rutile.desktop", "644"],
+    ["README.md", "usr/share/doc/rutile/README.md", "644"],
+]

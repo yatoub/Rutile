@@ -1,0 +1,264 @@
+name: Release
+
+# Triggered by a version tag (vX.Y.Z), or manually via workflow_dispatch to
+# re-publish an existing tag.
+#
+# Rutile is a GTK4/libadwaita/vte4 desktop app — Linux-only, unlike a
+# portable CLI tool, so this pipeline (unlike a cross-platform release)
+# targets a single glibc-compat Linux binary plus DEB/RPM packages built
+# from it.
+#
+# Pipeline:
+#   build       — one x86_64 Linux binary, uploaded to the GitHub Release
+#   build-deb   — DEB package (built from the binary's own recipe)
+#   build-rpm   — Fedora RPM package (built from source, in a Fedora container)
+#
+# After build:
+#   update-pkgbuild — commits refreshed PKGBUILD/PKGBUILD.bin/rutile.spec to
+#                     main, which triggers aur-publish.yml
+#
+# NOTE: .deb/.rpm are attached to the GitHub Release only — this does not
+# stand up hosted APT/DNF repositories (that needs a gh-pages branch, GPG
+# signing key, and more infrastructure than a v0.1 release warrants; can be
+# added later the same way susshi does it).
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to re-publish (e.g. v0.1.0)"
+        required: true
+
+permissions:
+  contents: read
+
+# A manual re-publish (workflow_dispatch) could otherwise race the run
+# triggered by the original tag push for the same tag.
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Linux binary ──────────────────────────────────────────────────────────
+
+  build:
+    name: Binary — x86_64
+    # Older LTS (older glibc) so the resulting binary runs on older distros
+    # too: glibc is forward-compatible only, so a binary linked against
+    # ubuntu-latest's glibc fails with "GLIBC_x.xx not found" on e.g. Debian.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install GTK4/libadwaita/vte4 dev packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libvte-2.91-gtk4-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Copy binary to release asset name
+        run: |
+          cp target/release/rutile rutile-linux-x86_64
+          chmod +x rutile-linux-x86_64
+
+      - name: Upload to GitHub Release
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de  # v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: rutile-linux-x86_64
+          asset_name: rutile-linux-x86_64
+          tag: ${{ github.event.inputs.tag || github.ref }}
+          overwrite: true
+
+  # ── DEB package ───────────────────────────────────────────────────────────
+
+  build-deb:
+    name: DEB package
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install GTK4/libadwaita/vte4 dev packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libvte-2.91-gtk4-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Build DEB
+        run: |
+          cargo build --release
+          cargo deb --no-build
+
+      - name: Smoke test (install + linked libraries resolve)
+        run: |
+          sudo dpkg -i target/debian/rutile_*.deb
+          ldd "$(command -v rutile)" | grep -qi "not found" && exit 1 || true
+          sudo dpkg -r rutile
+
+      - name: Upload to GitHub Release
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de  # v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/debian/rutile_*.deb
+          file_glob: true
+          tag: ${{ github.event.inputs.tag || github.ref }}
+          overwrite: true
+
+  # ── RPM package (Fedora) ──────────────────────────────────────────────────
+
+  build-rpm:
+    name: RPM package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: fedora:41
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install build dependencies
+        run: |
+          dnf install -y rust cargo gtk4-devel libadwaita-devel vte291-devel \
+            pkgconf-pkg-config desktop-file-utils rpm-build rpmdevtools git
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v6
+        with:
+          path: |
+            /github/home/.cargo/registry/index
+            /github/home/.cargo/registry/cache
+            /github/home/.cargo/git/db
+          key: fedora-rpm-x86_64-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            fedora-rpm-x86_64-
+
+      - name: Set up rpmbuild tree
+        run: rpmdev-setuptree
+
+      - name: Patch version in spec file
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          sed -i "s/^Version:.*/Version:        ${VERSION}/" rutile.spec
+
+      - name: Fetch source archive
+        run: spectool -g -R rutile.spec
+
+      - name: Build RPM
+        run: rpmbuild -ba rutile.spec
+
+      - name: Smoke test (install + linked libraries resolve)
+        run: |
+          rpm_file=$(find /github/home/rpmbuild/RPMS -name "rutile-*.rpm" | grep -v debug | head -n1)
+          dnf install -y "${rpm_file}"
+          ldd "$(command -v rutile)" | grep -qi "not found" && exit 1 || true
+          rpm -e rutile
+
+      - name: Upload to GitHub Release
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de  # v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: /github/home/rpmbuild/RPMS/**/*.rpm
+          file_glob: true
+          tag: ${{ github.event.inputs.tag || github.ref }}
+          overwrite: true
+
+  # ── Arch Linux PKGBUILD (committed to repo) ───────────────────────────────
+
+  update-pkgbuild:
+    name: Update PKGBUILD in repo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          # PAT required: this push must trigger aur-publish.yml (GITHUB_TOKEN
+          # pushes are silently ignored by workflow event triggers), and must
+          # bypass main's PR-required branch protection as an admin push
+          # (the default GITHUB_TOKEN actor is not an admin and would be
+          # rejected). Add a fine-grained PAT from an admin account as the
+          # `RUTILE_RELEASE_TOKEN` repo secret before this job can succeed.
+          token: ${{ secrets.RUTILE_RELEASE_TOKEN }}
+          ref: main
+
+      - name: Update PKGBUILD
+        run: bash scripts/update-pkgbuild.sh
+
+      - name: Regenerate .SRCINFO
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/pkg" \
+            -w /pkg \
+            archlinux@sha256:fe6972d4dc1f660c0c10f4c41b2de8986bab89e7e2955378f8beadb8ebcd7433 \
+            bash -c "
+              pacman -Sy --noconfirm base-devel > /dev/null 2>&1
+              useradd -m builder
+              chown -R builder:builder /pkg
+              su builder -s /bin/bash -c 'cd /pkg && makepkg --printsrcinfo > /pkg/.SRCINFO'
+            "
+
+      - name: Fix workspace permissions after Docker
+        run: sudo chown -R "$USER" .
+
+      - name: Commit and push if changed
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add PKGBUILD PKGBUILD.bin .SRCINFO rutile.spec
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          VERSION="${TAG#v}"
+          git commit -m "chore(release): update PKGBUILD to v${VERSION}"
+          git push
+
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          github-token: ${{ github.token }}
+          title: "PKGBUILD update failed for ${{ github.event.inputs.tag || github.ref_name }}"
+          body: "update-pkgbuild failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
