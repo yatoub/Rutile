@@ -7,6 +7,7 @@ use vte4::TerminalExt;
 
 use crate::layout::{Orientation, PaneId};
 use crate::pane_header;
+use crate::preferences::Preferences;
 use crate::session::SessionView;
 use crate::terminal::broadcast::{BroadcastGroup, SessionId};
 
@@ -18,10 +19,13 @@ use crate::terminal::broadcast::{BroadcastGroup, SessionId};
 /// - gaining GTK focus (e.g. a left click) marks this pane as focused, so
 ///   split/close/broadcast actions target whatever the user last clicked
 ///   into instead of a stale keyboard-driven focus;
+/// - moving the mouse over the pane also focuses it, if the
+///   "focus follows mouse" preference is enabled;
 /// - every "commit" (text this pane is about to send its child process,
 ///   i.e. typed/pasted input) is forwarded to the current broadcast group.
 pub fn attach(
     session_view: Rc<RefCell<SessionView>>,
+    prefs: Rc<RefCell<Preferences>>,
     session_id: SessionId,
     pane_id: PaneId,
     terminal: &vte4::Terminal,
@@ -36,14 +40,30 @@ pub fn attach(
         pane_header::attach(session_view.clone(), session_id, pane_id, &header);
     }
 
+    let motion_controller = gtk4::EventControllerMotion::new();
+    {
+        let session_view = session_view.clone();
+        let prefs = prefs.clone();
+        motion_controller.connect_enter(move |_controller, _x, _y| {
+            if prefs.borrow().focus_follows_mouse
+                && let Ok(mut session_view) = session_view.try_borrow_mut()
+            {
+                session_view.set_focused_pane(session_id, pane_id);
+            }
+        });
+    }
+    terminal.add_controller(motion_controller);
+
     let gesture = gtk4::GestureClick::new();
     gesture.set_button(gdk::BUTTON_SECONDARY);
 
     let terminal_for_menu = terminal.clone();
     let session_view_for_menu = session_view.clone();
+    let prefs_for_menu = prefs.clone();
     gesture.connect_pressed(move |_gesture, _n_press, x, y| {
         show_menu(
             session_view_for_menu.clone(),
+            prefs_for_menu.clone(),
             session_id,
             pane_id,
             &terminal_for_menu,
@@ -95,6 +115,7 @@ pub fn attach(
 
 fn show_menu(
     session_view: Rc<RefCell<SessionView>>,
+    prefs: Rc<RefCell<Preferences>>,
     session_id: SessionId,
     pane_id: PaneId,
     terminal: &vte4::Terminal,
@@ -111,14 +132,28 @@ fn show_menu(
 
     {
         let session_view = session_view.clone();
+        let prefs = prefs.clone();
         add_action(&menu_box, &popover, "Diviser horizontalement", move || {
-            split_and_wire(&session_view, session_id, pane_id, Orientation::Horizontal);
+            split_and_wire(
+                &session_view,
+                &prefs,
+                session_id,
+                pane_id,
+                Orientation::Horizontal,
+            );
         });
     }
     {
         let session_view = session_view.clone();
+        let prefs = prefs.clone();
         add_action(&menu_box, &popover, "Diviser verticalement", move || {
-            split_and_wire(&session_view, session_id, pane_id, Orientation::Vertical);
+            split_and_wire(
+                &session_view,
+                &prefs,
+                session_id,
+                pane_id,
+                Orientation::Vertical,
+            );
         });
     }
 
@@ -166,6 +201,7 @@ fn add_action(
 /// own context menu so it can be split/broadcast-toggled the same way.
 fn split_and_wire(
     session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
     session_id: SessionId,
     pane_id: PaneId,
     orientation: Orientation,
@@ -179,6 +215,12 @@ fn split_and_wire(
     };
     let terminal = session_view.borrow().widget_for(session_id, new_id);
     if let Some(terminal) = terminal {
-        attach(session_view.clone(), session_id, new_id, &terminal);
+        attach(
+            session_view.clone(),
+            prefs.clone(),
+            session_id,
+            new_id,
+            &terminal,
+        );
     }
 }

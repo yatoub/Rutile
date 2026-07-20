@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/github/license/yatoub/Rutile?style=flat-square)](LICENSE)
 [![Maintenance](https://img.shields.io/badge/maintenance-active-brightgreen?style=flat-square)](https://github.com/yatoub/Rutile)
 
-**Rutile** is a from-scratch Rust/GTK4 rewrite of [Tilix](https://gnome-terminator.org/) — recursive split tiling, synchronized input across panes, independent multi-sessions, and a Catppuccin theme, built natively on GTK4/libadwaita/vte4.
+**Rutile** is a from-scratch Rust/GTK4 rewrite of [Tilix](https://gnunn1.github.io/tilix-web/) — recursive split tiling, synchronized input across panes, independent multi-sessions, and a Catppuccin theme, built natively on GTK4/libadwaita/vte4.
 
 ## Why Rutile?
 
