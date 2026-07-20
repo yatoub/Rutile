@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Maintain dependencies for Cargo (Rust)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+  # NOTE: release.yml pins a base image by digest (archlinux) in an inline
+  # `docker run` command, not in a Dockerfile/docker-compose.yml.
+  # Dependabot's "docker" ecosystem only scans Dockerfile/compose syntax, not
+  # docker-run digests embedded in workflow run: scripts, so that pin
+  # currently has no automated update path and must be bumped by hand.
