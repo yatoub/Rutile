@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Rutile
+Comment=GNOME-native terminal emulator with split tiling and synchronized input
+Exec=rutile
+Icon=utilities-terminal
+Terminal=false
+Categories=System;TerminalEmulator;
