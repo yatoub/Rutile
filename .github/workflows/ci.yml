@@ -75,6 +75,32 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
+  msrv:
+    name: MSRV (Rust 1.92)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+
+      - name: Install GTK4/libadwaita/vte4 dev packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libvte-2.91-gtk4-dev
+
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@387aeee55b189f024a4f6d94890c5b18d73339cc  # 1.92.0
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2
+        with:
+          key: msrv
+
+      - name: Check (MSRV)
+        run: cargo +1.92.0 check --all-targets
+
   deny:
     name: Security (cargo deny)
     runs-on: ubuntu-latest
@@ -105,3 +131,48 @@ jobs:
         uses: oxsecurity/megalinter/flavors/rust@ef3e84b8b836d76db562d0f3ed7da61e8fd538bc  # v9.6.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Informational only (not a required status check yet): visibility into
+  # which parts of split_tree.rs/broadcast.rs (and everything else) aren't
+  # exercised by cargo test, not a coverage gate.
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+
+      - name: Install GTK4/libadwaita/vte4 dev packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libvte-2.91-gtk4-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9  # v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Generate coverage report
+        run: |
+          cargo llvm-cov \
+            --lcov \
+            --output-path lcov.info \
+            --ignore-filename-regex 'src/(main\.rs|app\.rs|window\.rs|context_menu\.rs|pane_header\.rs|preferences/window\.rs|session/sidebar\.rs)'
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac  # v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: false

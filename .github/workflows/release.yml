@@ -52,6 +52,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
@@ -77,6 +79,15 @@ jobs:
           cp target/release/rutile rutile-linux-x86_64
           chmod +x rutile-linux-x86_64
 
+      # SLSA build provenance: cryptographically ties this artifact to this
+      # exact repo/commit/workflow run — verifiable via `gh attestation
+      # verify`, unlike SHA256SUMS.txt which only proves the download wasn't
+      # corrupted, not where it actually came from.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3
+        with:
+          subject-path: rutile-linux-x86_64
+
       - name: Upload to GitHub Release
         uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de  # v2
         with:
@@ -94,6 +105,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
@@ -125,6 +138,11 @@ jobs:
           ldd "$(command -v rutile)" | grep -qi "not found" && exit 1 || true
           sudo dpkg -r rutile
 
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3
+        with:
+          subject-path: target/debian/rutile_*.deb
+
       - name: Upload to GitHub Release
         uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de  # v2
         with:
@@ -140,9 +158,14 @@ jobs:
     name: RPM package
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    container: fedora:41
+    # Pinned by digest (fedora:41 as of this pin), same reasoning as the
+    # SHA-pinned GitHub Actions above: an unpinned tag can be updated to a
+    # different image without notice, changing the build environment.
+    container: fedora@sha256:f1a3fab47bcb3c3ddf3135d5ee7ba8b7b25f2e809a47440936212a3a50957f3d
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
@@ -187,6 +210,11 @@ jobs:
           dnf install -y "${rpm_file}"
           ldd "$(command -v rutile)" | grep -qi "not found" && exit 1 || true
           rpm -e rutile
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3
+        with:
+          subject-path: /github/home/rpmbuild/RPMS/**/*.rpm
 
       - name: Upload to GitHub Release
         uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de  # v2
