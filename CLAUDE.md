@@ -282,6 +282,52 @@ pour l'instant — à ajouter plus tard si besoin) :
   directement en cas de besoin (ex. `update-pkgbuild` dans `release.yml`,
   voir plus bas), ce qui est voulu.
 
+## DevSecOps (posture au-delà du lint/scan de base)
+
+Pour une app desktop réelle distribuée largement (AUR/deb/rpm/binaire
+standalone, contrairement à un outil CLI), sécuriser juste le code source
+ne suffit pas — la chaîne de distribution compte tout autant :
+
+- **Sécurité native GitHub activée** (réglages du repo, pas de fichier) :
+  Dependabot alerts + Dependabot security updates (activés via `gh api -X
+  PUT repos/yatoub/Rutile/vulnerability-alerts` et
+  `.../automated-security-fixes` — étaient désactivés par défaut), secret
+  scanning + push protection (déjà actifs par défaut). Complète Gitleaks/
+  Secretlint/TruffleHog déjà dans MegaLinter sans coût CI.
+- **Toutes les actions GitHub sont épinglées par SHA de commit**, pas par
+  tag (`actions/checkout@<sha>  # v7`, etc. — commentaire du tag gardé pour
+  la lisibilité). Un tag peut être déplacé/compromis après coup ; un SHA
+  non. Seuls `svenstaro/upload-release-action` et
+  `KSXGitHub/github-actions-deploy-aur` l'étaient déjà (hérités de
+  susshi) ; le reste (`actions/checkout`, `dtolnay/rust-toolchain`,
+  `Swatinem/rust-cache`, `EmbarkStudios/cargo-deny-action`,
+  `oxsecurity/megalinter`, `dependabot/fetch-metadata`, `actions/cache`)
+  a été durci en plus — Rutile va plus loin que susshi sur ce point
+  précis, choix assumé vu la surface de distribution plus large.
+  **Piège** : `Swatinem/rust-cache@v2` et `EmbarkStudios/cargo-deny-action@v2`
+  sont des tags ANNOTÉS — `gh api repos/OWNER/REPO/git/refs/tags/vX` donne
+  le SHA de l'objet tag, pas celui du commit sous-jacent. Toujours résoudre
+  via `gh api repos/OWNER/REPO/commits/vX` (résout correctement dans les
+  deux cas), jamais via `git/refs/tags/`.
+- **`.github/workflows/scorecard.yml`** : score OpenSSF Scorecard continu
+  (pinning, permissions des workflows, protection de branche...), publié
+  sur push vers `main` + hebdomadaire + sur changement de
+  `branch_protection_rule`. Résultats en SARIF uploadés vers l'onglet
+  Security de GitHub (`github/codeql-action/upload-sarif`).
+- **`SHA256SUMS.txt` généré à chaque release** (`release.yml`, job
+  `checksums`, après `build`/`build-deb`/`build-rpm`) : permet à qui
+  installe le binaire standalone/`.deb`/`.rpm` de vérifier l'intégrité du
+  téléchargement. Pas de signature GPG pour l'instant (contrairement aux
+  dépôts APT/DNF hébergés de susshi, volontairement pas mis en place ici
+  — voir section Packaging) — les checksums seuls n'authentifient pas la
+  provenance, juste l'intégrité vis-à-vis de ce qui est affiché sur la
+  page de release GitHub elle-même.
+- **Explicitement pas fait** (pistes pour plus tard, pas un manque
+  bloquant) : CodeQL pour Rust (risque de redondance avec Semgrep déjà
+  dans MegaLinter), couverture de tests via `cargo-llvm-cov`/Codecov
+  (susshi l'a, discuté mais pas encore demandé pour Rutile), signature GPG
+  des releases.
+
 ## Packaging (AUR / deb / rpm)
 
 Calqué sur `release.yml`/`aur-publish.yml` de `susshi`, mais **scope réduit
