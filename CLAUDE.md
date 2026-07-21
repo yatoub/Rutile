@@ -366,6 +366,51 @@ ne suffit pas — la chaîne de distribution compte tout autant :
   chantier de maintenance à part entière), `cargo-geiger` (métrique de
   code `unsafe`), signature GPG des releases.
 
+## Conventional Commits + release-plz (versioning/CHANGELOG automatisés)
+
+Calqué sur `release-plz.yml`/`release-plz.toml` de `susshi`, avec une
+différence assumée : **pas de publication crates.io** (`publish = false`
+dans `release-plz.toml`) — Rutile est un binaire GUI, pas une lib à
+consommer, et le nom est de toute façon déjà pris sur crates.io (cf
+GUIDELINE.md). release-plz ne gère ici QUE version dans `Cargo.toml` +
+`CHANGELOG.md` + tag Git + GitHub Release (notes = changelog) ; le tag
+poussé déclenche ensuite `release.yml` (déjà en place) qui construit et
+attache binaire/`.deb`/`.rpm`/`SHA256SUMS.txt`/attestations SLSA à cette
+même Release.
+
+- **Chaque commit individuel doit respecter Conventional Commits** (choix
+  explicite de l'utilisateur, plus strict que juste lint le titre de PR) :
+  `.github/workflows/commitlint.yml` tourne sur chaque PR
+  (`wagoid/commitlint-github-action`), vérifie TOUS les commits de la
+  branche, pas seulement le titre — attrape l'erreur au moment du commit,
+  pas seulement à l'ouverture de la PR. Config dans `.commitlintrc.yml`
+  (`@commitlint/config-conventional`, types standards `feat`/`fix`/
+  `chore`/`docs`/`ci`/`test`/`refactor`/`perf`/`build`/...).
+  `Commitlint` ajouté aux status checks requis par la protection de
+  branche (6 checks requis au total maintenant).
+- **`release-plz.toml`** : `release_commits = "^(feat|fix|perf|refactor)"`
+  (seuls ces types déclenchent une PR de release — évite qu'un commit
+  `chore(release): update PKGBUILD to vX.Y.Z` du job `update-pkgbuild` de
+  `release.yml` ne redéclenche une release en boucle),
+  `features_always_increment_minor = true` (garantit bump mineur, pas
+  patch, pour `feat:` tant qu'on est en 0.x), `commit_parsers` mappe les
+  types conventionnels vers les sections du changelog (`feat` → "Added",
+  `fix` → "Fixed", `perf`/`refactor` → "Changed", le reste — `chore`/`ci`/
+  `test`/`docs` — skip du changelog mais reste linté par commitlint).
+- **`.github/workflows/release-plz.yml`** : sur chaque push vers `main`,
+  ouvre/rafraîchit une PR de release (bump + changelog) si des commits
+  releasables sont en attente, ou crée le tag + la GitHub Release une fois
+  cette PR mergée (auto-merge squash dès que la CI passe). **Réutilise le
+  secret `RUTILE_RELEASE_TOKEN`** déjà créé pour `update-pkgbuild` (même
+  besoin : contourner `enforce_admins: false` et déclencher `release.yml`
+  sur le tag poussé, ce que `GITHUB_TOKEN` ne peut pas faire) — **mais ce
+  PAT doit avoir le scope `Pull requests: Read and write` ajouté en plus
+  de `Contents: Read and write`** (pas modifiable via API, à faire dans
+  GitHub Settings → Developer settings → Fine-grained tokens).
+- **`CHANGELOG.md`** créé avec juste l'en-tête (aucune entrée encore,
+  Rutile n'a pas de tag de version) — release-plz y ajoute une section à
+  chaque release.
+
 ## Packaging (AUR / deb / rpm)
 
 Calqué sur `release.yml`/`aur-publish.yml` de `susshi`, mais **scope réduit
