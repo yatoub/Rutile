@@ -164,10 +164,14 @@ jobs:
     name: RPM package
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Pinned by digest (fedora:41 as of this pin), same reasoning as the
+    # Pinned by digest (fedora:42 as of this pin), same reasoning as the
     # SHA-pinned GitHub Actions above: an unpinned tag can be updated to a
     # different image without notice, changing the build environment.
-    container: fedora@sha256:f1a3fab47bcb3c3ddf3135d5ee7ba8b7b25f2e809a47440936212a3a50957f3d
+    # fedora:41 shipped rustc 1.91.1 in its repos, below our MSRV of 1.92
+    # (gtk4-rs 0.11.4's real floor, see CLAUDE.md) — build failed with
+    # "rustc 1.91.1 is not supported by ... requires rustc 1.92". fedora:42
+    # ships rustc 1.95.0, verified via `docker run fedora:42 dnf info rust`.
+    container: fedora@sha256:99e203b80b1c3d8f7e161ec10a68fd02b081ef83a3963553e513c82846b97814
     permissions:
       contents: write
       id-token: write
