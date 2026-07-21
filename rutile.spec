@@ -9,7 +9,7 @@ Source0:        https://github.com/yatoub/Rutile/archive/refs/tags/v%{version}.t
 BuildRequires:  cargo
 BuildRequires:  gtk4-devel
 BuildRequires:  libadwaita-devel
-BuildRequires:  vte291-devel
+BuildRequires:  vte291-gtk4-devel
 BuildRequires:  pkgconf-pkg-config
 BuildRequires:  desktop-file-utils
 
