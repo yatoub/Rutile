@@ -1,0 +1,32 @@
+name: Commitlint
+
+# Every commit in a PR must follow Conventional Commits — release-plz
+# parses commit history on `main` to decide the next version bump and
+# CHANGELOG.md section, so a malformed commit message doesn't just look
+# bad, it silently breaks (or skips) the next release.
+#
+# Checks every commit in the PR, not just the (squash-merge) final title:
+# catching the mistake at commit time, not only when opening the PR.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    name: Commitlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          fetch-depth: 0
+
+      - name: Lint commit messages
+        uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed  # v6

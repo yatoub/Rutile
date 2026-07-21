@@ -1,0 +1,62 @@
+[workspace]
+# Only open/update a release PR when at least one releasable commit is present.
+# Prevents the PKGBUILD bot-push (chore(release):) from triggering a spurious PR.
+release_commits = "^(feat|fix|perf|refactor)"
+# For 0.x crates, guarantee that feat: commits produce a minor bump (0.y → 0.y+1),
+# not a patch. Without this flag release-plz may default to patch on pre-1.0 packages.
+features_always_increment_minor = true
+# Automatically create/update the GitHub Release with the CHANGELOG section.
+# release.yml's tag-push trigger then appends the binary/.deb/.rpm/SHA256SUMS
+# to this same release.
+git_release_enable = true
+# Use the [Unreleased] section content as release notes
+git_release_body = "{{ changelog }}"
+# Rutile is a GUI binary, not a library meant to be depended on — not
+# published to crates.io (the name is also already taken, see GUIDELINE.md).
+# release-plz here only handles versioning/CHANGELOG.md/git tag.
+publish = false
+# semver-checks flags internal pub types as breaking changes — disabled to reduce noise
+semver_check = false
+
+[changelog]
+# Keep a Changelog-compatible format
+header = """
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/).
+
+---
+"""
+
+# Map conventional commit types to changelog sections
+body = """
+{% if version %}## [{{ version | trim_start_matches(pat="v") }}] — {{ timestamp | date(format="%Y-%m-%d") }}{% else %}## [Unreleased]{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }}{% if commit.breaking %} (**BREAKING**){% endif %}
+{% endfor %}
+{% endfor %}
+"""
+
+commit_parsers = [
+  # Purely operational commits: no user-facing release triggered.
+  { message = "^fix\\(ci\\)", skip = true },
+  { message = "^chore\\(roadmap\\)", skip = true },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore\\(deps\\)", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^test", skip = true },
+  { message = "^docs", skip = true },
+  # Commits visible in the changelog.
+  { message = "^feat", group = "Added" },
+  { message = "^fix", group = "Fixed" },
+  { message = "^perf", group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+]
+
+protect_breaking_commits = false
