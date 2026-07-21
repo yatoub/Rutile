@@ -440,6 +440,49 @@ même Release.
   Les deux bugs vérifiés en isolant chaque étape exactement comme dans le
   run CI cassé (`cargo fetch --locked && cargo build --frozen --release`
   avec un `CARGO_HOME` neuf, pour reproduire le conteneur frais).
+- **Découverte critique après avoir corrigé les deux bugs ci-dessus** : en
+  relançant `release.yml` sur le tag `v0.2.0` (via `workflow_dispatch`) le
+  RPM échouait TOUJOURS de la même façon — parce qu'un tag Git est figé
+  sur son commit d'origine ; relancer le workflow pour un tag existant
+  rejoue le code TEL QU'IL ÉTAIT à ce tag, pas la version corrigée sur
+  `main`. Pour tester un fix après coup, il faut soit un nouveau tag, soit
+  laisser release-plz en créer un.
+
+  Mais release-plz refusait de proposer un nouveau bump après le fix
+  (`fix:` typé correctement pourtant) : les logs du job montraient
+  `downloading packages from cargo registry crates.io` →
+  `Downloaded rutile v0.1.1` → `local version (0.2.0) > registry version
+  (0.1.1). Only changelog will be updated` → `Already published - Tag
+  v0.2.0 already exists`. **Un crate `rutile` totalement indépendant est
+  déjà publié sur crates.io** (exactement ce que GUIDELINE.md avait
+  anticipé — "nom déjà pris"). Même avec `publish = false` dans
+  `release-plz.toml`, release-plz interroge quand même crates.io pour sa
+  logique de comparaison de version ; confronté à un paquet sans rapport,
+  il abandonne silencieusement toute proposition de nouveau bump une fois
+  que la version locale a dépassé la version (non pertinente) du registre.
+
+  **Fix définitif** : renommer le `[package] name` dans `Cargo.toml` en
+  `rutile-terminal` (vérifié libre sur crates.io via l'index sparse —
+  `curl https://index.crates.io/ru/ti/rutile-terminal` → 404 — l'API
+  REST `crates.io/api/v1/crates/...` refuse les requêtes automatisées,
+  utiliser l'index sparse à la place). Pour que ça reste invisible
+  partout ailleurs (binaire, `rutile.spec`, `PKGBUILD`, assets `.deb`,
+  `resources/rutile.desktop`), deux sections ajoutées pour garder le nom
+  interne `rutile` :
+  ```toml
+  [lib]
+  name = "rutile"
+  path = "src/lib.rs"
+
+  [[bin]]
+  name = "rutile"
+  path = "src/main.rs"
+  ```
+  Sans le `[lib]`, tout le code (`use rutile::...` dans `main.rs` et les
+  tests) casse puisque Cargo dérive le nom de la lib du nom du package
+  par défaut. `[package.metadata.deb].name` reste `"rutile"` sans y
+  toucher — c'est juste le nom du paquet `.deb`, indépendant de l'identité
+  crates.io du crate.
 
 ## Packaging (AUR / deb / rpm)
 

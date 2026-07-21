@@ -1,11 +1,28 @@
 [package]
-name = "rutile"
+# NOT "rutile": an unrelated crate is already published on crates.io under
+# that exact name (confirmed the hard way — release-plz's version
+# comparison logic queries crates.io regardless of `publish = false`
+# below, got confused comparing our version against that unrelated
+# package's, and silently stopped proposing new version bumps). The
+# `[[bin]]` section below keeps the actual executable named "rutile"
+# everywhere it matters (rutile.spec, PKGBUILD, the .deb assets, the
+# .desktop file's Exec= line) — only the crates.io-facing package
+# identity changes.
+name = "rutile-terminal"
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.92"
 description = "GNOME-native terminal emulator with recursive split tiling and synchronized input, in Rust/GTK4"
 license = "MIT"
 repository = "https://github.com/yatoub/Rutile"
+
+[lib]
+name = "rutile"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rutile"
+path = "src/main.rs"
 
 [dependencies]
 gtk4 = { version = "0.11.4", features = ["v4_14"] }
