@@ -410,6 +410,36 @@ même Release.
 - **`CHANGELOG.md`** créé avec juste l'en-tête (aucune entrée encore,
   Rutile n'a pas de tag de version) — release-plz y ajoute une section à
   chaque release.
+- **Piège vécu dès le premier run** : le commit qui a *introduit*
+  commitlint/release-plz était typé `feat(ci): ...` — techniquement un
+  type "feat" déclenche un bump MINEUR (`features_always_increment_minor
+  = true`) même si c'est un changement d'outillage pur, pas une feature
+  applicative. Résultat : passage direct 0.1.0 → 0.2.0 non voulu dès le
+  premier commit conventionnel. **Toujours typer les changements de
+  CI/outillage en `ci:` ou `chore(ci):`, jamais `feat:`**, même quand
+  GitHub lui-même range ça sous "CI/CD" — le type doit refléter l'impact
+  utilisateur final, pas la catégorie de fichiers touchés.
+- **`release.yml` cassé au premier vrai run** (deux bugs indépendants de
+  release-plz, découverts parce que release-plz a justement déclenché un
+  vrai tag pour la première fois) :
+  1. `rutile.spec` : il manquait `cargo fetch --locked` dans `%prep` avant
+     `cargo build --frozen` dans `%build` — le registre Cargo local d'un
+     conteneur Fedora fraîchement démarré est vide, donc `--frozen` ne
+     trouve aucun paquet du tout (erreur trompeuse : `error: no matching
+     package named 'libadwaita' found`, qui ressemble à un problème de
+     dépendance mais est en fait un problème de cache jamais peuplé).
+  2. Les jobs `build`/`build-deb` de `release.yml` tournaient sur
+     `ubuntu-22.04` (choisi initialement pour la compat glibc, façon
+     susshi) — mais `libvte-2.91-gtk4-dev` n'existe pas du tout dans les
+     dépôts d'Ubuntu 22.04 (disponible seulement à partir de 23.10+).
+     Passés à `ubuntu-latest` : contrairement à un binaire CLI statique,
+     Rutile a de toute façon besoin d'un GTK4/libadwaita/vte4 système
+     *récent* pour tourner chez l'utilisateur, donc viser une vieille
+     glibc n'élargit pas réellement la compatibilité ici — une distro trop
+     vieille pour une glibc récente n'aura de toute façon pas ces libs.
+  Les deux bugs vérifiés en isolant chaque étape exactement comme dans le
+  run CI cassé (`cargo fetch --locked && cargo build --frozen --release`
+  avec un `CARGO_HOME` neuf, pour reproduire le conteneur frais).
 
 ## Packaging (AUR / deb / rpm)
 

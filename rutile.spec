@@ -21,6 +21,7 @@ across panes, independent multi-session support, and a Catppuccin theme.
 %prep
 %autosetup -n Rutile-%{version}
 export RUSTUP_TOOLCHAIN=stable
+cargo fetch --locked
 
 %build
 export RUSTUP_TOOLCHAIN=stable

@@ -45,10 +45,15 @@ jobs:
 
   build:
     name: Binary — x86_64
-    # Older LTS (older glibc) so the resulting binary runs on older distros
-    # too: glibc is forward-compatible only, so a binary linked against
-    # ubuntu-latest's glibc fails with "GLIBC_x.xx not found" on e.g. Debian.
-    runs-on: ubuntu-22.04
+    # ubuntu-latest, matching ci.yml: unlike a static CLI tool, Rutile
+    # needs a genuinely modern GTK4/libadwaita/vte4 *runtime* on the
+    # user's machine anyway (see Cargo.toml's feature flags), so building
+    # on an older LTS for glibc-compat doesn't meaningfully broaden
+    # compatibility here — a system too old for glibc 2.39 almost
+    # certainly lacks GTK4 4.14+/libadwaita/vte4 too. ubuntu-22.04 also
+    # doesn't ship libvte-2.91-gtk4-dev at all (only 23.10+), which is
+    # what actually broke this job the first time around.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write
@@ -101,7 +106,8 @@ jobs:
 
   build-deb:
     name: DEB package
-    runs-on: ubuntu-22.04
+    # See the `build` job's comment above re: ubuntu-latest vs. an older LTS.
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: write
