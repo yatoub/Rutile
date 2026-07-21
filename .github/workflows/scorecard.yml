@@ -1,0 +1,55 @@
+name: OpenSSF Scorecard
+
+# Continuous supply-chain security posture score (pinned actions, branch
+# protection, token permissions, ...). Desktop apps distributed widely
+# (AUR/deb/rpm) benefit from this signal being public and up to date, not
+# just a one-time audit.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, since the score can drift even without a Rutile-side change
+    # (e.g. a dependency's own posture changing).
+    - cron: "30 2 * * 1"
+  branch_protection_rule:
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      # Needed to publish results and get a badge.
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload SARIF results to code scanning
+        uses: github/codeql-action/upload-sarif@7188fc363630916deb702c7fdcf4e481b751f97a  # v4
+        with:
+          sarif_file: results.sarif
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
