@@ -331,3 +331,31 @@ jobs:
           github-token: ${{ github.token }}
           title: "PKGBUILD update failed for ${{ github.event.inputs.tag || github.ref_name }}"
           body: "update-pkgbuild failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ── Trigger AUR publish explicitly on manual re-publish ────────────────────
+
+  trigger-aur-publish:
+    name: Trigger AUR publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [build, build-deb, build-rpm]
+    # Only for workflow_dispatch: aur-publish.yml's own `workflow_run` trigger
+    # already handles the normal tag-push case correctly, because head_sha
+    # there is the tag commit itself. For a manual re-publish, this job is
+    # dispatched against a branch (e.g. `main`) so that the *workflow file*
+    # picks up fixes merged after the tag was cut (see CLAUDE.md: re-running
+    # against the tag itself replays the workflow AS IT WAS AT THAT TAG) —
+    # but that means the resulting workflow_run's head_sha is the branch's
+    # HEAD, not the tag commit, so aur-publish.yml's tag-resolution (matching
+    # head_sha against remote tags) can't find it and fails closed. Trigger
+    # aur-publish.yml directly instead, passing the tag explicitly.
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch aur-publish.yml with explicit tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          gh workflow run aur-publish.yml --repo "${{ github.repository }}" --ref main -f "tag=${TAG}"
