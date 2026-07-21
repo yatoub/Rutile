@@ -322,11 +322,49 @@ ne suffit pas — la chaîne de distribution compte tout autant :
   — voir section Packaging) — les checksums seuls n'authentifient pas la
   provenance, juste l'intégrité vis-à-vis de ce qui est affiché sur la
   page de release GitHub elle-même.
-- **Explicitement pas fait** (pistes pour plus tard, pas un manque
-  bloquant) : CodeQL pour Rust (risque de redondance avec Semgrep déjà
-  dans MegaLinter), couverture de tests via `cargo-llvm-cov`/Codecov
-  (susshi l'a, discuté mais pas encore demandé pour Rutile), signature GPG
-  des releases.
+- **`rust-version = "1.92"` dans `Cargo.toml`** + job `msrv` requis dans
+  `ci.yml`. **Piège découvert en le mettant en place** : le vrai plancher
+  n'est PAS lié à notre propre code (les let-chains `if let ... && let
+  ...` qu'on utilise ne demandent que Rust 1.88) mais à l'écosystème
+  gtk4-rs 0.11.4 lui-même, qui exige rustc ≥ 1.92 (`cargo +1.88 check`
+  échoue avec "gtk4@0.11.4 requires rustc 1.92" etc., même si NOTRE code
+  compilerait très bien sous 1.88). Toujours vérifier le MSRV réel avec
+  `cargo +X.Y.Z check --all-targets` sur une vraie toolchain installée
+  (`rustup toolchain install X.Y.Z`), jamais en déduisant juste de la
+  syntaxe Rust qu'on utilise soi-même. Important puisque `PKGBUILD`/
+  `rutile.spec` compilent depuis les sources avec le `cargo`/`rustc` du
+  dépôt de la distro cible, pas forcément la dernière stable.
+- **`SECURITY.md`** — politique de signalement de vulnérabilité (contact
+  via GitHub Security Advisories privées). Coche le check "Security-Policy"
+  d'OpenSSF Scorecard.
+- **Image conteneur `fedora:41` du job `build-rpm` épinglée par digest**
+  (`fedora@sha256:...`), même raisonnement que le pinning SHA des actions
+  — récupéré via `docker pull fedora:41 && docker inspect --format=
+  '{{index .RepoDigests 0}}' fedora:41` (pas de `skopeo`/`crane` dispo,
+  `docker manifest inspect` seul donne un index multi-arch pas directement
+  utilisable comme référence `container:`).
+- **Attestations de provenance SLSA** (`actions/attest-build-provenance`,
+  natif GitHub) sur les 3 artefacts de release (binaire, `.deb`, `.rpm`)
+  — après le smoke test, avant l'upload. Contrairement à `SHA256SUMS.txt`
+  (intégrité du téléchargement uniquement), une attestation prouve
+  cryptographiquement la provenance (ce repo, ce commit, ce run précis),
+  vérifiable via `gh attestation verify`. Nécessite `id-token: write` +
+  `attestations: write` en plus de `contents: write` sur ces 3 jobs.
+- **Job `coverage` dans `ci.yml`** (`cargo-llvm-cov` → Codecov) —
+  **volontairement pas dans `required_status_checks`** de la protection
+  de branche (informatif, pas un gate). Exclut du rapport les fichiers
+  couplés à GTK (`main.rs`, `app.rs`, `window.rs`, `context_menu.rs`,
+  `pane_header.rs`, `preferences/window.rs`, `session/sidebar.rs`) qui ne
+  sont testables que manuellement de toute façon — se concentre sur les
+  modules qui ont ou pourraient avoir de vrais tests unitaires. Nécessite
+  un secret `CODECOV_TOKEN` non configuré pour l'instant (`fail_ci_if_error:
+  false`, donc le job ne casse rien tant qu'il n'est pas ajouté).
+- **Explicitement pas fait** (Phase C du plan, à activer seulement sur
+  demande explicite) : CodeQL pour Rust (risque de redondance avec Semgrep
+  déjà dans MegaLinter), fuzzing continu (`cargo-fuzz` sur
+  `split_tree.rs`/`broadcast.rs`, bons candidats car purs/sans GTK, mais
+  chantier de maintenance à part entière), `cargo-geiger` (métrique de
+  code `unsafe`), signature GPG des releases.
 
 ## Packaging (AUR / deb / rpm)
 
