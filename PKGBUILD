@@ -1,5 +1,5 @@
 pkgname=rutile
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=1
 pkgdesc='GNOME-native terminal emulator with split tiling and synchronized input'
 url='https://github.com/yatoub/Rutile'
@@ -8,7 +8,7 @@ makedepends=('cargo')
 depends=('gtk4' 'libadwaita' 'vte4')
 arch=('x86_64' 'aarch64')
 source=("https://github.com/yatoub/Rutile/archive/refs/tags/v$pkgver.tar.gz")
-b2sums=(4ade86fcc13d3058e390ac508b14fe3a6c45f10142878dc918292909059b1c37df9a167853b1df9edec595e047387263cd3e60c70875877c9379cc5e889b84d9)
+b2sums=(e7bd8aff091f069c945cdb496fa96f8fc0c7446f01f2f272fbe9ed85a510c8b129898350af6b93c6616b9bb37d3fd23d1cf37a4029c5936a6ea9497b2e36484a)
 
 prepare() {
     cd Rutile-$pkgver
