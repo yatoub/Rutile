@@ -1,0 +1,16 @@
+pkgbase = rutile
+	pkgdesc = GNOME-native terminal emulator with split tiling and synchronized input
+	pkgver = 0.2.0
+	pkgrel = 1
+	url = https://github.com/yatoub/Rutile
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = cargo
+	depends = gtk4
+	depends = libadwaita
+	depends = vte4
+	source = https://github.com/yatoub/Rutile/archive/refs/tags/v0.2.0.tar.gz
+	b2sums = 4ade86fcc13d3058e390ac508b14fe3a6c45f10142878dc918292909059b1c37df9a167853b1df9edec595e047387263cd3e60c70875877c9379cc5e889b84d9
+
+pkgname = rutile
