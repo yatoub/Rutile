@@ -9,6 +9,7 @@ use libadwaita as adw;
 use crate::context_menu;
 use crate::keymap::{self, Action};
 use crate::layout::Orientation;
+use crate::preferences::{self, Preferences};
 use crate::session::session_view::ClosePaneOutcome;
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
@@ -17,6 +18,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let header_bar = adw::HeaderBar::new();
 
     let session_view = Rc::new(RefCell::new(SessionView::new()));
+    let prefs = Rc::new(RefCell::new(Preferences::load()));
 
     // Tilix-style session switcher: a left sidebar of session rows instead
     // of a top tab strip. Hidden by default — revealed via the toolbar's
@@ -24,7 +26,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let sidebar = SessionSidebar::new(session_view.clone());
     sidebar.widget().set_visible(false);
 
-    build_toolbar(&header_bar, &session_view, &sidebar);
+    build_toolbar(&header_bar, &session_view, &prefs, &sidebar);
 
     let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
     body.set_vexpand(true);
@@ -51,13 +53,35 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // initial session's initial pane.
     let initial_session_id = session_view.borrow().current_session_id();
     if let Some(session_id) = initial_session_id {
-        wire_pane_context_menu(&session_view, session_id);
+        wire_pane_context_menu(&session_view, &prefs, session_id);
+    }
+
+    // Close the whole window once the last session is closed, if the
+    // preference is enabled — SessionView otherwise just leaves an empty
+    // tab_view behind (no session left to switch to).
+    {
+        let session_view_for_listener = session_view.clone();
+        let prefs = prefs.clone();
+        let window_weak = window.downgrade();
+        session_view
+            .borrow_mut()
+            .register_session_listener(move || {
+                let is_empty = session_view_for_listener.borrow().session_ids().is_empty();
+                if is_empty
+                    && prefs.borrow().close_window_on_last_session_closed
+                    && let Some(window) = window_weak.upgrade()
+                {
+                    window.close();
+                }
+            });
     }
 
     let new_session_action = gio::SimpleAction::new("new-session", None);
     {
         let session_view = session_view.clone();
-        new_session_action.connect_activate(move |_, _| new_session_and_wire(&session_view));
+        let prefs = prefs.clone();
+        new_session_action
+            .connect_activate(move |_, _| new_session_and_wire(&session_view, &prefs));
     }
     window.add_action(&new_session_action);
 
@@ -68,10 +92,23 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     }
     window.add_action(&close_session_action);
 
+    let preferences_action = gio::SimpleAction::new("preferences", None);
+    {
+        let prefs = prefs.clone();
+        let window_weak = window.downgrade();
+        preferences_action.connect_activate(move |_, _| {
+            if let Some(window) = window_weak.upgrade() {
+                preferences::window::build(&window, prefs.clone()).present();
+            }
+        });
+    }
+    window.add_action(&preferences_action);
+
     let key_controller = gtk4::EventControllerKey::new();
     key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
     {
         let session_view = session_view.clone();
+        let prefs = prefs.clone();
         key_controller.connect_key_pressed(move |_controller, key, _keycode, state| {
             let Some(action) = keymap::lookup(key, state) else {
                 return glib::Propagation::Proceed;
@@ -79,7 +116,11 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
 
             match action {
                 Action::SplitHorizontal | Action::SplitVertical => {
-                    split_focused_and_wire(&session_view, keymap::orientation_for(action).unwrap());
+                    split_focused_and_wire(
+                        &session_view,
+                        &prefs,
+                        keymap::orientation_for(action).unwrap(),
+                    );
                 }
                 Action::ClosePane => {
                     let outcome = session_view.borrow_mut().close_focused_pane();
@@ -91,7 +132,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 Action::Navigate(direction) => {
                     session_view.borrow_mut().navigate_focused(direction);
                 }
-                Action::NewSession => new_session_and_wire(&session_view),
+                Action::NewSession => new_session_and_wire(&session_view, &prefs),
                 Action::CloseSession => close_current_session(&session_view),
                 Action::NextSession => session_view.borrow_mut().next_session(),
                 Action::PrevSession => session_view.borrow_mut().prev_session(),
@@ -106,17 +147,19 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // for the lifetime of the window.
     unsafe {
         window.set_data("session-view", session_view);
+        window.set_data("preferences", prefs);
     }
 
     window
 }
 
 /// Builds the global toolbar (packed into the headerbar): split buttons, a
-/// sidebar visibility toggle, and a hamburger menu button reserved for
-/// future settings/actions.
+/// sidebar visibility toggle, and a hamburger menu with session actions and
+/// preferences.
 fn build_toolbar(
     header_bar: &adw::HeaderBar,
     session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
     sidebar: &Rc<SessionSidebar>,
 ) {
     let toggle_sidebar = gtk4::ToggleButton::builder()
@@ -138,8 +181,9 @@ fn build_toolbar(
         .build();
     {
         let session_view = session_view.clone();
+        let prefs = prefs.clone();
         split_h.connect_clicked(move |_| {
-            split_focused_and_wire(&session_view, Orientation::Horizontal)
+            split_focused_and_wire(&session_view, &prefs, Orientation::Horizontal)
         });
     }
     header_bar.pack_start(&split_h);
@@ -150,8 +194,10 @@ fn build_toolbar(
         .build();
     {
         let session_view = session_view.clone();
-        split_v
-            .connect_clicked(move |_| split_focused_and_wire(&session_view, Orientation::Vertical));
+        let prefs = prefs.clone();
+        split_v.connect_clicked(move |_| {
+            split_focused_and_wire(&session_view, &prefs, Orientation::Vertical)
+        });
     }
     header_bar.pack_start(&split_v);
 
@@ -160,8 +206,10 @@ fn build_toolbar(
     session_section.append(Some("Nouvelle session"), Some("win.new-session"));
     session_section.append(Some("Fermer la session"), Some("win.close-session"));
     menu.append_section(None, &session_section);
-    // Placeholder for the future settings/preferences menu (theme variants,
-    // session save/restore, etc. — all deferred to v0.2 per the roadmap).
+
+    let preferences_section = gio::Menu::new();
+    preferences_section.append(Some("Préférences"), Some("win.preferences"));
+    menu.append_section(None, &preferences_section);
 
     let menu_button = gtk4::MenuButton::builder()
         .icon_name("open-menu-symbolic")
@@ -171,7 +219,11 @@ fn build_toolbar(
     header_bar.pack_end(&menu_button);
 }
 
-fn split_focused_and_wire(session_view: &Rc<RefCell<SessionView>>, orientation: Orientation) {
+fn split_focused_and_wire(
+    session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
+    orientation: Orientation,
+) {
     let split = session_view.borrow_mut().split_focused(orientation);
     if let Some((session_id, new_id)) = split {
         // `let` first, not `if let Some(x) = rc.borrow()....` — the latter
@@ -180,14 +232,20 @@ fn split_focused_and_wire(session_view: &Rc<RefCell<SessionView>>, orientation: 
         // `borrow_mut()` inside `context_menu::attach` would panic.
         let terminal = session_view.borrow().widget_for(session_id, new_id);
         if let Some(terminal) = terminal {
-            context_menu::attach(session_view.clone(), session_id, new_id, &terminal);
+            context_menu::attach(
+                session_view.clone(),
+                prefs.clone(),
+                session_id,
+                new_id,
+                &terminal,
+            );
         }
     }
 }
 
-fn new_session_and_wire(session_view: &Rc<RefCell<SessionView>>) {
+fn new_session_and_wire(session_view: &Rc<RefCell<SessionView>>, prefs: &Rc<RefCell<Preferences>>) {
     let session_id = session_view.borrow_mut().new_session();
-    wire_pane_context_menu(session_view, session_id);
+    wire_pane_context_menu(session_view, prefs, session_id);
 }
 
 fn close_current_session(session_view: &Rc<RefCell<SessionView>>) {
@@ -199,13 +257,23 @@ fn close_current_session(session_view: &Rc<RefCell<SessionView>>) {
 
 /// Attaches the right-click context menu to a session's (single, initial)
 /// focused pane. Used right after a new session/tab is created.
-fn wire_pane_context_menu(session_view: &Rc<RefCell<SessionView>>, session_id: SessionId) {
+fn wire_pane_context_menu(
+    session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
+    session_id: SessionId,
+) {
     let pane_id = session_view.borrow().focused_pane_id(session_id);
     let Some(pane_id) = pane_id else {
         return;
     };
     let terminal = session_view.borrow().widget_for(session_id, pane_id);
     if let Some(terminal) = terminal {
-        context_menu::attach(session_view.clone(), session_id, pane_id, &terminal);
+        context_menu::attach(
+            session_view.clone(),
+            prefs.clone(),
+            session_id,
+            pane_id,
+            &terminal,
+        );
     }
 }

@@ -20,8 +20,10 @@ Voir `GUIDELINE.md` pour la vision complète et la roadmap priorisée
   `v4_2`..`v4_12`) donc pas de perte d'API réellement utilisée. Toujours
   choisir la feature en fonction de la plus VIEILLE distro cible, jamais
   de la machine de dev.
-- Pas de `serde`/`toml`/`zbus` tant qu'ils ne servent pas un besoin réel
-  (config, D-Bus/quake mode = v0.2+).
+- `serde`/`toml` ajoutés dès que la fenêtre de préférences a introduit un
+  vrai besoin de config persistée (voir section Préférences plus bas) —
+  jusque-là volontairement absents, comme prévu par le guideline. `zbus`
+  toujours absent (D-Bus/quake mode = v0.2+).
 - `libadwaita` s'importe partout via `use libadwaita as adw;` (le crate
   s'appelle `libadwaita`, pas `adw`).
 
@@ -36,6 +38,9 @@ src/
 ├── context_menu.rs       # câblage par pane : clic droit, focus souris,
 │                         #   commit→broadcast, child-exited→fermeture
 ├── pane_header.rs        # barre par-pane façon Tilix (sync/maximize/close)
+├── preferences/
+│   ├── config.rs         # struct Preferences (serde), load()/save() en TOML
+│   └── window.rs         # AdwPreferencesWindow (sidebar de catégories façon Tilix)
 ├── layout/
 │   ├── split_tree.rs     # arbre de splits, SANS GTK, testable en cargo test
 │   └── pane_view.rs      # rendu GTK de l'arbre (GtkPaned imbriqués)
@@ -173,6 +178,45 @@ en interne (gère bien la sélection/le cycle de vie des pages), mais sans
   nouvelle session reste séparé (menu hamburger "Nouvelle session",
   Ctrl+Shift+T). `build_toolbar()` prend `sidebar` en paramètre (créée
   avant le toolbar dans `build_window`, ordre important).
+
+## Préférences
+
+Fenêtre `adw::PreferencesWindow` (`preferences/window.rs`), qui donne la
+navigation par sidebar de catégories gratuitement (une `AdwPreferencesPage`
+= une entrée de la sidebar), plutôt que de reconstruire à la main la
+`ListBox` + pile de pages que Tilix (GTK3) devait faire lui-même.
+
+- **Une seule page a du contenu réel pour l'instant : "General"** —
+  `focus_follows_mouse` (focus au survol de la souris, sans clic —
+  implémenté via un `gtk4::EventControllerMotion` sur chaque terminal dans
+  `context_menu::attach`, même garde `try_borrow_mut()` que le
+  `EventControllerFocus` existant pour la ré-entrance) et
+  `close_window_on_last_session_closed` (ferme la fenêtre au lieu de la
+  laisser vide — bug latent corrigé au passage : avant cette fenêtre, fermer
+  toutes les sessions laissait une fenêtre vide sans jamais quitter).
+  **Défauts alignés sur ceux de Tilix** (les deux cases correspondantes
+  sont cochées par défaut dans la capture d'écran fournie par
+  l'utilisateur), pas sur le comportement pré-existant de Rutile.
+- **Toutes les autres pages** (Appearance, Bookmarks, Shortcuts, Encoding,
+  Advanced, Profiles) sont des `AdwStatusPage` placeholder — décision
+  explicite de l'utilisateur : reproduire la structure complète façon
+  Tilix maintenant, remplir au fur et à mesure, plutôt que n'ajouter que
+  "General". Ces concepts (profils, signets, encodage autre qu'UTF-8)
+  n'existent pas du tout dans Rutile aujourd'hui.
+- **Stockage** : TOML dans `glib::user_config_dir()/rutile/preferences.toml`
+  (pas GSettings/dconf — choix explicite de l'utilisateur, plus simple/
+  indépendant de GNOME). `Preferences::load()` retombe sur les défauts si
+  le fichier n'existe pas ou ne parse pas (jamais d'erreur bloquante).
+  `save()` est appelé à chaque toggle (`connect_active_notify` sur chaque
+  `AdwSwitchRow`), pas de bouton "Appliquer" séparé.
+- `Rc<RefCell<Preferences>>` créé une fois dans `window::build_window`,
+  passé partout où c'est lu (`context_menu::attach` maintenant à 5
+  paramètres : `session_view, prefs, session_id, pane_id, terminal` — tous
+  les sites d'appel de `attach`/`split_and_wire`/`show_menu` dans
+  `context_menu.rs` et `window.rs` ont dû être mis à jour en cascade).
+- L'action `win.preferences` (item de menu "Préférences" dans le hamburger)
+  utilise `window.downgrade()`/`WeakRef` pour construire la fenêtre de
+  préférences à la demande, pas une fenêtre pré-construite gardée en vie.
 
 ## Fermeture de pane
 
