@@ -1,5 +1,5 @@
 Name:           rutile
-Version:        0.2.1
+Version:        0.2.2
 Release:        1%{?dist}
 Summary:        GNOME-native terminal emulator with split tiling and synchronized input
 License:        MIT
