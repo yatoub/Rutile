@@ -142,7 +142,19 @@ jobs:
         run: |
           sudo dpkg -i target/debian/rutile_*.deb
           ldd "$(command -v rutile)" | grep -qi "not found" && exit 1 || true
-          sudo dpkg -r rutile
+
+      - name: Install Xvfb + D-Bus for launch smoke test
+        run: |
+          sudo apt-get install -y xvfb dbus-x11
+
+      # Release gate: fails the whole Release run (blocking aur-publish.yml
+      # and update-pkgbuild) if the actual installed package can't launch,
+      # not just that its shared libraries resolve.
+      - name: Smoke test (launch under Xvfb)
+        uses: ./.github/actions/smoke-launch
+
+      - name: Remove test install
+        run: sudo dpkg -r rutile
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3
@@ -219,7 +231,23 @@ jobs:
           rpm_file=$(find /github/home/rpmbuild/RPMS -name "rutile-*.rpm" | grep -v debug | head -n1)
           dnf install -y "${rpm_file}"
           ldd "$(command -v rutile)" | grep -qi "not found" && exit 1 || true
-          rpm -e rutile
+
+      - name: Install Xvfb + D-Bus for launch smoke test
+        run: dnf install -y xorg-x11-server-Xvfb dbus-x11
+
+      # Release gate: fails the whole Release run (blocking aur-publish.yml
+      # and update-pkgbuild) if the actual installed package can't launch,
+      # not just that its shared libraries resolve. Caught a real bug here
+      # while verifying this against the published v0.2.1 RPM: rutile
+      # aborted with "Couldn't open libGLESv2.so.2" — gtk4/libepoxy
+      # dlopen() it at runtime to probe for a GLES EGL backend, so RPM's
+      # automatic dependency scanner (ELF NEEDED list only) never picked it
+      # up. Fixed via rutile.spec's explicit `Requires: libglvnd-gles`.
+      - name: Smoke test (launch under Xvfb)
+        uses: ./.github/actions/smoke-launch
+
+      - name: Remove test install
+        run: rpm -e rutile
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a  # v3
@@ -234,6 +262,82 @@ jobs:
           file_glob: true
           tag: ${{ github.event.inputs.tag || github.ref }}
           overwrite: true
+
+  # ── Arch package smoke test (pre-publish release gate) ─────────────────────
+
+  smoke-arch:
+    name: Smoke test — Arch package (install + launch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build]
+    # Same digest release.yml already pins for regenerating .SRCINFO in
+    # update-pkgbuild. Builds the exact PKGBUILD.bin content aur-publish.yml's
+    # aur-bin job is about to push to AUR (same checksum-patch logic) and
+    # installs + launches it under Xvfb *before* anything reaches AUR — a
+    # failure here fails the whole Release run, which blocks both
+    # update-pkgbuild and aur-publish.yml (the latter only fires when this
+    # workflow_run's overall conclusion is 'success').
+    container: archlinux@sha256:fe6972d4dc1f660c0c10f4c41b2de8986bab89e7e2955378f8beadb8ebcd7433
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Install build + runtime dependencies
+        run: |
+          pacman -Sy --noconfirm git base-devel curl xorg-server-xvfb dbus \
+            gtk4 libadwaita vte4
+
+      - name: Compute checksums (source archive + Linux binary)
+        id: checksums
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          curl -fsSL "https://github.com/${{ github.repository }}/archive/refs/tags/${TAG}.tar.gz" -o archive.tar.gz
+          curl -fsSL "https://github.com/${{ github.repository }}/releases/download/${TAG}/rutile-linux-x86_64" -o rutile-linux-x86_64
+          echo "src=$(b2sum archive.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "bin=$(b2sum rutile-linux-x86_64 | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Patch PKGBUILD.bin
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          B2SUM_SRC: ${{ steps.checksums.outputs.src }}
+          B2SUM_BIN: ${{ steps.checksums.outputs.bin }}
+        run: |
+          VERSION="${TAG#v}"
+          cp PKGBUILD.bin PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+          sed -i "s/^b2sums=(.*/b2sums=(${B2SUM_SRC})/" PKGBUILD
+          sed -i "s/^b2sums_x86_64=(.*/b2sums_x86_64=(${B2SUM_BIN})/" PKGBUILD
+
+      - name: Build package as non-root user
+        run: |
+          useradd -m builder
+          chown -R builder:builder .
+          su builder -s /bin/bash -c 'makepkg -c --noconfirm'
+
+      - name: Install package
+        # [0-9]* excludes the debug package makepkg -c also produces
+        # (rutile-bin-debug-*.pkg.tar.zst) — only the real package is wanted.
+        run: pacman -U --noconfirm rutile-bin-[0-9]*.pkg.tar.zst
+
+      # Release gate: see smoke-launch's own description for the pass/fail
+      # contract shared with build-deb/build-rpm.
+      - name: Smoke test (launch under Xvfb)
+        uses: ./.github/actions/smoke-launch
+
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          github-token: ${{ github.token }}
+          title: "Arch package smoke test failed for ${{ github.event.inputs.tag || github.ref_name }}"
+          body: "smoke-arch failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   # ── Checksums (so a downloaded artifact's provenance is verifiable) ───────
 
@@ -272,7 +376,11 @@ jobs:
     name: Update PKGBUILD in repo
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [build]
+    # build-deb/build-rpm/smoke-arch all needed (not just `build`): don't
+    # commit a version bump to PKGBUILD/PKGBUILD.bin/rutile.spec — which
+    # feeds straight into aur-publish.yml — if any package failed to build
+    # or failed its install+launch smoke test.
+    needs: [build, build-deb, build-rpm, smoke-arch]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
@@ -338,7 +446,7 @@ jobs:
     name: Trigger AUR publish
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [build, build-deb, build-rpm]
+    needs: [build, build-deb, build-rpm, smoke-arch]
     # Only for workflow_dispatch: aur-publish.yml's own `workflow_run` trigger
     # already handles the normal tag-push case correctly, because head_sha
     # there is the tag commit itself. For a manual re-publish, this job is
