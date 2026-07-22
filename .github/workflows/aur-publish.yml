@@ -36,6 +36,8 @@ jobs:
     permissions:
       contents: read
       issues: write
+    outputs:
+      tag: ${{ steps.ver.outputs.tag }}
     # Also run when the completed Release workflow was itself a manual
     # workflow_dispatch re-publish: a re-publish can rebuild the binary
     # (overwrite: true on the upload step) with different bytes, which
@@ -164,3 +166,20 @@ jobs:
           github-token: ${{ github.token }}
           title: "AUR publish (rutile-bin) failed for ${{ steps.ver.outputs.tag || 'unknown' }}"
           body: "aur-bin failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ── Trigger post-release smoke test ──────────────────────────────────────
+
+  trigger-smoke-test:
+    name: Trigger post-release smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [aur-source, aur-bin]
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch smoke-test.yml with the published tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.aur-source.outputs.tag }}
+        run: |
+          gh workflow run smoke-test.yml --repo "${{ github.repository }}" --ref main -f "tag=${TAG}"

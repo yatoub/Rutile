@@ -1,0 +1,190 @@
+name: Post-release smoke test
+
+# Triggered explicitly by aur-publish.yml's trigger-smoke-test job once a
+# release's rutile/rutile-bin AUR packages are live, or manually via
+# workflow_dispatch to re-check an already-published release.
+#
+# Always dispatched with an explicit tag (never chained via a workflow_run's
+# head_sha, unlike aur-publish.yml originally was) — head_sha only equals the
+# tag commit for a plain tag push, not for a manual re-publish dispatched
+# against a branch, which is exactly the bug fixed in release.yml's
+# trigger-aur-publish job. Dispatching this workflow explicitly with a tag
+# input sidesteps that whole class of bug instead of re-implementing it.
+#
+# Installs the real, already-published deliverable for each distro (GitHub
+# Release .deb/.rpm assets, and the actual AUR git repo for Arch — not a
+# locally rebuilt package) and launches it under Xvfb to confirm it starts
+# without crashing. This goes further than build-deb/build-rpm's existing
+# smoke tests, which only check that shared libraries resolve (`ldd`), never
+# that the GTK4/libadwaita app actually launches.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to smoke test (e.g. v0.2.1)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-test-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Debian/Ubuntu (.deb) ────────────────────────────────────────────────
+
+  smoke-deb:
+    name: Install + launch — .deb
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+
+      - name: Install Xvfb + D-Bus
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb dbus-x11
+
+      - name: Download .deb from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: gh release download "$TAG" --repo "${{ github.repository }}" --pattern '*.deb' --dir assets
+
+      - name: Install package
+        run: sudo dpkg -i assets/*.deb
+
+      - name: Launch under Xvfb
+        run: |
+          set +e
+          dbus-run-session -- xvfb-run -a timeout 8 rutile
+          code=$?
+          set -e
+          if [ "$code" -ne 124 ]; then
+            echo "rutile exited early with code $code (expected 124 = still running when timeout fired)" >&2
+            exit 1
+          fi
+          echo "rutile ran for the full 8s window without crashing"
+
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          github-token: ${{ github.token }}
+          title: "Post-release smoke test (.deb) failed for ${{ github.event.inputs.tag }}"
+          body: "smoke-deb failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ── Fedora (.rpm) ───────────────────────────────────────────────────────
+
+  smoke-rpm:
+    name: Install + launch — .rpm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Same pinned digest as release.yml's build-rpm job, so the smoke test
+    # runs on the same Fedora userland the package was actually built for.
+    container: fedora@sha256:99e203b80b1c3d8f7e161ec10a68fd02b081ef83a3963553e513c82846b97814
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+
+      - name: Install Xvfb + D-Bus + gh
+        run: dnf install -y xorg-x11-server-Xvfb dbus-x11 gh
+
+      - name: Download .rpm from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag }}
+        run: gh release download "$TAG" --repo "${{ github.repository }}" --pattern '*.rpm' --dir assets
+
+      - name: Install package
+        run: dnf install -y ./assets/*.rpm
+
+      - name: Launch under Xvfb
+        run: |
+          set +e
+          dbus-run-session -- xvfb-run -a timeout 8 rutile
+          code=$?
+          set -e
+          if [ "$code" -ne 124 ]; then
+            echo "rutile exited early with code $code (expected 124 = still running when timeout fired)" >&2
+            exit 1
+          fi
+          echo "rutile ran for the full 8s window without crashing"
+
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          github-token: ${{ github.token }}
+          title: "Post-release smoke test (.rpm) failed for ${{ github.event.inputs.tag }}"
+          body: "smoke-rpm failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # ── Arch Linux (AUR rutile-bin) ─────────────────────────────────────────
+
+  smoke-arch:
+    name: Install + launch — AUR (rutile-bin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Same pinned digest release.yml already uses for the .SRCINFO regen
+    # step. Builds straight from the live AUR git repo rather than a local
+    # PKGBUILD, so this tests exactly what a real `yay -S rutile-bin` user
+    # would get.
+    container: archlinux@sha256:fe6972d4dc1f660c0c10f4c41b2de8986bab89e7e2955378f8beadb8ebcd7433
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Install build + runtime dependencies
+        run: pacman -Sy --noconfirm git base-devel xorg-server-xvfb dbus
+
+      - name: Clone rutile-bin from AUR
+        run: git clone https://aur.archlinux.org/rutile-bin.git
+
+      - name: Verify AUR package version matches the tag
+        env:
+          TAG: ${{ github.event.inputs.tag }}
+        run: |
+          expected="${TAG#v}"
+          actual=$(grep -m1 '^pkgver=' rutile-bin/PKGBUILD | cut -d= -f2)
+          if [ "$actual" != "$expected" ]; then
+            echo "AUR rutile-bin is at pkgver=$actual, expected $expected ($TAG) — publish may not have landed yet" >&2
+            exit 1
+          fi
+
+      - name: Build package as non-root user
+        run: |
+          useradd -m builder
+          chown -R builder:builder rutile-bin
+          su builder -s /bin/bash -c 'cd rutile-bin && makepkg -c --noconfirm'
+
+      - name: Install package
+        run: pacman -U --noconfirm rutile-bin/*.pkg.tar.zst
+
+      - name: Launch under Xvfb
+        run: |
+          set +e
+          dbus-run-session -- xvfb-run -a timeout 8 rutile
+          code=$?
+          set -e
+          if [ "$code" -ne 124 ]; then
+            echo "rutile exited early with code $code (expected 124 = still running when timeout fired)" >&2
+            exit 1
+          fi
+          echo "rutile ran for the full 8s window without crashing"
+
+      - name: Notify on failure
+        if: failure()
+        uses: ./.github/actions/notify-failure
+        with:
+          github-token: ${{ github.token }}
+          title: "Post-release smoke test (AUR) failed for ${{ github.event.inputs.tag }}"
+          body: "smoke-arch failed. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
