@@ -40,6 +40,16 @@ pub fn attach(
         pane_header::attach(session_view.clone(), session_id, pane_id, &header);
     }
 
+    {
+        let terminal_for_selection = terminal.clone();
+        let prefs = prefs.clone();
+        terminal.connect_selection_changed(move |_terminal| {
+            if prefs.borrow().copy_on_select && terminal_for_selection.has_selection() {
+                terminal_for_selection.copy_clipboard_format(vte4::Format::Text);
+            }
+        });
+    }
+
     let motion_controller = gtk4::EventControllerMotion::new();
     {
         let session_view = session_view.clone();
@@ -130,6 +140,38 @@ fn show_menu(
 
     let menu_box = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
 
+    // Tilix grays out both "Copy" entries when nothing is selected instead
+    // of letting them fire a no-op copy — matched here via `has_selection()`.
+    let has_selection = terminal.has_selection();
+    {
+        let terminal = terminal.clone();
+        add_action(&menu_box, &popover, "Copier", move || {
+            terminal.copy_clipboard_format(vte4::Format::Text);
+        })
+        .set_sensitive(has_selection);
+    }
+    {
+        let terminal = terminal.clone();
+        add_action(&menu_box, &popover, "Copier au format HTML", move || {
+            terminal.copy_clipboard_format(vte4::Format::Html);
+        })
+        .set_sensitive(has_selection);
+    }
+    {
+        let terminal = terminal.clone();
+        add_action(&menu_box, &popover, "Coller", move || {
+            terminal.paste_clipboard();
+        });
+    }
+    {
+        let terminal = terminal.clone();
+        add_action(&menu_box, &popover, "Tout sélectionner", move || {
+            terminal.select_all();
+        });
+    }
+
+    menu_box.append(&gtk4::Separator::new(gtk4::Orientation::Horizontal));
+
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
@@ -181,7 +223,7 @@ fn add_action(
     popover: &gtk4::Popover,
     label: &str,
     on_click: impl Fn() + 'static,
-) {
+) -> gtk4::Button {
     let button = gtk4::Button::builder()
         .label(label)
         .has_frame(false)
@@ -195,6 +237,7 @@ fn add_action(
     });
 
     container.append(&button);
+    button
 }
 
 /// Performs a mouse-triggered split, then wires up the newly created pane's

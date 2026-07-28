@@ -15,6 +15,9 @@ pub struct Preferences {
     /// Close the whole window once the last session is closed, instead of
     /// leaving an empty window open.
     pub close_window_on_last_session_closed: bool,
+    /// Automatically copy the terminal selection to the clipboard as soon as
+    /// it's made, instead of requiring an explicit "Copy".
+    pub copy_on_select: bool,
 }
 
 impl Default for Preferences {
@@ -22,6 +25,7 @@ impl Default for Preferences {
         Self {
             focus_follows_mouse: true,
             close_window_on_last_session_closed: true,
+            copy_on_select: true,
         }
     }
 }
