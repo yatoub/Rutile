@@ -10,6 +10,7 @@ use crate::context_menu;
 use crate::keymap::{self, Action};
 use crate::layout::Orientation;
 use crate::preferences::{self, Preferences};
+use crate::profile::{ColorSchemeStore, ProfileStore};
 use crate::session::session_view::ClosePaneOutcome;
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
@@ -17,8 +18,24 @@ use crate::terminal::broadcast::SessionId;
 pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let header_bar = adw::HeaderBar::new();
 
-    let session_view = Rc::new(RefCell::new(SessionView::new()));
     let prefs = Rc::new(RefCell::new(Preferences::load()));
+    let profiles = Rc::new(RefCell::new(ProfileStore::load()));
+    // Read-only for the lifetime of the window: schemes are only ever
+    // added/edited by hand-editing files under
+    // `$XDG_CONFIG_HOME/rutile/schemes/`, not through any UI yet, so
+    // there's nothing that needs to invalidate this snapshot.
+    let schemes = Rc::new(ColorSchemeStore::load());
+
+    let initial_scheme = {
+        let profiles = profiles.borrow();
+        let default_profile_id = &prefs.borrow().default_profile_id;
+        let scheme_id = profiles
+            .get(default_profile_id)
+            .map(|p| p.scheme_id.as_str())
+            .unwrap_or("catppuccin-mocha");
+        schemes.get_or_default(scheme_id).clone()
+    };
+    let session_view = Rc::new(RefCell::new(SessionView::new(initial_scheme)));
 
     // Tilix-style session switcher: a left sidebar of session rows instead
     // of a top tab strip. Hidden by default — revealed via the toolbar's
@@ -95,10 +112,13 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let preferences_action = gio::SimpleAction::new("preferences", None);
     {
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let schemes = schemes.clone();
         let window_weak = window.downgrade();
         preferences_action.connect_activate(move |_, _| {
             if let Some(window) = window_weak.upgrade() {
-                preferences::window::build(&window, prefs.clone()).present();
+                preferences::window::build(&window, prefs.clone(), profiles.clone(), &schemes)
+                    .present();
             }
         });
     }
@@ -148,6 +168,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     unsafe {
         window.set_data("session-view", session_view);
         window.set_data("preferences", prefs);
+        window.set_data("profiles", profiles);
+        window.set_data("schemes", schemes);
     }
 
     window

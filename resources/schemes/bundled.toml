@@ -1,0 +1,145 @@
+# Bundled color schemes: Tilix's 9 stock palettes (base16-twilight-dark,
+# linux, material, monokai, orchis, solarized-dark, solarized-light, tango,
+# yaru) plus Catppuccin Mocha/Latte, ported from the existing
+# resources/catppuccin-{mocha,latte}.css values (Mocha) / well-known
+# published palettes (the rest — Solarized, Tango, the Linux console default,
+# and Catppuccin are standard/official hex values; base16-twilight, Material,
+# Monokai, Orchis and Yaru are reproduced from widely-published terminal
+# scheme values, NOT re-verified against Tilix's own bundled JSON since this
+# sandbox has no network access — worth a visual side-by-side diff against
+# real Tilix before calling this pixel-perfect).
+#
+# `palette` is the 16-color ANSI table: black, red, green, yellow, blue,
+# magenta, cyan, white, then the bright variants in the same order.
+
+[[scheme]]
+id = "catppuccin-mocha"
+name = "Catppuccin Mocha"
+foreground = "#cdd6f4"
+background = "#1e1e2e"
+palette = [
+  "#45475a", "#f38ba8", "#a6e3a1", "#f9e2af",
+  "#89b4fa", "#f5c2e7", "#94e2d5", "#bac2de",
+  "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af",
+  "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8",
+]
+
+[[scheme]]
+id = "catppuccin-latte"
+name = "Catppuccin Latte"
+foreground = "#4c4f69"
+background = "#eff1f5"
+palette = [
+  "#5c5f77", "#d20f39", "#40a02b", "#df8e1d",
+  "#1e66f5", "#ea76cb", "#179299", "#acb0be",
+  "#6c6f85", "#d20f39", "#40a02b", "#df8e1d",
+  "#1e66f5", "#ea76cb", "#179299", "#bcc0cc",
+]
+
+[[scheme]]
+id = "solarized-dark"
+name = "Solarized Dark"
+foreground = "#839496"
+background = "#002b36"
+palette = [
+  "#073642", "#dc322f", "#859900", "#b58900",
+  "#268bd2", "#d33682", "#2aa198", "#eee8d5",
+  "#002b36", "#cb4b16", "#586e75", "#657b83",
+  "#839496", "#6c71c4", "#93a1a1", "#fdf6e3",
+]
+
+[[scheme]]
+id = "solarized-light"
+name = "Solarized Light"
+foreground = "#657b83"
+background = "#fdf6e3"
+palette = [
+  "#073642", "#dc322f", "#859900", "#b58900",
+  "#268bd2", "#d33682", "#2aa198", "#eee8d5",
+  "#002b36", "#cb4b16", "#586e75", "#657b83",
+  "#839496", "#6c71c4", "#93a1a1", "#fdf6e3",
+]
+
+[[scheme]]
+id = "tango"
+name = "Tango"
+foreground = "#d3d7cf"
+background = "#2e3436"
+palette = [
+  "#2e3436", "#cc0000", "#4e9a06", "#c4a000",
+  "#3465a4", "#75507b", "#06989a", "#d3d7cf",
+  "#555753", "#ef2929", "#8ae234", "#fce94f",
+  "#729fcf", "#ad7fa8", "#34e2e2", "#eeeeec",
+]
+
+[[scheme]]
+id = "linux"
+name = "Linux Console"
+foreground = "#aaaaaa"
+background = "#000000"
+palette = [
+  "#000000", "#aa0000", "#00aa00", "#aa5500",
+  "#0000aa", "#aa00aa", "#00aaaa", "#aaaaaa",
+  "#555555", "#ff5555", "#55ff55", "#ffff55",
+  "#5555ff", "#ff55ff", "#55ffff", "#ffffff",
+]
+
+[[scheme]]
+id = "yaru"
+name = "Yaru"
+foreground = "#ffffff"
+background = "#300a24"
+palette = [
+  "#2e3436", "#cc0000", "#4e9a06", "#c4a000",
+  "#3465a4", "#75507b", "#06989a", "#d3d7cf",
+  "#555753", "#ef2929", "#8ae234", "#fce94f",
+  "#729fcf", "#ad7fa8", "#34e2e2", "#eeeeec",
+]
+
+[[scheme]]
+id = "monokai"
+name = "Monokai"
+foreground = "#f8f8f2"
+background = "#272822"
+palette = [
+  "#272822", "#f92672", "#a6e22e", "#f4bf75",
+  "#66d9ef", "#ae81ff", "#a1efe4", "#f8f8f2",
+  "#75715e", "#f92672", "#a6e22e", "#f4bf75",
+  "#66d9ef", "#ae81ff", "#a1efe4", "#f9f8f5",
+]
+
+[[scheme]]
+id = "material"
+name = "Material"
+foreground = "#eeffff"
+background = "#263238"
+palette = [
+  "#000000", "#ff5370", "#c3e88d", "#ffcb6b",
+  "#82aaff", "#c792ea", "#89ddff", "#ffffff",
+  "#545454", "#ff5370", "#c3e88d", "#ffcb6b",
+  "#82aaff", "#c792ea", "#89ddff", "#ffffff",
+]
+
+[[scheme]]
+id = "base16-twilight-dark"
+name = "Base16 Twilight Dark"
+foreground = "#a7a7a7"
+background = "#1e1e1e"
+palette = [
+  "#1e1e1e", "#cf6a4c", "#8f9d6a", "#f9ee98",
+  "#7587a6", "#9b859d", "#afc4db", "#a7a7a7",
+  "#5f5a60", "#cf6a4c", "#8f9d6a", "#f9ee98",
+  "#7587a6", "#9b859d", "#afc4db", "#ffffff",
+]
+
+[[scheme]]
+id = "orchis"
+name = "Orchis"
+foreground = "#eceff1"
+background = "#263238"
+palette = [
+  "#263238", "#e53935", "#66bb6a", "#ffca28",
+  "#42a5f5", "#ab47bc", "#26c6da", "#eceff1",
+  "#37474f", "#e53935", "#66bb6a", "#ffca28",
+  "#42a5f5", "#ab47bc", "#26c6da", "#ffffff",
+]

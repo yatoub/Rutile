@@ -18,6 +18,11 @@ pub struct Preferences {
     /// Automatically copy the terminal selection to the clipboard as soon as
     /// it's made, instead of requiring an explicit "Copy".
     pub copy_on_select: bool,
+    /// Which profile (`crate::profile::ProfileStore`) new sessions are
+    /// created with. Kept here rather than on `ProfileStore` itself since
+    /// it's a cross-cutting *setting* (which profile is active), not part
+    /// of any one profile's own data.
+    pub default_profile_id: String,
 }
 
 impl Default for Preferences {
@@ -26,6 +31,7 @@ impl Default for Preferences {
             focus_follows_mouse: true,
             close_window_on_last_session_closed: true,
             copy_on_select: true,
+            default_profile_id: "default".to_string(),
         }
     }
 }

@@ -1,19 +1,23 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gtk4::prelude::*;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
 use crate::preferences::config::Preferences;
+use crate::profile::{ColorSchemeStore, ProfileStore};
 
 /// Builds the Preferences window, mirroring Tilix's sidebar of categories
 /// (`AdwPreferencesWindow` gives us that navigation for free — one page per
-/// category). Only "General" has real, wired-up settings for now; the rest
-/// are placeholders for features Rutile doesn't have yet (profiles,
-/// bookmarks, encoding, ...) — see GUIDELINE.md's v0.2+ list.
+/// category). "General" and "Profiles" have real, wired-up settings; the
+/// rest are placeholders for features Rutile doesn't have yet (bookmarks,
+/// encoding, ...) — see `docs/ROADMAP.md`.
 pub fn build(
     parent: &adw::ApplicationWindow,
     prefs: Rc<RefCell<Preferences>>,
+    profiles: Rc<RefCell<ProfileStore>>,
+    schemes: &Rc<ColorSchemeStore>,
 ) -> adw::PreferencesWindow {
     let window = adw::PreferencesWindow::builder()
         .title("Preferences")
@@ -21,7 +25,8 @@ pub fn build(
         .modal(true)
         .build();
 
-    window.add(&general_page(prefs));
+    window.add(&general_page(prefs.clone()));
+    window.add(ProfilesPage::new(prefs, profiles, schemes.clone()).page());
     window.add(&placeholder_page(
         "Appearance",
         "view-grid-symbolic",
@@ -43,7 +48,6 @@ pub fn build(
         "applications-system-symbolic",
         "No advanced settings yet.",
     ));
-    window.add(&placeholder_page("Profiles", "avatar-default-symbolic", "Rutile has no per-profile configuration yet — all terminals share the same Catppuccin Mocha theme and behavior."));
 
     window
 }
@@ -121,4 +125,223 @@ fn placeholder_page(title: &str, icon_name: &str, message: &str) -> adw::Prefere
     group.add(&status);
     page.add(&group);
     page
+}
+
+/// The "Profiles" page: one `AdwPreferencesGroup` per profile (name, color
+/// scheme picker, default toggle, clone/delete), plus an "Add profile" row.
+/// `Rc<Self>` (not a free function) because every row's callback needs to
+/// trigger a full `rebuild()` of the page afterwards — adding/renaming/
+/// deleting a profile changes what every other row should show (e.g. only
+/// one row's "default" switch can be on at a time), and rebuilding from
+/// scratch is far simpler than patching individual rows in place (same
+/// "just rebuild" tradeoff `PaneView`/`SessionSidebar` already make).
+struct ProfilesPage {
+    page: adw::PreferencesPage,
+    groups: RefCell<Vec<adw::PreferencesGroup>>,
+    prefs: Rc<RefCell<Preferences>>,
+    profiles: Rc<RefCell<ProfileStore>>,
+    schemes: Rc<ColorSchemeStore>,
+}
+
+impl ProfilesPage {
+    fn new(
+        prefs: Rc<RefCell<Preferences>>,
+        profiles: Rc<RefCell<ProfileStore>>,
+        schemes: Rc<ColorSchemeStore>,
+    ) -> Rc<Self> {
+        let page = adw::PreferencesPage::builder()
+            .title("Profiles")
+            .icon_name("avatar-default-symbolic")
+            .build();
+
+        let this = Rc::new(Self {
+            page,
+            groups: RefCell::new(Vec::new()),
+            prefs,
+            profiles,
+            schemes,
+        });
+        this.rebuild();
+        this
+    }
+
+    fn page(&self) -> &adw::PreferencesPage {
+        &self.page
+    }
+
+    fn rebuild(self: &Rc<Self>) {
+        for group in self.groups.borrow_mut().drain(..) {
+            self.page.remove(&group);
+        }
+
+        let scheme_ids: Vec<String> = self.schemes.iter().map(|s| s.id.clone()).collect();
+        let scheme_names: Vec<&str> = self.schemes.iter().map(|s| s.name.as_str()).collect();
+
+        let profile_ids: Vec<String> = self
+            .profiles
+            .borrow()
+            .iter()
+            .map(|p| p.id.clone())
+            .collect();
+        let can_delete = profile_ids.len() > 1;
+
+        for profile_id in &profile_ids {
+            let group =
+                self.build_profile_group(profile_id, &scheme_ids, &scheme_names, can_delete);
+            self.page.add(&group);
+            self.groups.borrow_mut().push(group);
+        }
+
+        let add_group = adw::PreferencesGroup::new();
+        let add_button = gtk4::Button::builder()
+            .label("Add Profile")
+            .icon_name("list-add-symbolic")
+            .halign(gtk4::Align::Start)
+            .build();
+        {
+            let this = self.clone();
+            add_button.connect_clicked(move |_| {
+                let scheme_id = this
+                    .schemes
+                    .iter()
+                    .next()
+                    .map(|s| s.id.clone())
+                    .unwrap_or_else(|| "catppuccin-mocha".to_string());
+                this.profiles.borrow_mut().create("New Profile", &scheme_id);
+                this.rebuild();
+            });
+        }
+        add_group.add(&add_button);
+        self.page.add(&add_group);
+        self.groups.borrow_mut().push(add_group);
+    }
+
+    fn build_profile_group(
+        self: &Rc<Self>,
+        profile_id: &str,
+        scheme_ids: &[String],
+        scheme_names: &[&str],
+        can_delete: bool,
+    ) -> adw::PreferencesGroup {
+        let profile = self
+            .profiles
+            .borrow()
+            .get(profile_id)
+            .expect("profile_id was read from this same store a moment ago")
+            .clone();
+        let is_default = self.prefs.borrow().default_profile_id == profile.id;
+
+        let group = adw::PreferencesGroup::builder()
+            .title(profile.name.clone())
+            .build();
+
+        let name_row = adw::EntryRow::builder()
+            .title("Name")
+            .text(profile.name.clone())
+            .show_apply_button(true)
+            .build();
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            name_row.connect_apply(move |row| {
+                let new_name = row.text();
+                let new_name = new_name.trim();
+                if !new_name.is_empty() {
+                    this.profiles.borrow_mut().rename(&profile_id, new_name);
+                }
+                this.rebuild();
+            });
+        }
+        group.add(&name_row);
+
+        let scheme_row = adw::ComboRow::builder()
+            .title("Color scheme")
+            .model(&gtk4::StringList::new(scheme_names))
+            .build();
+        if let Some(index) = scheme_ids.iter().position(|id| *id == profile.scheme_id) {
+            scheme_row.set_selected(index as u32);
+        }
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            let scheme_ids = scheme_ids.to_vec();
+            scheme_row.connect_selected_notify(move |row| {
+                if let Some(scheme_id) = scheme_ids.get(row.selected() as usize) {
+                    this.profiles
+                        .borrow_mut()
+                        .set_scheme(&profile_id, scheme_id);
+                }
+            });
+        }
+        group.add(&scheme_row);
+
+        let default_row = adw::SwitchRow::builder()
+            .title("Default profile")
+            .subtitle("New sessions are created with this profile")
+            .active(is_default)
+            .build();
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            default_row.connect_active_notify(move |row| {
+                // Also handles the user turning the *current* default off
+                // directly: nothing gets written since `is_active()` is
+                // false, and `rebuild()` snaps the switch straight back to
+                // on — there must always be exactly one default profile.
+                if row.is_active() {
+                    let mut prefs = this.prefs.borrow_mut();
+                    prefs.default_profile_id = profile_id.clone();
+                    prefs.save();
+                }
+                this.rebuild();
+            });
+        }
+        group.add(&default_row);
+
+        let button_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
+        button_box.set_margin_top(6);
+        button_box.set_margin_bottom(6);
+        button_box.set_halign(gtk4::Align::End);
+
+        let clone_button = gtk4::Button::builder().label("Clone").build();
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            clone_button.connect_clicked(move |_| {
+                this.profiles.borrow_mut().clone_profile(&profile_id);
+                this.rebuild();
+            });
+        }
+        button_box.append(&clone_button);
+
+        if can_delete {
+            let delete_button = gtk4::Button::builder().label("Delete").build();
+            delete_button.add_css_class("destructive-action");
+            {
+                let this = self.clone();
+                let profile_id = profile.id.clone();
+                delete_button.connect_clicked(move |_| {
+                    let was_default = this.prefs.borrow().default_profile_id == profile_id;
+                    this.profiles.borrow_mut().delete(&profile_id);
+                    if was_default {
+                        // The now-deleted profile was the default: fall
+                        // back to whatever profile happens to be first
+                        // rather than leaving `default_profile_id`
+                        // dangling on an id nothing references anymore.
+                        let fallback = this.profiles.borrow().iter().next().map(|p| p.id.clone());
+                        if let Some(fallback) = fallback {
+                            let mut prefs = this.prefs.borrow_mut();
+                            prefs.default_profile_id = fallback;
+                            prefs.save();
+                        }
+                    }
+                    this.rebuild();
+                });
+            }
+            button_box.append(&delete_button);
+        }
+
+        group.add(&button_box);
+        group
+    }
 }

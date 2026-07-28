@@ -5,6 +5,7 @@ use std::rc::Rc;
 use gtk4::prelude::*;
 
 use crate::layout::{Direction, Orientation, PaneId, SplitId, SplitTree};
+use crate::profile::ColorScheme;
 use crate::terminal::TerminalWidget;
 
 /// Owns one session's split tree together with the live terminal widgets,
@@ -37,10 +38,15 @@ pub struct PaneView {
     /// When set, only this pane is rendered (Tilix's per-pane "maximize").
     maximized: Option<PaneId>,
     root: gtk4::Widget,
+    /// The scheme every new terminal in this session is created with.
+    /// Doesn't retroactively re-theme existing panes if the profile's
+    /// scheme changes later — matches Tilix, which also only applies a
+    /// profile change to newly spawned terminals.
+    scheme: ColorScheme,
 }
 
 impl PaneView {
-    pub fn new(id: PaneId) -> Self {
+    pub fn new(id: PaneId, scheme: ColorScheme) -> Self {
         let mut this = Self {
             tree: Rc::new(RefCell::new(SplitTree::new_leaf(id))),
             widgets: HashMap::new(),
@@ -49,6 +55,7 @@ impl PaneView {
             focused: id,
             maximized: None,
             root: gtk4::Box::new(gtk4::Orientation::Vertical, 0).upcast(),
+            scheme,
         };
         this.create_pane(id);
         this.root = this.wrappers[&id].clone().upcast();
@@ -56,7 +63,7 @@ impl PaneView {
     }
 
     fn create_pane(&mut self, id: PaneId) {
-        let widget = TerminalWidget::new();
+        let widget = TerminalWidget::new(&self.scheme);
 
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header.add_css_class("pane-header");
