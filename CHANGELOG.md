@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
+## [0.3.0] — 2026-07-28
+
+### Added
+
+- Save/restore session layout, cwd, and profile
+
+- Profile model, bundled color schemes, real Profiles page
+
+- Tilix-parity context menu with copy-on-select
+
+
+### Fixed
+
+- Persist split ratio across drag and rebuild
+
+
 ## [0.2.2] — 2026-07-22
 
 ### Added
