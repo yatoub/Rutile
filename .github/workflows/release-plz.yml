@@ -9,6 +9,26 @@ name: Changelog & Release PR
 #   - Release PR was merged → create the git tag and the GitHub Release
 #     (changelog as release notes). The tag push then triggers release.yml,
 #     which builds and attaches the binary/.deb/.rpm/SHA256SUMS.
+#
+# This calls the release-plz CLI directly instead of using release-plz/action
+# (reproducing that action's own release-pr/release/auto-merge logic by
+# hand): rutile-terminal has `publish = false` and has genuinely never been
+# published to crates.io (the crates.io name "rutile" is an unrelated
+# third-party crate — see the fix/crates-io-name-collision history in
+# CLAUDE.md). release-plz always queries the registry for a version
+# baseline regardless of `publish = false`, and when that lookup 404s (as
+# it now correctly does, post-rename) it falls back to treating the
+# *current* Cargo.toml version as already final instead of diffing since
+# the last git tag — so every push to main after the rename silently
+# stopped opening release PRs at all (`next version is 0.2.2` forever,
+# confirmed locally with `release-plz update`, even though #19-#22 all
+# carried real `feat:`/`fix:` commits).
+#
+# release-plz's `--registry-manifest-path` flag exists exactly for this:
+# point it at a local checkout of the last release tag instead of the
+# registry. Verified locally that this makes it compute the correct bump
+# (0.2.2 -> 0.3.0). release-plz/action itself doesn't expose that flag
+# (checked its action.yml source), hence calling the CLI directly here.
 
 on:
   push:
@@ -17,6 +37,9 @@ on:
 permissions:
   pull-requests: write
   contents: write
+
+env:
+  RELEASE_PLZ_VERSION: "0.3.160" # matches the version release-plz/action itself pins
 
 jobs:
   release-plz:
@@ -33,15 +56,53 @@ jobs:
         with:
           fetch-depth: 0 # release-plz needs the full git history
 
+      - name: Checkout last release tag as the registry baseline
+        id: baseline
+        run: |
+          last_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          if [[ -z "$last_tag" ]]; then
+            echo "No previous release tag found — first-ever release, no baseline needed."
+            echo "manifest-path=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Using $last_tag as the registry baseline (rutile-terminal is unpublished, publish = false)"
+          git worktree add /tmp/rutile-registry-baseline "$last_tag"
+          echo "manifest-path=/tmp/rutile-registry-baseline/Cargo.toml" >> "$GITHUB_OUTPUT"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4  # stable
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2
 
-      - name: Run release-plz
-        id: release-plz
-        uses: release-plz/action@2eb1d8bcb770b4c48ccfaad919734b38b51958c9  # v0.5
+      # Same install strategy as release-plz/action (cargo-semver-checks via
+      # install-action to avoid a crates.io lookup, release-plz itself via
+      # cargo-binstall since install-action's release cadence lags).
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf  # v2.85.2
+        with:
+          tool: cargo-semver-checks@0.49
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa  # v1.21.1
+        env:
+          BINSTALL_VERSION: 1.21.1
+
+      - name: Install release-plz
+        run: |
+          cargo-binstall \
+            "release-plz@${RELEASE_PLZ_VERSION}" \
+            --force \
+            --strategies=crate-meta-data,compile \
+            --no-confirm
+
+      - name: Configure git user from GitHub token
+        uses: release-plz/git-config@59144859caf016f8b817a2ac9b051578729173c4  # v0.1.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RUTILE_RELEASE_TOKEN }}
+
+      - name: Run release-plz release-pr
+        id: release-pr
         env:
           # Must be a PAT, not GITHUB_TOKEN: pushes/tags made with the
           # built-in token don't fire other workflows' events (release.yml
@@ -51,10 +112,44 @@ jobs:
           # here (needs "Pull requests: Read and write" added to that PAT's
           # scope in addition to "Contents: Read and write").
           GITHUB_TOKEN: ${{ secrets.RUTILE_RELEASE_TOKEN }}
+          BASELINE_MANIFEST_PATH: ${{ steps.baseline.outputs.manifest-path }}
+        run: |
+          registry_manifest_path=()
+          if [[ -n "$BASELINE_MANIFEST_PATH" ]]; then
+            registry_manifest_path=("--registry-manifest-path" "$BASELINE_MANIFEST_PATH")
+          fi
 
-      - name: Auto-merge release PR
-        if: steps.release-plz.outputs.prs_created == 'true'
+          release_pr_output=$(release-plz release-pr \
+            --git-token "${GITHUB_TOKEN}" \
+            --repo-url "https://github.com/${GITHUB_REPOSITORY}" \
+            "${registry_manifest_path[@]}" \
+            -o json)
+          echo "release_pr_output: $release_pr_output"
+
+          prs=$(echo "$release_pr_output" | jq -c .prs)
+          prs_length=$(echo "$prs" | jq 'length')
+          if [ "$prs_length" != "0" ]; then
+            echo "prs_created=true" >> "$GITHUB_OUTPUT"
+            echo "pr=$(echo "$prs" | jq -c .[0])" >> "$GITHUB_OUTPUT"
+          else
+            echo "prs_created=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run release-plz release
         env:
           GITHUB_TOKEN: ${{ secrets.RUTILE_RELEASE_TOKEN }}
-          PR_URL: ${{ fromJson(steps.release-plz.outputs.pr).html_url }}
+        # `release` has no --registry-manifest-path (unlike release-pr/update):
+        # by the time it runs, the release PR has already bumped Cargo.toml
+        # to the right version, so it doesn't need a registry baseline to
+        # diff against — it just tags/releases whatever's currently there.
+        run: |
+          release-plz release \
+            --git-token "${GITHUB_TOKEN}" \
+            -o json
+
+      - name: Auto-merge release PR
+        if: steps.release-pr.outputs.prs_created == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.RUTILE_RELEASE_TOKEN }}
+          PR_URL: ${{ fromJson(steps.release-pr.outputs.pr).html_url }}
         run: gh pr merge --auto --squash "$PR_URL"
