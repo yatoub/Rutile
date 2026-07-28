@@ -132,7 +132,15 @@ jobs:
             echo "prs_created=true" >> "$GITHUB_OUTPUT"
             echo "pr=$(echo "$prs" | jq -c .[0])" >> "$GITHUB_OUTPUT"
           else
+            # Always write `pr`, even when empty (`{}`, valid JSON) — the
+            # "Auto-merge" step's `env:` calls fromJson() on this output
+            # unconditionally while GitHub Actions resolves that step's
+            # `env:` context, *before* checking its `if:` guard. An unset
+            # output there is an empty string, and fromJson('') errors out
+            # the whole job even though the step itself would've been
+            # skipped.
             echo "prs_created=false" >> "$GITHUB_OUTPUT"
+            echo "pr={}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run release-plz release
