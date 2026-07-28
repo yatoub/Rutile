@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+
+use serde::{Deserialize, Serialize};
+
 pub type PaneId = u64;
 pub type SplitId = u64;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Orientation {
     Horizontal,
     Vertical,
@@ -29,7 +33,7 @@ impl Rect {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SplitTree {
     Leaf(PaneId),
     Split {
@@ -265,5 +269,48 @@ impl SplitTree {
             })
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(id, _)| id)
+    }
+
+    /// Reassigns every `PaneId`/`SplitId` in this tree using `next_id`
+    /// (e.g. a process-local counter). A tree deserialized from a saved
+    /// session was built by a *previous* process, so its ids can collide
+    /// with ones already in use by this one — this produces an equivalent
+    /// tree with fresh ids, plus the old-id -> new-id map for `PaneId`s
+    /// specifically, since callers (`session::persist`) need it to look up
+    /// per-pane metadata that was saved keyed by the old id.
+    pub fn remap_ids(
+        &self,
+        next_id: &mut impl FnMut() -> u64,
+    ) -> (SplitTree, HashMap<PaneId, PaneId>) {
+        let mut pane_map = HashMap::new();
+        let remapped = self.remap_ids_inner(next_id, &mut pane_map);
+        (remapped, pane_map)
+    }
+
+    fn remap_ids_inner(
+        &self,
+        next_id: &mut impl FnMut() -> u64,
+        pane_map: &mut HashMap<PaneId, PaneId>,
+    ) -> SplitTree {
+        match self {
+            SplitTree::Leaf(old_id) => {
+                let new_id = next_id();
+                pane_map.insert(*old_id, new_id);
+                SplitTree::Leaf(new_id)
+            }
+            SplitTree::Split {
+                orientation,
+                ratio,
+                left,
+                right,
+                ..
+            } => SplitTree::Split {
+                id: next_id(),
+                orientation: *orientation,
+                ratio: *ratio,
+                left: Box::new(left.remap_ids_inner(next_id, pane_map)),
+                right: Box::new(right.remap_ids_inner(next_id, pane_map)),
+            },
+        }
     }
 }

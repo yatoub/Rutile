@@ -1,3 +1,4 @@
+pub mod persist;
 pub mod session_view;
 pub mod sidebar;
 
