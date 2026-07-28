@@ -85,6 +85,21 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     }
     behavior_group.add(&close_window_row);
 
+    let copy_on_select_row = adw::SwitchRow::builder()
+        .title("Copy on select")
+        .subtitle("Automatically copy the selected text to the clipboard")
+        .active(prefs.borrow().copy_on_select)
+        .build();
+    {
+        let prefs = prefs.clone();
+        copy_on_select_row.connect_active_notify(move |row| {
+            let mut prefs = prefs.borrow_mut();
+            prefs.copy_on_select = row.is_active();
+            prefs.save();
+        });
+    }
+    behavior_group.add(&copy_on_select_row);
+
     page.add(&behavior_group);
     page
 }
