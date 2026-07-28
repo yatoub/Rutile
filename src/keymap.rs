@@ -15,6 +15,7 @@ pub enum Action {
     CloseSession,
     NextSession,
     PrevSession,
+    ToggleSearch,
 }
 
 const CTRL_SHIFT: gdk::ModifierType =
@@ -45,6 +46,7 @@ const KEYBINDINGS: &[(gdk::Key, gdk::ModifierType, Action)] = &[
     (gdk::Key::Q, CTRL_SHIFT, Action::CloseSession),
     (gdk::Key::Page_Down, CTRL_SHIFT, Action::NextSession),
     (gdk::Key::Page_Up, CTRL_SHIFT, Action::PrevSession),
+    (gdk::Key::F, CTRL_SHIFT, Action::ToggleSearch),
 ];
 
 /// Maps a key + active modifiers to an `Action`, ignoring modifier bits not

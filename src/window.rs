@@ -236,6 +236,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 Action::CloseSession => close_current_session(&session_view),
                 Action::NextSession => session_view.borrow_mut().next_session(),
                 Action::PrevSession => session_view.borrow_mut().prev_session(),
+                Action::ToggleSearch => session_view.borrow().toggle_search_focused(),
             }
 
             glib::Propagation::Stop
