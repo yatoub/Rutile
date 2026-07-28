@@ -8,9 +8,10 @@ use libadwaita as adw;
 
 use crate::context_menu;
 use crate::keymap::{self, Action};
-use crate::layout::Orientation;
+use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, Preferences};
-use crate::profile::{ColorSchemeStore, ProfileStore};
+use crate::profile::{ColorScheme, ColorSchemeStore, ProfileStore};
+use crate::session::persist::{self, SavedWindow};
 use crate::session::session_view::ClosePaneOutcome;
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
@@ -26,16 +27,40 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // there's nothing that needs to invalidate this snapshot.
     let schemes = Rc::new(ColorSchemeStore::load());
 
-    let initial_scheme = {
-        let profiles = profiles.borrow();
-        let default_profile_id = &prefs.borrow().default_profile_id;
-        let scheme_id = profiles
-            .get(default_profile_id)
-            .map(|p| p.scheme_id.as_str())
-            .unwrap_or("catppuccin-mocha");
-        schemes.get_or_default(scheme_id).clone()
+    let resolve_scheme = {
+        let profiles = profiles.clone();
+        let schemes = schemes.clone();
+        move |profile_id: &crate::profile::ProfileId| -> ColorScheme {
+            let scheme_id = profiles
+                .borrow()
+                .get(profile_id)
+                .map(|p| p.scheme_id.clone())
+                .unwrap_or_else(|| "catppuccin-mocha".to_string());
+            schemes.get_or_default(&scheme_id).clone()
+        }
     };
-    let session_view = Rc::new(RefCell::new(SessionView::new(initial_scheme)));
+
+    let default_profile_id = prefs.borrow().default_profile_id.clone();
+    let initial_scheme = resolve_scheme(&default_profile_id);
+    let session_view = Rc::new(RefCell::new(SessionView::new(
+        default_profile_id,
+        initial_scheme,
+    )));
+
+    // Auto-restore: a session saved on the last clean shutdown (see the
+    // close-request handler below) takes over from the single blank
+    // session `SessionView::new` just created above. Doesn't yet honor a
+    // `-s`/`--session <path>` CLI override — that's Phase 5 (no CLI
+    // parsing exists at all yet).
+    if let Some(saved) = persist::SavedWindow::load_from_file(&persist::last_session_path()) {
+        let mut session_view_mut = session_view.borrow_mut();
+        session_view_mut.replace_all_with(&saved.sessions, &resolve_scheme);
+        session_view_mut.set_broadcast_group(saved.broadcast_group);
+        let session_ids = session_view_mut.session_ids();
+        if let Some(&session_id) = session_ids.get(saved.active_session_index) {
+            session_view_mut.select_session(session_id);
+        }
+    }
 
     // Tilix-style session switcher: a left sidebar of session rows instead
     // of a top tab strip. Hidden by default — revealed via the toolbar's
@@ -66,11 +91,18 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         .content(&content)
         .build();
 
-    // Wire the context menu (right-click: split + broadcast group) for the
-    // initial session's initial pane.
-    let initial_session_id = session_view.borrow().current_session_id();
-    if let Some(session_id) = initial_session_id {
-        wire_pane_context_menu(&session_view, &prefs, session_id);
+    // Wire the context menu (right-click: split + broadcast group) for
+    // every pane of every session that exists so far — just the one blank
+    // session on a fresh launch, but a restored session can already have
+    // several sessions each with their own split tree.
+    {
+        let session_ids = session_view.borrow().session_ids();
+        for session_id in session_ids {
+            let pane_ids = session_view.borrow().pane_ids_for(session_id);
+            for pane_id in pane_ids {
+                wire_pane_context_menu_for(&session_view, &prefs, session_id, pane_id);
+            }
+        }
     }
 
     // Close the whole window once the last session is closed, if the
@@ -92,6 +124,54 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 }
             });
     }
+
+    // Auto-save: a clean shutdown (window closed normally, not a crash)
+    // snapshots the whole window to `last_session_path()` so the next
+    // launch can auto-restore it (see the load above).
+    {
+        let session_view = session_view.clone();
+        window.connect_close_request(move |window| {
+            let saved = snapshot_window(&session_view.borrow(), window);
+            if let Err(err) = saved.save_to_file(&persist::last_session_path()) {
+                eprintln!("[rutile] failed to auto-save session: {err}");
+            }
+            glib::Propagation::Proceed
+        });
+    }
+
+    let session_save_as_action = gio::SimpleAction::new("session-save-as", None);
+    {
+        let session_view = session_view.clone();
+        let window_weak = window.downgrade();
+        session_save_as_action.connect_activate(move |_, _| {
+            let Some(window) = window_weak.upgrade() else {
+                return;
+            };
+            let saved = snapshot_window(&session_view.borrow(), &window);
+            save_session_as(&window, saved);
+        });
+    }
+    window.add_action(&session_save_as_action);
+
+    let session_open_action = gio::SimpleAction::new("session-open", None);
+    {
+        let session_view = session_view.clone();
+        let prefs = prefs.clone();
+        let window_weak = window.downgrade();
+        let resolve_scheme = resolve_scheme.clone();
+        session_open_action.connect_activate(move |_, _| {
+            let Some(window) = window_weak.upgrade() else {
+                return;
+            };
+            open_session(
+                &window,
+                session_view.clone(),
+                prefs.clone(),
+                resolve_scheme.clone(),
+            );
+        });
+    }
+    window.add_action(&session_open_action);
 
     let new_session_action = gio::SimpleAction::new("new-session", None);
     {
@@ -229,6 +309,14 @@ fn build_toolbar(
     session_section.append(Some("Fermer la session"), Some("win.close-session"));
     menu.append_section(None, &session_section);
 
+    let persistence_section = gio::Menu::new();
+    persistence_section.append(
+        Some("Enregistrer la session sous…"),
+        Some("win.session-save-as"),
+    );
+    persistence_section.append(Some("Ouvrir une session…"), Some("win.session-open"));
+    menu.append_section(None, &persistence_section);
+
     let preferences_section = gio::Menu::new();
     preferences_section.append(Some("Préférences"), Some("win.preferences"));
     menu.append_section(None, &preferences_section);
@@ -277,6 +365,95 @@ fn close_current_session(session_view: &Rc<RefCell<SessionView>>) {
     }
 }
 
+/// Snapshots every session (tree, profile, per-pane cwd), the active tab,
+/// window size, and broadcast group into a `SavedWindow` — the shared core
+/// of auto-save and "Save Session As...".
+fn snapshot_window(session_view: &SessionView, window: &adw::ApplicationWindow) -> SavedWindow {
+    let session_ids = session_view.session_ids();
+    let active_session_index = session_view
+        .current_session_id()
+        .and_then(|id| session_ids.iter().position(|&sid| sid == id))
+        .unwrap_or(0);
+
+    let sessions = session_ids
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &session_id)| {
+            session_view.session_snapshot(session_id, format!("Session {}", index + 1))
+        })
+        .collect();
+
+    SavedWindow {
+        sessions,
+        active_session_index,
+        window_width: window.width(),
+        window_height: window.height(),
+        broadcast_group: session_view.broadcast_group(),
+    }
+}
+
+fn session_file_filter() -> gtk4::FileFilter {
+    let filter = gtk4::FileFilter::new();
+    filter.set_name(Some("Rutile session (*.rutile-session.toml)"));
+    filter.add_pattern("*.rutile-session.toml");
+    filter
+}
+
+fn save_session_as(window: &adw::ApplicationWindow, saved: SavedWindow) {
+    let dialog = gtk4::FileDialog::builder()
+        .title("Enregistrer la session sous")
+        .initial_name("session.rutile-session.toml")
+        .default_filter(&session_file_filter())
+        .build();
+
+    dialog.save(Some(window), gtk4::gio::Cancellable::NONE, move |result| {
+        let Ok(file) = result else { return };
+        let Some(path) = file.path() else { return };
+        if let Err(err) = saved.save_to_file(&path) {
+            eprintln!("[rutile] failed to save session to {path:?}: {err}");
+        }
+    });
+}
+
+fn open_session(
+    window: &adw::ApplicationWindow,
+    session_view: Rc<RefCell<SessionView>>,
+    prefs: Rc<RefCell<Preferences>>,
+    resolve_scheme: impl Fn(&crate::profile::ProfileId) -> ColorScheme + 'static,
+) {
+    let dialog = gtk4::FileDialog::builder()
+        .title("Ouvrir une session")
+        .default_filter(&session_file_filter())
+        .build();
+
+    dialog.open(Some(window), gtk4::gio::Cancellable::NONE, move |result| {
+        let Ok(file) = result else { return };
+        let Some(path) = file.path() else { return };
+        let Some(saved) = SavedWindow::load_from_file(&path) else {
+            eprintln!("[rutile] failed to parse session file {path:?}");
+            return;
+        };
+
+        let mut view = session_view.borrow_mut();
+        view.replace_all_with(&saved.sessions, &resolve_scheme);
+        view.set_broadcast_group(saved.broadcast_group);
+        let session_ids = view.session_ids();
+        if let Some(&session_id) = session_ids.get(saved.active_session_index) {
+            view.select_session(session_id);
+        }
+        drop(view);
+
+        // Every restored pane needs its context menu wired up fresh, same
+        // as the ones created at launch-time auto-restore.
+        for &session_id in &session_ids {
+            let pane_ids = session_view.borrow().pane_ids_for(session_id);
+            for pane_id in pane_ids {
+                wire_pane_context_menu_for(&session_view, &prefs, session_id, pane_id);
+            }
+        }
+    });
+}
+
 /// Attaches the right-click context menu to a session's (single, initial)
 /// focused pane. Used right after a new session/tab is created.
 fn wire_pane_context_menu(
@@ -285,9 +462,21 @@ fn wire_pane_context_menu(
     session_id: SessionId,
 ) {
     let pane_id = session_view.borrow().focused_pane_id(session_id);
-    let Some(pane_id) = pane_id else {
-        return;
-    };
+    if let Some(pane_id) = pane_id {
+        wire_pane_context_menu_for(session_view, prefs, session_id, pane_id);
+    }
+}
+
+/// Same as `wire_pane_context_menu`, but for a specific pane rather than
+/// "whichever one is currently focused" — used to wire up every pane of a
+/// session restored from a save file, since a restored tree can already
+/// have several.
+fn wire_pane_context_menu_for(
+    session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
+    session_id: SessionId,
+    pane_id: PaneId,
+) {
     let terminal = session_view.borrow().widget_for(session_id, pane_id);
     if let Some(terminal) = terminal {
         context_menu::attach(

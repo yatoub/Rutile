@@ -9,7 +9,8 @@ use vte4::TerminalExt;
 
 use crate::layout::pane_view::PaneView;
 use crate::layout::{Direction, Orientation, PaneId};
-use crate::profile::ColorScheme;
+use crate::profile::{ColorScheme, ProfileId};
+use crate::session::persist::{PaneMeta, SavedSession};
 use crate::terminal::broadcast::{BroadcastGroup, BroadcastManager, SessionId};
 
 /// Result of attempting to close the focused pane of the current session.
@@ -60,10 +61,16 @@ pub struct SessionView {
     /// split off from it) is created with — see `PaneView::scheme`'s doc
     /// comment for why this isn't live-updated for existing panes.
     default_scheme: ColorScheme,
+    default_profile_id: ProfileId,
+    /// Which profile each session was created/restored with — tracked
+    /// separately from `default_scheme` because `session::persist` needs
+    /// to save the *profile*, not the resolved colors, so a later scheme
+    /// edit is picked up on the next restore.
+    session_profiles: HashMap<SessionId, ProfileId>,
 }
 
 impl SessionView {
-    pub fn new(default_scheme: ColorScheme) -> Self {
+    pub fn new(default_profile_id: ProfileId, default_scheme: ColorScheme) -> Self {
         let mut this = Self {
             tab_view: adw::TabView::new(),
             sessions: HashMap::new(),
@@ -77,6 +84,8 @@ impl SessionView {
             next_session_id: 0,
             next_pane_id: 0,
             default_scheme,
+            default_profile_id,
+            session_profiles: HashMap::new(),
         };
         this.new_session();
         this
@@ -160,14 +169,46 @@ impl SessionView {
     }
 
     pub fn new_session(&mut self) -> SessionId {
-        let session_id = self.next_session_id;
-        self.next_session_id += 1;
-
         let pane_id = self.next_pane_id;
         self.next_pane_id += 1;
 
         let pane_view = PaneView::new(pane_id, self.default_scheme.clone());
-        self.broadcast.register_pane(session_id, pane_id);
+        self.insert_session(self.default_profile_id.clone(), pane_view)
+    }
+
+    /// Rebuilds a session from a save file: remaps the saved tree's ids
+    /// (allocated by a previous process, so they could collide with this
+    /// one's) via `SplitTree::remap_ids`, translates the saved per-pane
+    /// metadata (keyed by the *old* ids) onto the fresh ones, and spawns
+    /// each terminal in its saved working directory.
+    pub fn restore_session(&mut self, saved: &SavedSession, scheme: ColorScheme) -> SessionId {
+        let (tree, id_map) = saved.tree.remap_ids(&mut || {
+            let id = self.next_pane_id;
+            self.next_pane_id += 1;
+            id
+        });
+
+        let cwd_by_new_id: HashMap<PaneId, Option<String>> = id_map
+            .iter()
+            .map(|(old_id, new_id)| {
+                let cwd = saved.pane_meta.get(old_id).and_then(|m| m.cwd.clone());
+                (*new_id, cwd)
+            })
+            .collect();
+
+        let pane_view = PaneView::from_tree(tree, scheme, move |id| {
+            cwd_by_new_id.get(&id).cloned().flatten()
+        });
+        self.insert_session(saved.profile_id.clone(), pane_view)
+    }
+
+    fn insert_session(&mut self, profile_id: ProfileId, pane_view: PaneView) -> SessionId {
+        let session_id = self.next_session_id;
+        self.next_session_id += 1;
+
+        for pane_id in pane_view.pane_ids() {
+            self.broadcast.register_pane(session_id, pane_id);
+        }
 
         let container = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         container.append(pane_view.root());
@@ -179,9 +220,56 @@ impl SessionView {
         self.pages.insert(session_id, page.clone());
         self.session_of_page.insert(page, session_id);
         self.sessions.insert(session_id, pane_view);
+        self.session_profiles.insert(session_id, profile_id);
 
         self.notify_session_listeners();
         session_id
+    }
+
+    /// A `SavedSession` snapshot of `session_id`'s current tree/profile/
+    /// per-pane cwd, for `session::persist` to write out. `name` is
+    /// currently always generic (`"Session N"`) — Rutile has no per-session
+    /// title UI yet (see `docs/ROADMAP.md` Phase 3), but the field is
+    /// carried through now so it doesn't need another format migration
+    /// once that lands.
+    pub fn session_snapshot(&self, session_id: SessionId, name: String) -> Option<SavedSession> {
+        let pane_view = self.sessions.get(&session_id)?;
+        let profile_id = self.session_profiles.get(&session_id)?.clone();
+        let tree = pane_view.tree_snapshot();
+        let pane_meta = pane_view
+            .pane_ids()
+            .into_iter()
+            .map(|id| {
+                let cwd = pane_view.cwd_for(id);
+                (id, PaneMeta { cwd })
+            })
+            .collect();
+
+        Some(SavedSession {
+            name,
+            profile_id,
+            tree,
+            pane_meta,
+        })
+    }
+
+    /// Closes every session and rebuilds from `saved`, in order — used by
+    /// "Open Session" to replace the whole window's layout in place.
+    /// `resolve_scheme` looks up each saved session's profile against the
+    /// *current* profile/scheme stores (a profile referenced by the save
+    /// file may since have been renamed/rescoped/deleted).
+    pub fn replace_all_with(
+        &mut self,
+        sessions: &[SavedSession],
+        resolve_scheme: impl Fn(&ProfileId) -> ColorScheme,
+    ) {
+        for session_id in self.session_ids() {
+            self.close_session(session_id);
+        }
+        for saved in sessions {
+            let scheme = resolve_scheme(&saved.profile_id);
+            self.restore_session(saved, scheme);
+        }
     }
 
     pub fn close_session(&mut self, id: SessionId) {
@@ -192,6 +280,7 @@ impl SessionView {
             }
         }
         self.containers.remove(&id);
+        self.session_profiles.remove(&id);
         if let Some(page) = self.pages.remove(&id) {
             self.session_of_page.remove(&page);
             self.tab_view.close_page(&page);
@@ -255,6 +344,16 @@ impl SessionView {
         self.sessions
             .get(&session_id)
             .map(|pane_view| pane_view.focused())
+    }
+
+    /// Every pane in `session_id`, e.g. so a restored (possibly
+    /// multi-pane) session can have its context menu wired up
+    /// pane-by-pane, not just its initially focused one.
+    pub fn pane_ids_for(&self, session_id: SessionId) -> Vec<PaneId> {
+        self.sessions
+            .get(&session_id)
+            .map(|pane_view| pane_view.pane_ids())
+            .unwrap_or_default()
     }
 
     pub fn widget_for(&self, session_id: SessionId, pane_id: PaneId) -> Option<vte4::Terminal> {

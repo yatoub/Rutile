@@ -62,8 +62,43 @@ impl PaneView {
         this
     }
 
+    /// Rebuilds a `PaneView` from a split tree restored from a saved
+    /// session (`session::persist`) — `tree`'s ids are assumed to already
+    /// be fresh/unique in this process (the caller remaps them via
+    /// `SplitTree::remap_ids` first). `cwd_for` supplies each pane's
+    /// working directory by its (already-remapped) id.
+    pub fn from_tree(
+        tree: SplitTree,
+        scheme: ColorScheme,
+        cwd_for: impl Fn(PaneId) -> Option<String>,
+    ) -> Self {
+        let leaves = tree.leaves();
+        let focused = *leaves
+            .first()
+            .expect("a restored tree always has at least one leaf");
+        let mut this = Self {
+            tree: Rc::new(RefCell::new(tree)),
+            widgets: HashMap::new(),
+            headers: HashMap::new(),
+            wrappers: HashMap::new(),
+            focused,
+            maximized: None,
+            root: gtk4::Box::new(gtk4::Orientation::Vertical, 0).upcast(),
+            scheme,
+        };
+        for id in leaves {
+            this.create_pane_with_cwd(id, cwd_for(id).as_deref());
+        }
+        this.rebuild();
+        this
+    }
+
     fn create_pane(&mut self, id: PaneId) {
-        let widget = TerminalWidget::new(&self.scheme);
+        self.create_pane_with_cwd(id, None);
+    }
+
+    fn create_pane_with_cwd(&mut self, id: PaneId, cwd: Option<&str>) {
+        let widget = TerminalWidget::new(&self.scheme, cwd);
 
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header.add_css_class("pane-header");
@@ -95,6 +130,21 @@ impl PaneView {
 
     pub fn pane_ids(&self) -> Vec<PaneId> {
         self.tree.borrow().leaves()
+    }
+
+    /// A snapshot of the current split tree (ratios included), for
+    /// `session::persist` to serialize. Cloned rather than borrowed since
+    /// the caller needs an owned value to put into a `SavedSession`.
+    pub fn tree_snapshot(&self) -> SplitTree {
+        self.tree.borrow().clone()
+    }
+
+    /// The working directory a pane's shell is currently in, for
+    /// `session::persist` to save alongside the tree — see
+    /// `TerminalWidget::current_directory`'s doc comment for when this is
+    /// `None`.
+    pub fn cwd_for(&self, id: PaneId) -> Option<String> {
+        self.widgets.get(&id)?.current_directory()
     }
 
     pub fn widget_for(&self, id: PaneId) -> Option<&vte4::Terminal> {

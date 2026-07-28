@@ -10,7 +10,10 @@ pub struct TerminalWidget {
 }
 
 impl TerminalWidget {
-    pub fn new(scheme: &ColorScheme) -> Self {
+    /// `cwd`: the shell's starting directory, used when restoring a saved
+    /// session (`session::persist`) — `None` spawns in vte's own default
+    /// (inherited from this process), same as before session persistence.
+    pub fn new(scheme: &ColorScheme, cwd: Option<&str>) -> Self {
         let terminal = vte4::Terminal::new();
         // Without this, a terminal nested inside a Paned doesn't claim its
         // share of space, so deeper splits can collapse a pane down to
@@ -27,7 +30,7 @@ impl TerminalWidget {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
         terminal.spawn_async(
             vte4::PtyFlags::DEFAULT,
-            None,
+            cwd,
             &[&shell],
             &[],
             glib::SpawnFlags::DEFAULT,
@@ -43,14 +46,23 @@ impl TerminalWidget {
 
         Self { terminal }
     }
-}
 
-impl TerminalWidget {
     pub fn widget(&self) -> &vte4::Terminal {
         &self.terminal
     }
 
     pub fn feed(&self, bytes: &[u8]) {
         self.terminal.feed_child(bytes);
+    }
+
+    /// The shell's current working directory, if vte has picked it up via
+    /// OSC 7 (most modern shell configs emit it automatically). `None` if
+    /// the shell never reported one — the caller falls back to no explicit
+    /// cwd on restore, same as a brand new terminal.
+    pub fn current_directory(&self) -> Option<String> {
+        let uri = self.terminal.current_directory_uri()?;
+        gtk4::gio::File::for_uri(&uri)
+            .path()
+            .map(|path| path.to_string_lossy().into_owned())
     }
 }

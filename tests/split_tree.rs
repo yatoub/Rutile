@@ -1,6 +1,62 @@
 use rutile::layout::{Direction, Orientation, SplitTree};
 
 #[test]
+fn remap_ids_produces_fresh_unique_ids_and_preserves_shape() {
+    let mut tree = SplitTree::new_leaf(1);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+    tree.split(1, Orientation::Vertical, 3, 103);
+
+    let mut next = 1000;
+    let (remapped, pane_map) = tree.remap_ids(&mut || {
+        let id = next;
+        next += 1;
+        id
+    });
+
+    // Same shape (leaf order, orientation), just renumbered.
+    assert_eq!(remapped.leaves().len(), 3);
+    let old_leaves = tree.leaves();
+    let new_leaves = remapped.leaves();
+    assert_eq!(old_leaves.len(), new_leaves.len());
+    for (old, new) in old_leaves.iter().zip(new_leaves.iter()) {
+        assert_eq!(pane_map[old], *new);
+    }
+
+    // Every id handed out (leaves + internal split nodes) is unique and
+    // came from the counter, not reused from the original tree.
+    let mut all_new_ids: Vec<u64> = new_leaves.clone();
+    fn collect_split_ids(tree: &SplitTree, out: &mut Vec<u64>) {
+        if let SplitTree::Split {
+            id, left, right, ..
+        } = tree
+        {
+            out.push(*id);
+            collect_split_ids(left, out);
+            collect_split_ids(right, out);
+        }
+    }
+    collect_split_ids(&remapped, &mut all_new_ids);
+    assert!(all_new_ids.iter().all(|id| *id >= 1000));
+    let unique: std::collections::HashSet<_> = all_new_ids.iter().collect();
+    assert_eq!(unique.len(), all_new_ids.len());
+}
+
+#[test]
+fn tree_round_trips_through_toml() {
+    let mut tree = SplitTree::new_leaf(1);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+    tree.set_ratio(102, 0.3);
+
+    let serialized = toml::to_string(&tree).expect("SplitTree must serialize");
+    let deserialized: SplitTree = toml::from_str(&serialized).expect("must deserialize back");
+
+    assert_eq!(deserialized.leaves(), tree.leaves());
+    let rects: std::collections::HashMap<_, _> = deserialized.leaf_rects().into_iter().collect();
+    let original_rects: std::collections::HashMap<_, _> = tree.leaf_rects().into_iter().collect();
+    assert_eq!(rects[&1].w, original_rects[&1].w);
+}
+
+#[test]
 fn split_creates_two_leaves_with_correct_orientation() {
     let mut tree = SplitTree::new_leaf(1);
     assert!(tree.split(1, Orientation::Horizontal, 2, 102));

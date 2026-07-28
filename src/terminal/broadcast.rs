@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use serde::{Deserialize, Serialize};
+
 use crate::layout::PaneId;
 
 pub type SessionId = u64;
@@ -8,7 +10,7 @@ pub type SessionId = u64;
 /// sessions" mode, since each session is meant to be an independent
 /// working context and cross-session sync would be surprising more often
 /// than useful.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BroadcastGroup {
     None,
     Session,
