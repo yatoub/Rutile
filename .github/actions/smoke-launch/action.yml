@@ -1,0 +1,37 @@
+name: Smoke test launch check
+description: >
+  Launches the already-installed `rutile` binary under Xvfb + a D-Bus
+  session and fails unless `timeout` had to kill it (exit 124) — meaning it
+  was still running and healthy, rather than crashing or exiting early.
+  Shared by release.yml's build-deb/build-rpm/smoke-arch jobs, which are
+  each a release gate for one distro's package (Debian/Fedora/Arch): every
+  distro checks pass/fail the same way through this action, and a failure
+  here blocks the whole Release run from succeeding — which in turn blocks
+  aur-publish.yml, since it only fires when this workflow's overall
+  conclusion is 'success'. The caller is responsible for installing
+  Xvfb/dbus-x11 (package names differ per distro) and the package under
+  test before calling this.
+
+inputs:
+  timeout-seconds:
+    description: How long to let rutile run before treating it as healthy
+    required: false
+    default: "8"
+
+runs:
+  using: composite
+  steps:
+    - name: Launch rutile under Xvfb
+      shell: bash
+      env:
+        TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+      run: |
+        set +e
+        dbus-run-session -- xvfb-run -a timeout "$TIMEOUT_SECONDS" rutile
+        code=$?
+        set -e
+        if [ "$code" -ne 124 ]; then
+          echo "rutile exited early with code $code (expected 124 = still running when timeout fired)" >&2
+          exit 1
+        fi
+        echo "rutile ran for the full ${TIMEOUT_SECONDS}s window without crashing"

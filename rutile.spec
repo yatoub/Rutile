@@ -1,5 +1,5 @@
 Name:           rutile
-Version:        0.2.0
+Version:        0.2.2
 Release:        1%{?dist}
 Summary:        GNOME-native terminal emulator with split tiling and synchronized input
 License:        MIT
@@ -9,9 +9,16 @@ Source0:        https://github.com/yatoub/Rutile/archive/refs/tags/v%{version}.t
 BuildRequires:  cargo
 BuildRequires:  gtk4-devel
 BuildRequires:  libadwaita-devel
-BuildRequires:  vte291-devel
+BuildRequires:  vte291-gtk4-devel
 BuildRequires:  pkgconf-pkg-config
 BuildRequires:  desktop-file-utils
+
+# gtk4/libepoxy dlopen() libGLESv2.so.2 at runtime to probe for a GLES EGL
+# backend rather than linking it directly, so RPM's automatic dependency
+# scanner (which only sees the ELF NEEDED list) never picks it up. Without
+# this, rutile aborts on launch: "Couldn't open libGLESv2.so.2" (SIGABRT).
+# Caught by the post-release smoke test (.github/workflows/smoke-test.yml).
+Requires:       libglvnd-gles
 
 %description
 Rutile is a from-scratch Rust/GTK4 rewrite of Tilix, aiming for functional
