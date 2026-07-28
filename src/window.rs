@@ -378,10 +378,7 @@ fn snapshot_window(session_view: &SessionView, window: &adw::ApplicationWindow) 
 
     let sessions = session_ids
         .iter()
-        .enumerate()
-        .filter_map(|(index, &session_id)| {
-            session_view.session_snapshot(session_id, format!("Session {}", index + 1))
-        })
+        .filter_map(|&session_id| session_view.session_snapshot(session_id))
         .collect();
 
     SavedWindow {
