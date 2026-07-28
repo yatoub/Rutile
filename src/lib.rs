@@ -4,6 +4,7 @@ pub mod keymap;
 pub mod layout;
 pub mod pane_header;
 pub mod preferences;
+pub mod profile;
 pub mod session;
 pub mod terminal;
 pub mod window;

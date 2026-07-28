@@ -9,6 +9,7 @@ use vte4::TerminalExt;
 
 use crate::layout::pane_view::PaneView;
 use crate::layout::{Direction, Orientation, PaneId};
+use crate::profile::ColorScheme;
 use crate::terminal::broadcast::{BroadcastGroup, BroadcastManager, SessionId};
 
 /// Result of attempting to close the focused pane of the current session.
@@ -55,10 +56,14 @@ pub struct SessionView {
     session_listeners: Vec<Rc<dyn Fn()>>,
     next_session_id: SessionId,
     next_pane_id: PaneId,
+    /// The scheme every newly created session's first pane (and every pane
+    /// split off from it) is created with — see `PaneView::scheme`'s doc
+    /// comment for why this isn't live-updated for existing panes.
+    default_scheme: ColorScheme,
 }
 
 impl SessionView {
-    pub fn new() -> Self {
+    pub fn new(default_scheme: ColorScheme) -> Self {
         let mut this = Self {
             tab_view: adw::TabView::new(),
             sessions: HashMap::new(),
@@ -71,6 +76,7 @@ impl SessionView {
             session_listeners: Vec::new(),
             next_session_id: 0,
             next_pane_id: 0,
+            default_scheme,
         };
         this.new_session();
         this
@@ -160,7 +166,7 @@ impl SessionView {
         let pane_id = self.next_pane_id;
         self.next_pane_id += 1;
 
-        let pane_view = PaneView::new(pane_id);
+        let pane_view = PaneView::new(pane_id, self.default_scheme.clone());
         self.broadcast.register_pane(session_id, pane_id);
 
         let container = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
@@ -395,11 +401,5 @@ impl SessionView {
             }
             container.append(pane_view.root());
         }
-    }
-}
-
-impl Default for SessionView {
-    fn default() -> Self {
-        Self::new()
     }
 }
