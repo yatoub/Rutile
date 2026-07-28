@@ -1,4 +1,5 @@
 pub type PaneId = u64;
+pub type SplitId = u64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Orientation {
@@ -32,6 +33,7 @@ impl Rect {
 pub enum SplitTree {
     Leaf(PaneId),
     Split {
+        id: SplitId,
         orientation: Orientation,
         ratio: f32,
         left: Box<SplitTree>,
@@ -45,13 +47,23 @@ impl SplitTree {
     }
 
     /// Splits the leaf identified by `target`, inserting `new_id` as the
-    /// second child in the given orientation. Returns true if `target` was
-    /// found and split.
-    pub fn split(&mut self, target: PaneId, orientation: Orientation, new_id: PaneId) -> bool {
+    /// second child in the given orientation. `split_id` identifies the new
+    /// `Split` node itself (distinct namespace from `PaneId`, allocated by
+    /// the caller) so that `set_ratio` can later target it by id instead of
+    /// by tree position, which would shift on every unrelated mutation.
+    /// Returns true if `target` was found and split.
+    pub fn split(
+        &mut self,
+        target: PaneId,
+        orientation: Orientation,
+        new_id: PaneId,
+        split_id: SplitId,
+    ) -> bool {
         match self {
             SplitTree::Leaf(id) if *id == target => {
                 let old = SplitTree::Leaf(*id);
                 *self = SplitTree::Split {
+                    id: split_id,
                     orientation,
                     ratio: 0.5,
                     left: Box::new(old),
@@ -61,7 +73,31 @@ impl SplitTree {
             }
             SplitTree::Leaf(_) => false,
             SplitTree::Split { left, right, .. } => {
-                left.split(target, orientation, new_id) || right.split(target, orientation, new_id)
+                left.split(target, orientation, new_id, split_id)
+                    || right.split(target, orientation, new_id, split_id)
+            }
+        }
+    }
+
+    /// Finds the `Split` node with the given id and overwrites its ratio,
+    /// clamped to a sane range so a drag to the very edge can't collapse a
+    /// pane to zero size. Returns false if no such split exists.
+    pub fn set_ratio(&mut self, target: SplitId, ratio: f32) -> bool {
+        match self {
+            SplitTree::Leaf(_) => false,
+            SplitTree::Split {
+                id,
+                ratio: r,
+                left,
+                right,
+                ..
+            } => {
+                if *id == target {
+                    *r = ratio.clamp(0.05, 0.95);
+                    true
+                } else {
+                    left.set_ratio(target, ratio) || right.set_ratio(target, ratio)
+                }
             }
         }
     }
@@ -151,6 +187,7 @@ impl SplitTree {
                 ratio,
                 left,
                 right,
+                ..
             } => match orientation {
                 Orientation::Horizontal => {
                     let left_w = rect.w * ratio;

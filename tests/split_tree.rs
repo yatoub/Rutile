@@ -3,7 +3,7 @@ use rutile::layout::{Direction, Orientation, SplitTree};
 #[test]
 fn split_creates_two_leaves_with_correct_orientation() {
     let mut tree = SplitTree::new_leaf(1);
-    assert!(tree.split(1, Orientation::Horizontal, 2));
+    assert!(tree.split(1, Orientation::Horizontal, 2, 102));
 
     match &tree {
         SplitTree::Split {
@@ -21,16 +21,42 @@ fn split_creates_two_leaves_with_correct_orientation() {
 }
 
 #[test]
+fn set_ratio_updates_the_targeted_split_only() {
+    let mut tree = SplitTree::new_leaf(1);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+    tree.split(1, Orientation::Vertical, 3, 103);
+
+    assert!(tree.set_ratio(103, 0.75));
+    assert!(!tree.set_ratio(999, 0.3));
+
+    let rects: std::collections::HashMap<_, _> = tree.leaf_rects().into_iter().collect();
+    // The inner (103) split moved to 0.75; the outer (102) split, untouched,
+    // stays at the default 0.5 — so leaf 1 (top of the inner split) now
+    // occupies a taller slice of the left half than leaf 3.
+    assert!(rects[&1].h > rects[&3].h);
+}
+
+#[test]
+fn set_ratio_clamps_to_avoid_collapsing_a_pane() {
+    let mut tree = SplitTree::new_leaf(1);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+
+    tree.set_ratio(102, 5.0);
+    let rects: std::collections::HashMap<_, _> = tree.leaf_rects().into_iter().collect();
+    assert!(rects[&2].w > 0.0);
+}
+
+#[test]
 fn split_on_unknown_target_is_noop() {
     let mut tree = SplitTree::new_leaf(1);
-    assert!(!tree.split(99, Orientation::Horizontal, 2));
+    assert!(!tree.split(99, Orientation::Horizontal, 2, 102));
     assert!(matches!(tree, SplitTree::Leaf(1)));
 }
 
 #[test]
 fn close_collapses_to_sibling() {
     let mut tree = SplitTree::new_leaf(1);
-    tree.split(1, Orientation::Horizontal, 2);
+    tree.split(1, Orientation::Horizontal, 2, 102);
     assert!(tree.close(2));
     assert!(matches!(tree, SplitTree::Leaf(1)));
 }
@@ -45,8 +71,8 @@ fn close_last_leaf_is_noop() {
 #[test]
 fn leaves_respects_left_to_right_order() {
     let mut tree = SplitTree::new_leaf(1);
-    tree.split(1, Orientation::Horizontal, 2);
-    tree.split(2, Orientation::Vertical, 3);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+    tree.split(2, Orientation::Vertical, 3, 103);
 
     assert_eq!(tree.leaves(), vec![1, 2, 3]);
 }
@@ -54,9 +80,9 @@ fn leaves_respects_left_to_right_order() {
 #[test]
 fn nested_splits_produce_correct_shape() {
     let mut tree = SplitTree::new_leaf(1);
-    tree.split(1, Orientation::Horizontal, 2);
-    tree.split(1, Orientation::Vertical, 3);
-    tree.split(2, Orientation::Vertical, 4);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+    tree.split(1, Orientation::Vertical, 3, 103);
+    tree.split(2, Orientation::Vertical, 4, 104);
 
     // Leaves should be: (1 top, 3 bottom) on the left, (2 top, 4 bottom) on the right.
     assert_eq!(tree.leaves(), vec![1, 3, 2, 4]);
@@ -65,9 +91,9 @@ fn nested_splits_produce_correct_shape() {
 #[test]
 fn leaf_rects_grid_2x2() {
     let mut tree = SplitTree::new_leaf(1);
-    tree.split(1, Orientation::Horizontal, 2);
-    tree.split(1, Orientation::Vertical, 3);
-    tree.split(2, Orientation::Vertical, 4);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+    tree.split(1, Orientation::Vertical, 3, 103);
+    tree.split(2, Orientation::Vertical, 4, 104);
 
     let rects: std::collections::HashMap<_, _> = tree.leaf_rects().into_iter().collect();
 
@@ -81,9 +107,9 @@ fn leaf_rects_grid_2x2() {
 #[test]
 fn neighbor_grid_2x2_directions() {
     let mut tree = SplitTree::new_leaf(1);
-    tree.split(1, Orientation::Horizontal, 2);
-    tree.split(1, Orientation::Vertical, 3);
-    tree.split(2, Orientation::Vertical, 4);
+    tree.split(1, Orientation::Horizontal, 2, 102);
+    tree.split(1, Orientation::Vertical, 3, 103);
+    tree.split(2, Orientation::Vertical, 4, 104);
 
     // Layout: 1 (top-left), 2 (top-right), 3 (bottom-left), 4 (bottom-right).
     assert_eq!(tree.neighbor(1, Direction::Right), Some(2));
@@ -97,8 +123,8 @@ fn neighbor_grid_2x2_directions() {
 #[test]
 fn neighbor_column_of_three() {
     let mut tree = SplitTree::new_leaf(1);
-    tree.split(1, Orientation::Vertical, 2);
-    tree.split(2, Orientation::Vertical, 3);
+    tree.split(1, Orientation::Vertical, 2, 102);
+    tree.split(2, Orientation::Vertical, 3, 103);
 
     assert_eq!(tree.neighbor(1, Direction::Down), Some(2));
     assert_eq!(tree.neighbor(2, Direction::Down), Some(3));
