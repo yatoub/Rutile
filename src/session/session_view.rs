@@ -232,9 +232,14 @@ impl SessionView {
     ) -> Option<PaneId> {
         let pane_id = self.next_pane_id;
         self.next_pane_id += 1;
+        // Reuses the same counter as pane ids: they live in disjoint
+        // namespaces (`SplitTree::Split.id` vs `SplitTree::Leaf`), so
+        // sharing the allocator is fine and avoids a second counter field.
+        let split_id = self.next_pane_id;
+        self.next_pane_id += 1;
 
         let pane_view = self.sessions.get_mut(&session_id)?;
-        pane_view.split(orientation, pane_id);
+        pane_view.split(orientation, pane_id, split_id);
         self.broadcast.register_pane(session_id, pane_id);
         self.resync_page_child(session_id);
         Some(pane_id)

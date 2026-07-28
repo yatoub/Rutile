@@ -1,8 +1,10 @@
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use gtk4::prelude::*;
 
-use crate::layout::{Direction, Orientation, PaneId, SplitTree};
+use crate::layout::{Direction, Orientation, PaneId, SplitId, SplitTree};
 use crate::terminal::TerminalWidget;
 
 /// Owns one session's split tree together with the live terminal widgets,
@@ -20,7 +22,11 @@ use crate::terminal::TerminalWidget;
 /// per-pane bar (sync toggle, maximize, close), since those actions need
 /// session-level context `PaneView` deliberately doesn't have.
 pub struct PaneView {
-    tree: SplitTree,
+    /// `Rc<RefCell<_>>` (not a plain field) so that a `GtkPaned`'s
+    /// `notify::position` callback — 'static, fired long after this
+    /// `PaneView` value was created — can write the dragged ratio straight
+    /// back into the tree without going through a full `rebuild()`.
+    tree: Rc<RefCell<SplitTree>>,
     widgets: HashMap<PaneId, TerminalWidget>,
     headers: HashMap<PaneId, gtk4::Box>,
     /// The `[header, terminal]` wrapper actually placed into the `GtkPaned`
@@ -36,7 +42,7 @@ pub struct PaneView {
 impl PaneView {
     pub fn new(id: PaneId) -> Self {
         let mut this = Self {
-            tree: SplitTree::new_leaf(id),
+            tree: Rc::new(RefCell::new(SplitTree::new_leaf(id))),
             widgets: HashMap::new(),
             headers: HashMap::new(),
             wrappers: HashMap::new(),
@@ -81,7 +87,7 @@ impl PaneView {
     }
 
     pub fn pane_ids(&self) -> Vec<PaneId> {
-        self.tree.leaves()
+        self.tree.borrow().leaves()
     }
 
     pub fn widget_for(&self, id: PaneId) -> Option<&vte4::Terminal> {
@@ -99,7 +105,7 @@ impl PaneView {
     /// whatever was last focused via keyboard. Returns false if `id` isn't
     /// a leaf of this tree.
     pub fn set_focused(&mut self, id: PaneId) -> bool {
-        if self.tree.find(id).is_none() {
+        if self.tree.borrow().find(id).is_none() {
             return false;
         }
         self.focused = id;
@@ -107,9 +113,11 @@ impl PaneView {
         true
     }
 
-    pub fn split(&mut self, orientation: Orientation, new_id: PaneId) {
+    pub fn split(&mut self, orientation: Orientation, new_id: PaneId, split_id: SplitId) {
         self.create_pane(new_id);
-        self.tree.split(self.focused, orientation, new_id);
+        self.tree
+            .borrow_mut()
+            .split(self.focused, orientation, new_id, split_id);
 
         self.focused = new_id;
         self.maximized = None;
@@ -122,12 +130,12 @@ impl PaneView {
     /// session" instead. Otherwise returns the closed pane's id, so the
     /// caller can drop its broadcast-group registration.
     pub fn close_focused(&mut self) -> Option<PaneId> {
-        if self.tree.is_leaf_only() {
+        if self.tree.borrow().is_leaf_only() {
             return None;
         }
 
         let closed = self.focused;
-        if !self.tree.close(closed) {
+        if !self.tree.borrow_mut().close(closed) {
             return None;
         }
         self.destroy_pane(closed);
@@ -137,6 +145,7 @@ impl PaneView {
 
         self.focused = *self
             .tree
+            .borrow()
             .leaves()
             .first()
             .expect("tree has at least one leaf");
@@ -146,14 +155,14 @@ impl PaneView {
     }
 
     pub fn navigate(&mut self, direction: Direction) {
-        if let Some(next) = self.tree.neighbor(self.focused, direction) {
+        if let Some(next) = self.tree.borrow().neighbor(self.focused, direction) {
             self.focused = next;
             self.focus_current();
         }
     }
 
     pub fn is_leaf_only(&self) -> bool {
-        self.tree.is_leaf_only()
+        self.tree.borrow().is_leaf_only()
     }
 
     pub fn is_maximized(&self, id: PaneId) -> bool {
@@ -165,7 +174,7 @@ impl PaneView {
     /// the new maximized state. No-op (returns `false`) if `id` isn't a
     /// leaf of this tree.
     pub fn toggle_maximize(&mut self, id: PaneId) -> bool {
-        if self.tree.find(id).is_none() {
+        if self.tree.borrow().find(id).is_none() {
             return false;
         }
         self.maximized = if self.maximized == Some(id) {
@@ -204,11 +213,24 @@ impl PaneView {
 
         self.root = match self.maximized {
             Some(id) if self.wrappers.contains_key(&id) => self.wrappers[&id].clone().upcast(),
-            _ => Self::build_widget(&self.tree, &self.wrappers),
+            _ => {
+                let node = self.tree.borrow();
+                Self::build_widget(&self.tree, &node, &self.wrappers)
+            }
         };
     }
 
-    fn build_widget(node: &SplitTree, wrappers: &HashMap<PaneId, gtk4::Box>) -> gtk4::Widget {
+    /// `tree` is the whole-tree handle cloned into each `GtkPaned`'s
+    /// `notify::position` callback (so a drag can write its ratio straight
+    /// back via `SplitTree::set_ratio` without a full `rebuild()`); `node`
+    /// is the already-borrowed subtree currently being rendered — kept
+    /// separate so this recursive read doesn't have to re-borrow `tree` at
+    /// every level.
+    fn build_widget(
+        tree: &Rc<RefCell<SplitTree>>,
+        node: &SplitTree,
+        wrappers: &HashMap<PaneId, gtk4::Box>,
+    ) -> gtk4::Widget {
         match node {
             SplitTree::Leaf(id) => wrappers
                 .get(id)
@@ -216,10 +238,11 @@ impl PaneView {
                 .clone()
                 .upcast(),
             SplitTree::Split {
+                id: split_id,
                 orientation,
+                ratio,
                 left,
                 right,
-                ..
             } => {
                 let gtk_orientation = match orientation {
                     Orientation::Horizontal => gtk4::Orientation::Horizontal,
@@ -227,10 +250,56 @@ impl PaneView {
                 };
                 let paned = gtk4::Paned::new(gtk_orientation);
                 paned.set_wide_handle(true);
-                paned.set_start_child(Some(&Self::build_widget(left, wrappers)));
-                paned.set_end_child(Some(&Self::build_widget(right, wrappers)));
+                paned.set_start_child(Some(&Self::build_widget(tree, left, wrappers)));
+                paned.set_end_child(Some(&Self::build_widget(tree, right, wrappers)));
                 paned.set_vexpand(true);
                 paned.set_hexpand(true);
+
+                // Deferred: the paned has no allocated size yet right after
+                // construction, so setting `position` (an absolute pixel
+                // offset, unlike the tree's normalized `ratio`) now would
+                // just be clamped to 0. Also guards against the `notify`
+                // handler firing on this programmatic set and immediately
+                // writing a bogus ratio back into the tree.
+                let split_id = *split_id;
+                let initial_ratio = *ratio;
+                let self_initiated = Rc::new(Cell::new(false));
+                {
+                    let paned = paned.clone();
+                    let self_initiated = self_initiated.clone();
+                    gtk4::glib::idle_add_local_once(move || {
+                        let extent = if paned.orientation() == gtk4::Orientation::Horizontal {
+                            paned.width()
+                        } else {
+                            paned.height()
+                        };
+                        if extent > 0 {
+                            self_initiated.set(true);
+                            paned.set_position((extent as f32 * initial_ratio) as i32);
+                            self_initiated.set(false);
+                        }
+                    });
+                }
+
+                let tree = tree.clone();
+                paned.connect_notify_local(Some("position"), move |paned, _pspec| {
+                    if self_initiated.get() {
+                        return;
+                    }
+                    let extent = if paned.orientation() == gtk4::Orientation::Horizontal {
+                        paned.width()
+                    } else {
+                        paned.height()
+                    };
+                    if extent <= 0 {
+                        return;
+                    }
+                    let ratio = paned.position() as f32 / extent as f32;
+                    if let Ok(mut tree) = tree.try_borrow_mut() {
+                        tree.set_ratio(split_id, ratio);
+                    }
+                });
+
                 paned.upcast()
             }
         }
