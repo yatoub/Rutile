@@ -6,7 +6,7 @@ use gtk4::prelude::*;
 
 use crate::layout::{Direction, Orientation, PaneId, SplitId, SplitTree};
 use crate::profile::ColorScheme;
-use crate::terminal::TerminalWidget;
+use crate::terminal::{SearchBar, TerminalWidget};
 
 /// Owns one session's split tree together with the live terminal widgets,
 /// and renders the tree into nested `GtkPaned`s. On every mutation the
@@ -30,10 +30,13 @@ pub struct PaneView {
     tree: Rc<RefCell<SplitTree>>,
     widgets: HashMap<PaneId, TerminalWidget>,
     headers: HashMap<PaneId, gtk4::Box>,
+    searches: HashMap<PaneId, SearchBar>,
     /// The `[header, terminal]` wrapper actually placed into the `GtkPaned`
     /// tree — this is what gets reparented on split/close, not the bare
-    /// terminal, so the header travels together with it.
-    wrappers: HashMap<PaneId, gtk4::Box>,
+    /// terminal, so the header travels together with it. A `gtk4::Overlay`
+    /// (not a bare `Box`) so the search bar (`terminal/search.rs`) can float
+    /// over the terminal instead of pushing it down.
+    wrappers: HashMap<PaneId, gtk4::Overlay>,
     focused: PaneId,
     /// When set, only this pane is rendered (Tilix's per-pane "maximize").
     maximized: Option<PaneId>,
@@ -51,6 +54,7 @@ impl PaneView {
             tree: Rc::new(RefCell::new(SplitTree::new_leaf(id))),
             widgets: HashMap::new(),
             headers: HashMap::new(),
+            searches: HashMap::new(),
             wrappers: HashMap::new(),
             focused: id,
             maximized: None,
@@ -80,6 +84,7 @@ impl PaneView {
             tree: Rc::new(RefCell::new(tree)),
             widgets: HashMap::new(),
             headers: HashMap::new(),
+            searches: HashMap::new(),
             wrappers: HashMap::new(),
             focused,
             maximized: None,
@@ -103,21 +108,43 @@ impl PaneView {
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header.add_css_class("pane-header");
 
-        let wrapper = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        let content = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
+        content.set_vexpand(true);
+        content.set_hexpand(true);
+        content.append(&header);
+        content.append(widget.widget());
+
+        let search = SearchBar::new(widget.widget());
+
+        let wrapper = gtk4::Overlay::new();
         wrapper.set_vexpand(true);
         wrapper.set_hexpand(true);
-        wrapper.append(&header);
-        wrapper.append(widget.widget());
+        wrapper.set_child(Some(&content));
+        wrapper.add_overlay(search.widget());
 
         self.widgets.insert(id, widget);
         self.headers.insert(id, header);
+        self.searches.insert(id, search);
         self.wrappers.insert(id, wrapper);
     }
 
     fn destroy_pane(&mut self, id: PaneId) {
         self.widgets.remove(&id);
         self.headers.remove(&id);
+        self.searches.remove(&id);
         self.wrappers.remove(&id);
+    }
+
+    /// Toggles the Ctrl+Shift+F search overlay for the focused pane.
+    /// No-op if the focused pane somehow has no search bar (shouldn't
+    /// happen — every pane gets one in `create_pane_with_cwd`).
+    pub fn toggle_search(&self) {
+        if let (Some(search), Some(widget)) = (
+            self.searches.get(&self.focused),
+            self.widgets.get(&self.focused),
+        ) {
+            search.toggle(widget.widget());
+        }
     }
 
     pub fn root(&self) -> &gtk4::Widget {
@@ -286,7 +313,7 @@ impl PaneView {
     fn build_widget(
         tree: &Rc<RefCell<SplitTree>>,
         node: &SplitTree,
-        wrappers: &HashMap<PaneId, gtk4::Box>,
+        wrappers: &HashMap<PaneId, gtk4::Overlay>,
     ) -> gtk4::Widget {
         match node {
             SplitTree::Leaf(id) => wrappers

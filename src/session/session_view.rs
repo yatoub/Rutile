@@ -488,6 +488,14 @@ impl SessionView {
         }
     }
 
+    pub fn toggle_search_focused(&self) {
+        if let Some(session_id) = self.current_session_id()
+            && let Some(pane_view) = self.sessions.get(&session_id)
+        {
+            pane_view.toggle_search();
+        }
+    }
+
     /// After a split/close rebuilds a `PaneView`'s widget tree, re-attach
     /// its new root inside that session's stable container.
     fn resync_page_child(&self, session_id: SessionId) {
