@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.3.1] — 2026-07-28
+
+### Added
+
+- Save/restore session layout, cwd, and profile
+
+- Profile model, bundled color schemes, real Profiles page
+
+- Tilix-parity context menu with copy-on-select
+
+- Enforce Conventional Commits and automate releases with release-plz
+
+
+### Fixed
+
+- Persist split ratio across drag and rebuild
+
+- Rename crates.io package to avoid name collision
+
+- Repair broken RPM build and drop unavailable Ubuntu 22.04 target
+
+
 ## [0.3.0] — 2026-07-28
 
 ### Added
