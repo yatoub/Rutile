@@ -11,7 +11,7 @@ pub enum Orientation {
     Vertical,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Direction {
     Up,
     Down,
@@ -101,6 +101,43 @@ impl SplitTree {
                     true
                 } else {
                     left.set_ratio(target, ratio) || right.set_ratio(target, ratio)
+                }
+            }
+        }
+    }
+
+    /// Finds the split closest to `target` (i.e. deepest in the tree) whose
+    /// orientation matches `axis` — the one a `ResizePane(direction)` action
+    /// should adjust. Returns `(split id, is_left, current ratio)`, where
+    /// `is_left` says whether `target` lives in that split's `left` (or
+    /// `top`, for a vertical split) subtree — the caller needs this to know
+    /// which way the ratio must move to grow `target` rather than shrink it.
+    /// Returns `None` if `target` isn't in this tree, or no ancestor split
+    /// has a matching orientation (e.g. asking to resize left/right inside a
+    /// lone vertical split).
+    pub fn find_resizable_ancestor(
+        &self,
+        target: PaneId,
+        axis: Orientation,
+    ) -> Option<(SplitId, bool, f32)> {
+        match self {
+            SplitTree::Leaf(_) => None,
+            SplitTree::Split {
+                id,
+                orientation,
+                ratio,
+                left,
+                right,
+            } => {
+                if left.find(target).is_some() {
+                    left.find_resizable_ancestor(target, axis)
+                        .or((*orientation == axis).then_some((*id, true, *ratio)))
+                } else if right.find(target).is_some() {
+                    right
+                        .find_resizable_ancestor(target, axis)
+                        .or((*orientation == axis).then_some((*id, false, *ratio)))
+                } else {
+                    None
                 }
             }
         }

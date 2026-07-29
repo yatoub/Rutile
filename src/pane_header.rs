@@ -97,6 +97,9 @@ pub fn attach(
             refresh_title(&title_label_for_notify, &state, pane_id);
         });
     }
+    session_view
+        .borrow_mut()
+        .register_pane_title_label(pane_id, title_label.clone());
     header.append(&title_label);
 
     let sync_button = gtk4::Button::new();

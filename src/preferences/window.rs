@@ -5,6 +5,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
+use crate::keymap::{self, Keymap};
 use crate::preferences::config::Preferences;
 use crate::profile::{ColorSchemeStore, ProfileStore};
 
@@ -18,6 +19,7 @@ pub fn build(
     prefs: Rc<RefCell<Preferences>>,
     profiles: Rc<RefCell<ProfileStore>>,
     schemes: &Rc<ColorSchemeStore>,
+    keymap: Rc<RefCell<Keymap>>,
 ) -> adw::PreferencesWindow {
     let window = adw::PreferencesWindow::builder()
         .title("Preferences")
@@ -37,7 +39,7 @@ pub fn build(
         "user-bookmarks-symbolic",
         "Rutile has no bookmarks concept yet.",
     ));
-    window.add(&placeholder_page("Shortcuts", "input-keyboard-symbolic", "Keybindings are currently a fixed Tilix-parity table (see keymap.rs); making them configurable is planned for a future version."));
+    window.add(ShortcutsPage::new(keymap).page());
     window.add(&placeholder_page(
         "Encoding",
         "text-x-generic-symbolic",
@@ -140,6 +142,109 @@ fn placeholder_page(title: &str, icon_name: &str, message: &str) -> adw::Prefere
     group.add(&status);
     page.add(&group);
     page
+}
+
+/// The "Shortcuts" page: one row per `Action`, showing its current chord and
+/// an "Edit" button that captures the next key combo pressed and rebinds it
+/// (`Keymap::rebind`, persisted immediately — same "no separate Apply
+/// button" convention as every other preference here). `Rc<Self>` for the
+/// same reason as `ProfilesPage`: rebinding one row can free up (or steal)
+/// another row's chord, so the whole list re-renders from `Keymap::entries`
+/// after every change instead of patching a single row in place.
+struct ShortcutsPage {
+    page: adw::PreferencesPage,
+    group: adw::PreferencesGroup,
+    keymap: Rc<RefCell<Keymap>>,
+}
+
+impl ShortcutsPage {
+    fn new(keymap: Rc<RefCell<Keymap>>) -> Rc<Self> {
+        let page = adw::PreferencesPage::builder()
+            .title("Shortcuts")
+            .icon_name("input-keyboard-symbolic")
+            .build();
+        let group = adw::PreferencesGroup::builder()
+            .title("Keybindings")
+            .description("Click Edit, then press the new key combination.")
+            .build();
+        page.add(&group);
+
+        let this = Rc::new(Self {
+            page,
+            group,
+            keymap,
+        });
+        this.rebuild();
+        this
+    }
+
+    fn page(&self) -> &adw::PreferencesPage {
+        &self.page
+    }
+
+    fn rebuild(self: &Rc<Self>) {
+        while let Some(row) = self.group.first_child() {
+            self.group.remove(&row);
+        }
+
+        for (action, chord) in self.keymap.borrow().entries() {
+            let row = adw::ActionRow::builder()
+                .title(keymap::action_label(action))
+                .build();
+
+            let edit_button = gtk4::Button::builder()
+                .label(chord)
+                .valign(gtk4::Align::Center)
+                .build();
+            {
+                let this = self.clone();
+                let edit_button_for_click = edit_button.clone();
+                edit_button.connect_clicked(move |button| {
+                    button.set_label("Press a key…");
+                    let controller = gtk4::EventControllerKey::new();
+                    controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
+                    let this = this.clone();
+                    let edit_button_for_key = edit_button_for_click.clone();
+                    controller.connect_key_pressed(move |controller, key, _keycode, state| {
+                        if key == gtk4::gdk::Key::Escape {
+                            edit_button_for_key.remove_controller(controller);
+                            this.rebuild();
+                            return gtk4::glib::Propagation::Stop;
+                        }
+                        if is_pure_modifier(key) {
+                            return gtk4::glib::Propagation::Proceed;
+                        }
+                        this.keymap.borrow_mut().rebind(action, key, state);
+                        this.keymap.borrow().save();
+                        edit_button_for_key.remove_controller(controller);
+                        this.rebuild();
+                        gtk4::glib::Propagation::Stop
+                    });
+                    edit_button_for_click.add_controller(controller);
+                    edit_button_for_click.grab_focus();
+                });
+            }
+            row.add_suffix(&edit_button);
+            self.group.add(&row);
+        }
+    }
+}
+
+fn is_pure_modifier(key: gtk4::gdk::Key) -> bool {
+    matches!(
+        key,
+        gtk4::gdk::Key::Control_L
+            | gtk4::gdk::Key::Control_R
+            | gtk4::gdk::Key::Shift_L
+            | gtk4::gdk::Key::Shift_R
+            | gtk4::gdk::Key::Alt_L
+            | gtk4::gdk::Key::Alt_R
+            | gtk4::gdk::Key::Super_L
+            | gtk4::gdk::Key::Super_R
+            | gtk4::gdk::Key::Meta_L
+            | gtk4::gdk::Key::Meta_R
+            | gtk4::gdk::Key::Caps_Lock
+    )
 }
 
 /// The "Profiles" page: one `AdwPreferencesGroup` per profile (name, color

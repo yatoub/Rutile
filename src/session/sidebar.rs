@@ -103,9 +103,10 @@ impl SessionSidebar {
         };
 
         for session_id in ids {
-            let row = build_row(session_view, session_id);
+            let (row, label) = build_row(session_view, session_id);
             unsafe {
                 row.set_data("session-id", session_id);
+                row.set_data("title-label", label);
             }
             self.list_box.append(&row);
 
@@ -114,6 +115,28 @@ impl SessionSidebar {
                 self.list_box.select_row(Some(&row));
                 self.syncing.set(false);
             }
+        }
+    }
+
+    /// Enters edit mode on the current session's row label
+    /// (`Action::RenameSession`). No-op if there's no current session.
+    pub fn start_rename_current(&self, session_view: &Rc<RefCell<SessionView>>) {
+        let Some(current) = session_view.borrow().current_session_id() else {
+            return;
+        };
+
+        let mut index = 0;
+        while let Some(row) = self.list_box.row_at_index(index) {
+            let row_session_id =
+                unsafe { row.data::<SessionId>("session-id").map(|p| *p.as_ref()) };
+            if row_session_id == Some(current) {
+                let label = unsafe { row.data::<gtk4::EditableLabel>("title-label") };
+                if let Some(label) = label {
+                    unsafe { label.as_ref().start_editing() };
+                }
+                return;
+            }
+            index += 1;
         }
     }
 
@@ -147,7 +170,10 @@ impl SessionSidebar {
 /// Thumbnail height in pixels; width follows the sidebar's own width.
 const THUMBNAIL_HEIGHT: i32 = 90;
 
-fn build_row(session_view: &Rc<RefCell<SessionView>>, session_id: SessionId) -> gtk4::ListBoxRow {
+fn build_row(
+    session_view: &Rc<RefCell<SessionView>>,
+    session_id: SessionId,
+) -> (gtk4::ListBoxRow, gtk4::EditableLabel) {
     let vbox = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
     vbox.set_margin_start(6);
     vbox.set_margin_end(6);
@@ -210,5 +236,5 @@ fn build_row(session_view: &Rc<RefCell<SessionView>>, session_id: SessionId) -> 
 
     let row = gtk4::ListBoxRow::new();
     row.set_child(Some(&vbox));
-    row
+    (row, label)
 }

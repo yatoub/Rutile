@@ -187,3 +187,36 @@ fn neighbor_column_of_three() {
     assert_eq!(tree.neighbor(3, Direction::Up), Some(2));
     assert_eq!(tree.neighbor(3, Direction::Down), None);
 }
+
+#[test]
+fn find_resizable_ancestor_matches_nearest_matching_orientation() {
+    let mut tree = SplitTree::new_leaf(1);
+    tree.split(1, Orientation::Horizontal, 2, 102); // 1 | 2, horizontal split id 102
+    tree.split(2, Orientation::Vertical, 3, 103); // 2 over 3, vertical split id 103
+
+    // Resizing 1 horizontally hits split 102 directly; 1 is the left child.
+    let (split_id, is_left, ratio) = tree
+        .find_resizable_ancestor(1, Orientation::Horizontal)
+        .unwrap();
+    assert_eq!(split_id, 102);
+    assert!(is_left);
+    assert_eq!(ratio, 0.5);
+
+    // Resizing 1 vertically: no vertical ancestor exists at all.
+    assert_eq!(tree.find_resizable_ancestor(1, Orientation::Vertical), None);
+
+    // Resizing 3 vertically hits the nearer split 103, not the outer 102.
+    let (split_id, is_left, _) = tree
+        .find_resizable_ancestor(3, Orientation::Vertical)
+        .unwrap();
+    assert_eq!(split_id, 103);
+    assert!(!is_left);
+
+    // Resizing 3 horizontally falls through to the outer split 102, where 3
+    // (via its parent 2) lives on the right.
+    let (split_id, is_left, _) = tree
+        .find_resizable_ancestor(3, Orientation::Horizontal)
+        .unwrap();
+    assert_eq!(split_id, 102);
+    assert!(!is_left);
+}

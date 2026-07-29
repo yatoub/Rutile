@@ -6,7 +6,7 @@ use gtk4::prelude::*;
 
 use crate::layout::{Direction, Orientation, PaneId, SplitId, SplitTree};
 use crate::profile::ColorScheme;
-use crate::terminal::{SearchBar, TerminalWidget};
+use crate::terminal::{MarginGuide, SearchBar, TerminalWidget};
 
 /// Owns one session's split tree together with the live terminal widgets,
 /// and renders the tree into nested `GtkPaned`s. On every mutation the
@@ -31,6 +31,7 @@ pub struct PaneView {
     widgets: HashMap<PaneId, TerminalWidget>,
     headers: HashMap<PaneId, gtk4::Box>,
     searches: HashMap<PaneId, SearchBar>,
+    margins: HashMap<PaneId, MarginGuide>,
     /// The `[header, terminal]` wrapper actually placed into the `GtkPaned`
     /// tree — this is what gets reparented on split/close, not the bare
     /// terminal, so the header travels together with it. A `gtk4::Overlay`
@@ -55,6 +56,7 @@ impl PaneView {
             widgets: HashMap::new(),
             headers: HashMap::new(),
             searches: HashMap::new(),
+            margins: HashMap::new(),
             wrappers: HashMap::new(),
             focused: id,
             maximized: None,
@@ -85,6 +87,7 @@ impl PaneView {
             widgets: HashMap::new(),
             headers: HashMap::new(),
             searches: HashMap::new(),
+            margins: HashMap::new(),
             wrappers: HashMap::new(),
             focused,
             maximized: None,
@@ -115,16 +118,19 @@ impl PaneView {
         content.append(widget.widget());
 
         let search = SearchBar::new(widget.widget());
+        let margin = MarginGuide::new(widget.widget());
 
         let wrapper = gtk4::Overlay::new();
         wrapper.set_vexpand(true);
         wrapper.set_hexpand(true);
         wrapper.set_child(Some(&content));
         wrapper.add_overlay(search.widget());
+        wrapper.add_overlay(margin.widget());
 
         self.widgets.insert(id, widget);
         self.headers.insert(id, header);
         self.searches.insert(id, search);
+        self.margins.insert(id, margin);
         self.wrappers.insert(id, wrapper);
     }
 
@@ -132,6 +138,7 @@ impl PaneView {
         self.widgets.remove(&id);
         self.headers.remove(&id);
         self.searches.remove(&id);
+        self.margins.remove(&id);
         self.wrappers.remove(&id);
     }
 
@@ -144,6 +151,16 @@ impl PaneView {
             self.widgets.get(&self.focused),
         ) {
             search.toggle(widget.widget());
+        }
+    }
+
+    /// Toggles the 80-column margin guide for the focused pane
+    /// (`Action::ToggleMargin`). No-op if the focused pane somehow has no
+    /// guide (shouldn't happen — every pane gets one in
+    /// `create_pane_with_cwd`).
+    pub fn toggle_margin(&self) {
+        if let Some(margin) = self.margins.get(&self.focused) {
+            margin.toggle();
         }
     }
 
@@ -243,6 +260,42 @@ impl PaneView {
             self.focused = next;
             self.focus_current();
         }
+    }
+
+    /// Grows/shrinks the focused pane towards `direction` by nudging the
+    /// nearest matching-orientation split's ratio (see
+    /// `SplitTree::find_resizable_ancestor`). No-op (returns `false`) if
+    /// there's no split on that axis at all (e.g. a single pane, or the
+    /// axis only splits somewhere unrelated to the focused pane).
+    pub fn resize_focused(&mut self, direction: Direction) -> bool {
+        const STEP: f32 = 0.05;
+        let axis = match direction {
+            Direction::Left | Direction::Right => Orientation::Horizontal,
+            Direction::Up | Direction::Down => Orientation::Vertical,
+        };
+        let Some((split_id, is_left, ratio)) = self
+            .tree
+            .borrow()
+            .find_resizable_ancestor(self.focused, axis)
+        else {
+            return false;
+        };
+
+        // Growing the pane on the "start" (left/top) side means giving it a
+        // bigger share, i.e. increasing the ratio, when the requested
+        // direction points away from the divider (Right/Down); growing the
+        // "end" (right/bottom) side means the opposite (Left/Up growing it
+        // by shrinking the other side's ratio).
+        let grows_start_side = matches!(direction, Direction::Right | Direction::Down);
+        let delta = if grows_start_side == is_left {
+            STEP
+        } else {
+            -STEP
+        };
+
+        self.tree.borrow_mut().set_ratio(split_id, ratio + delta);
+        self.rebuild();
+        true
     }
 
     pub fn is_leaf_only(&self) -> bool {
