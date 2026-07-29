@@ -86,6 +86,21 @@ pub fn attach(
     });
     terminal.add_controller(gesture);
 
+    // Middle-click paste from the PRIMARY selection (X11/Wayland's
+    // separate "last thing you selected" buffer, distinct from the
+    // Ctrl+C/Ctrl+Shift+C clipboard) — standard xterm/VTE convention, not
+    // wired anywhere else (the context menu's "Paste" and Ctrl+Shift+V
+    // both target the regular clipboard via `paste_clipboard`).
+    let middle_click = gtk4::GestureClick::new();
+    middle_click.set_button(gdk::BUTTON_MIDDLE);
+    {
+        let terminal = terminal.clone();
+        middle_click.connect_pressed(move |_gesture, _n_press, _x, _y| {
+            terminal.paste_primary();
+        });
+    }
+    terminal.add_controller(middle_click);
+
     let session_view_for_focus = session_view.clone();
     let focus_controller = gtk4::EventControllerFocus::new();
     focus_controller.connect_enter(move |_controller| {

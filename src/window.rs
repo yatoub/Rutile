@@ -5,6 +5,7 @@ use gtk4::gio;
 use gtk4::glib;
 use gtk4::prelude::*;
 use libadwaita as adw;
+use vte4::TerminalExt;
 
 use crate::context_menu;
 use crate::keymap::{self, Action};
@@ -237,6 +238,16 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 Action::NextSession => session_view.borrow_mut().next_session(),
                 Action::PrevSession => session_view.borrow_mut().prev_session(),
                 Action::ToggleSearch => session_view.borrow().toggle_search_focused(),
+                Action::Copy => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        terminal.copy_clipboard_format(vte4::Format::Text);
+                    }
+                }
+                Action::Paste => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        terminal.paste_clipboard();
+                    }
+                }
             }
 
             glib::Propagation::Stop

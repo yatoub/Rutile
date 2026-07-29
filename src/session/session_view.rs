@@ -388,6 +388,15 @@ impl SessionView {
         self.sessions.get(&session_id)?.widget_for(pane_id).cloned()
     }
 
+    /// The currently focused pane's terminal widget, across the currently
+    /// selected session — for global keyboard shortcuts (copy/paste) that
+    /// act on "whatever's focused" rather than a specific pane.
+    pub fn focused_terminal(&self) -> Option<vte4::Terminal> {
+        let session_id = self.current_session_id()?;
+        let pane_id = self.focused_pane_id(session_id)?;
+        self.widget_for(session_id, pane_id)
+    }
+
     /// The empty per-pane header box for `pane_id`, for the caller
     /// (`pane_header.rs`) to fill with the sync/maximize/close bar.
     pub fn header_for(&self, session_id: SessionId, pane_id: PaneId) -> Option<gtk4::Box> {
