@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.0] — 2026-07-29
+
+### Added
+
+- Ctrl+shift+c/v and middle-click paste beyond the context menu
+
+- Add a toggle for hyperlink handling, cursor on path hover
+
+- Open OSC 8 hyperlinks on ctrl+click
+
+- Live pane/session titles with rename support
+
+
+### Fixed
+
+- Underline plain http(s) URLs on hover, Tilix-parity
+
+- Restrict hyperlink schemes and open system paths on ctrl+click
+
+
 ## [0.4.0] — 2026-07-28
 
 ### Added
