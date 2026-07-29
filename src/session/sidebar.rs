@@ -169,10 +169,30 @@ fn build_row(session_view: &Rc<RefCell<SessionView>>, session_id: SessionId) -> 
 
     let hbox = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
 
-    let label = gtk4::Label::new(Some(&format!("Session {session_id}")));
+    // `GtkEditableLabel` so a session can be renamed in place (double-click)
+    // — Tilix parity; see `SessionView::session_name`/`rename_session`.
+    let label = gtk4::EditableLabel::new(&session_view.borrow().session_name(session_id));
     label.set_hexpand(true);
     label.set_halign(gtk4::Align::Start);
-    label.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    {
+        let session_view = session_view.clone();
+        label.connect_notify_local(Some("editing"), move |label, _| {
+            if label.is_editing() {
+                return;
+            }
+            let typed = label.text().to_string();
+            session_view
+                .borrow_mut()
+                .rename_session(session_id, Some(typed).filter(|t| !t.trim().is_empty()));
+            // Reflect the resolved name (typed text, or the generic
+            // default if the user cleared it) rather than leaving stale
+            // text in the label.
+            let resolved = session_view.borrow().session_name(session_id);
+            if label.text() != resolved {
+                label.set_text(&resolved);
+            }
+        });
+    }
     hbox.append(&label);
 
     let close_button = gtk4::Button::from_icon_name("window-close-symbolic");

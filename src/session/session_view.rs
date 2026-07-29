@@ -67,6 +67,12 @@ pub struct SessionView {
     /// to save the *profile*, not the resolved colors, so a later scheme
     /// edit is picked up on the next restore.
     session_profiles: HashMap<SessionId, ProfileId>,
+    /// User-set session names (Tilix-style rename via the sidebar's
+    /// `GtkEditableLabel`). Absent = still the generic default — kept out
+    /// of this map rather than pre-seeded so `session_snapshot`/restore
+    /// round-trip only ever writes a real save file name once the user
+    /// actually renamed something.
+    session_names: HashMap<SessionId, String>,
 }
 
 impl SessionView {
@@ -86,6 +92,7 @@ impl SessionView {
             default_scheme,
             default_profile_id,
             session_profiles: HashMap::new(),
+            session_names: HashMap::new(),
         };
         this.new_session();
         this
@@ -199,7 +206,9 @@ impl SessionView {
         let pane_view = PaneView::from_tree(tree, scheme, move |id| {
             cwd_by_new_id.get(&id).cloned().flatten()
         });
-        self.insert_session(saved.profile_id.clone(), pane_view)
+        let session_id = self.insert_session(saved.profile_id.clone(), pane_view);
+        self.session_names.insert(session_id, saved.name.clone());
+        session_id
     }
 
     fn insert_session(&mut self, profile_id: ProfileId, pane_view: PaneView) -> SessionId {
@@ -226,13 +235,31 @@ impl SessionView {
         session_id
     }
 
+    /// This session's display name: the user's own rename (sidebar's
+    /// `GtkEditableLabel`) if set, else the generic Tilix-style default.
+    pub fn session_name(&self, session_id: SessionId) -> String {
+        self.session_names
+            .get(&session_id)
+            .cloned()
+            .unwrap_or_else(|| format!("Session {session_id}"))
+    }
+
+    /// Sets this session's display name (sidebar rename). `None`/empty
+    /// clears the override and reverts to the generic default.
+    pub fn rename_session(&mut self, session_id: SessionId, name: Option<String>) {
+        match name.filter(|n| !n.trim().is_empty()) {
+            Some(name) => {
+                self.session_names.insert(session_id, name);
+            }
+            None => {
+                self.session_names.remove(&session_id);
+            }
+        }
+    }
+
     /// A `SavedSession` snapshot of `session_id`'s current tree/profile/
-    /// per-pane cwd, for `session::persist` to write out. `name` is
-    /// currently always generic (`"Session N"`) — Rutile has no per-session
-    /// title UI yet (see `docs/ROADMAP.md` Phase 3), but the field is
-    /// carried through now so it doesn't need another format migration
-    /// once that lands.
-    pub fn session_snapshot(&self, session_id: SessionId, name: String) -> Option<SavedSession> {
+    /// per-pane cwd/name, for `session::persist` to write out.
+    pub fn session_snapshot(&self, session_id: SessionId) -> Option<SavedSession> {
         let pane_view = self.sessions.get(&session_id)?;
         let profile_id = self.session_profiles.get(&session_id)?.clone();
         let tree = pane_view.tree_snapshot();
@@ -246,7 +273,7 @@ impl SessionView {
             .collect();
 
         Some(SavedSession {
-            name,
+            name: self.session_name(session_id),
             profile_id,
             tree,
             pane_meta,
@@ -281,6 +308,7 @@ impl SessionView {
         }
         self.containers.remove(&id);
         self.session_profiles.remove(&id);
+        self.session_names.remove(&id);
         if let Some(page) = self.pages.remove(&id) {
             self.session_of_page.remove(&page);
             self.tab_view.close_page(&page);
@@ -358,6 +386,15 @@ impl SessionView {
 
     pub fn widget_for(&self, session_id: SessionId, pane_id: PaneId) -> Option<vte4::Terminal> {
         self.sessions.get(&session_id)?.widget_for(pane_id).cloned()
+    }
+
+    /// The currently focused pane's terminal widget, across the currently
+    /// selected session — for global keyboard shortcuts (copy/paste) that
+    /// act on "whatever's focused" rather than a specific pane.
+    pub fn focused_terminal(&self) -> Option<vte4::Terminal> {
+        let session_id = self.current_session_id()?;
+        let pane_id = self.focused_pane_id(session_id)?;
+        self.widget_for(session_id, pane_id)
     }
 
     /// The empty per-pane header box for `pane_id`, for the caller

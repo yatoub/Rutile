@@ -104,6 +104,21 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     }
     behavior_group.add(&copy_on_select_row);
 
+    let hyperlinks_row = adw::SwitchRow::builder()
+        .title("Enable hyperlinks")
+        .subtitle("Ctrl+Click opens OSC 8 links and filesystem paths in terminal output")
+        .active(prefs.borrow().enable_hyperlinks)
+        .build();
+    {
+        let prefs = prefs.clone();
+        hyperlinks_row.connect_active_notify(move |row| {
+            let mut prefs = prefs.borrow_mut();
+            prefs.enable_hyperlinks = row.is_active();
+            prefs.save();
+        });
+    }
+    behavior_group.add(&hyperlinks_row);
+
     page.add(&behavior_group);
     page
 }

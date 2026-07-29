@@ -10,6 +10,7 @@ use crate::pane_header;
 use crate::preferences::Preferences;
 use crate::session::SessionView;
 use crate::terminal::broadcast::{BroadcastGroup, SessionId};
+use crate::terminal::hyperlinks;
 
 /// Wires up interaction for a pane: its Tilix-style header bar (sync
 /// toggle, maximize, close) and its terminal's mouse/keyboard behavior:
@@ -37,7 +38,7 @@ pub fn attach(
     // `pane_header::attach` below would panic ("already borrowed").
     let header = session_view.borrow().header_for(session_id, pane_id);
     if let Some(header) = header {
-        pane_header::attach(session_view.clone(), session_id, pane_id, &header);
+        pane_header::attach(session_view.clone(), session_id, pane_id, &header, terminal);
     }
 
     {
@@ -49,6 +50,8 @@ pub fn attach(
             }
         });
     }
+
+    hyperlinks::attach(terminal, prefs.clone());
 
     let motion_controller = gtk4::EventControllerMotion::new();
     {
@@ -82,6 +85,21 @@ pub fn attach(
         );
     });
     terminal.add_controller(gesture);
+
+    // Middle-click paste from the PRIMARY selection (X11/Wayland's
+    // separate "last thing you selected" buffer, distinct from the
+    // Ctrl+C/Ctrl+Shift+C clipboard) — standard xterm/VTE convention, not
+    // wired anywhere else (the context menu's "Paste" and Ctrl+Shift+V
+    // both target the regular clipboard via `paste_clipboard`).
+    let middle_click = gtk4::GestureClick::new();
+    middle_click.set_button(gdk::BUTTON_MIDDLE);
+    {
+        let terminal = terminal.clone();
+        middle_click.connect_pressed(move |_gesture, _n_press, _x, _y| {
+            terminal.paste_primary();
+        });
+    }
+    terminal.add_controller(middle_click);
 
     let session_view_for_focus = session_view.clone();
     let focus_controller = gtk4::EventControllerFocus::new();
