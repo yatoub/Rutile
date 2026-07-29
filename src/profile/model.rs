@@ -9,6 +9,19 @@ pub struct Profile {
     pub id: ProfileId,
     pub name: String,
     pub scheme_id: String,
+    /// Seconds of no terminal output required, once a burst of CPU
+    /// activity subsides, before `terminal::monitor` fires its "command
+    /// finished" notification for a pane using this profile. `#[serde(default
+    /// = ...)]` (rather than a container-level `#[serde(default)]` like
+    /// `Preferences` has) since `Profile` itself has no meaningful
+    /// `Default` impl — it's always constructed with an explicit
+    /// id/name/scheme_id.
+    #[serde(default = "default_silence_seconds")]
+    pub silence_seconds: u32,
+}
+
+fn default_silence_seconds() -> u32 {
+    10
 }
 
 /// Every known profile, persisted as TOML in
@@ -45,6 +58,7 @@ impl ProfileStore {
                 id: "default".to_string(),
                 name: "Default".to_string(),
                 scheme_id: "catppuccin-mocha".to_string(),
+                silence_seconds: default_silence_seconds(),
             }],
         }
     }
@@ -83,6 +97,7 @@ impl ProfileStore {
             id: id.clone(),
             name: name.to_string(),
             scheme_id: scheme_id.to_string(),
+            silence_seconds: default_silence_seconds(),
         });
         self.save();
         id
@@ -93,7 +108,9 @@ impl ProfileStore {
     pub fn clone_profile(&mut self, id: &str) -> Option<ProfileId> {
         let source = self.get(id)?.clone();
         let new_name = format!("{} copy", source.name);
-        Some(self.create(&new_name, &source.scheme_id))
+        let new_id = self.create(&new_name, &source.scheme_id);
+        self.set_silence_seconds(&new_id, source.silence_seconds);
+        Some(new_id)
     }
 
     pub fn rename(&mut self, id: &str, new_name: &str) {
@@ -106,6 +123,13 @@ impl ProfileStore {
     pub fn set_scheme(&mut self, id: &str, scheme_id: &str) {
         if let Some(profile) = self.get_mut(id) {
             profile.scheme_id = scheme_id.to_string();
+            self.save();
+        }
+    }
+
+    pub fn set_silence_seconds(&mut self, id: &str, silence_seconds: u32) {
+        if let Some(profile) = self.get_mut(id) {
+            profile.silence_seconds = silence_seconds;
             self.save();
         }
     }

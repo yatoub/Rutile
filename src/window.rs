@@ -8,14 +8,31 @@ use libadwaita as adw;
 use vte4::TerminalExt;
 
 use crate::context_menu;
-use crate::keymap::{self, Action};
+use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, Preferences};
-use crate::profile::{ColorScheme, ColorSchemeStore, ProfileStore};
+use crate::profile::{ColorScheme, ColorSchemeStore, ProfileId, ProfileStore};
 use crate::session::persist::{self, SavedWindow};
 use crate::session::session_view::ClosePaneOutcome;
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
+
+/// Resolves a profile id to its current color scheme — shared by
+/// `build_window`'s own `resolve_scheme` closure and `detach_session`, which
+/// needs the same lookup against a *different* window's freshly-loaded
+/// `profiles`/`schemes` stores.
+fn resolve_scheme_for(
+    profiles: &Rc<RefCell<ProfileStore>>,
+    schemes: &Rc<ColorSchemeStore>,
+    profile_id: &ProfileId,
+) -> ColorScheme {
+    let scheme_id = profiles
+        .borrow()
+        .get(profile_id)
+        .map(|p| p.scheme_id.clone())
+        .unwrap_or_else(|| "catppuccin-mocha".to_string());
+    schemes.get_or_default(&scheme_id).clone()
+}
 
 pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let header_bar = adw::HeaderBar::new();
@@ -31,15 +48,12 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let resolve_scheme = {
         let profiles = profiles.clone();
         let schemes = schemes.clone();
-        move |profile_id: &crate::profile::ProfileId| -> ColorScheme {
-            let scheme_id = profiles
-                .borrow()
-                .get(profile_id)
-                .map(|p| p.scheme_id.clone())
-                .unwrap_or_else(|| "catppuccin-mocha".to_string());
-            schemes.get_or_default(&scheme_id).clone()
+        move |profile_id: &ProfileId| -> ColorScheme {
+            resolve_scheme_for(&profiles, &schemes, profile_id)
         }
     };
+
+    let keymap = Rc::new(RefCell::new(Keymap::load()));
 
     let default_profile_id = prefs.borrow().default_profile_id.clone();
     let initial_scheme = resolve_scheme(&default_profile_id);
@@ -69,7 +83,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let sidebar = SessionSidebar::new(session_view.clone());
     sidebar.widget().set_visible(false);
 
-    build_toolbar(&header_bar, &session_view, &prefs, &sidebar);
+    build_toolbar(&header_bar, &session_view, &prefs, &profiles, app, &sidebar);
 
     let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
     body.set_vexpand(true);
@@ -101,7 +115,14 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         for session_id in session_ids {
             let pane_ids = session_view.borrow().pane_ids_for(session_id);
             for pane_id in pane_ids {
-                wire_pane_context_menu_for(&session_view, &prefs, session_id, pane_id);
+                wire_pane_context_menu_for(
+                    &session_view,
+                    &prefs,
+                    &profiles,
+                    app,
+                    session_id,
+                    pane_id,
+                );
             }
         }
     }
@@ -158,6 +179,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         let window_weak = window.downgrade();
         let resolve_scheme = resolve_scheme.clone();
         session_open_action.connect_activate(move |_, _| {
@@ -168,6 +191,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 &window,
                 session_view.clone(),
                 prefs.clone(),
+                profiles.clone(),
+                app.clone(),
                 resolve_scheme.clone(),
             );
         });
@@ -178,8 +203,11 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
-        new_session_action
-            .connect_activate(move |_, _| new_session_and_wire(&session_view, &prefs));
+        let profiles = profiles.clone();
+        let app = app.clone();
+        new_session_action.connect_activate(move |_, _| {
+            new_session_and_wire(&session_view, &prefs, &profiles, &app)
+        });
     }
     window.add_action(&new_session_action);
 
@@ -195,11 +223,18 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         let prefs = prefs.clone();
         let profiles = profiles.clone();
         let schemes = schemes.clone();
+        let keymap = keymap.clone();
         let window_weak = window.downgrade();
         preferences_action.connect_activate(move |_, _| {
             if let Some(window) = window_weak.upgrade() {
-                preferences::window::build(&window, prefs.clone(), profiles.clone(), &schemes)
-                    .present();
+                preferences::window::build(
+                    &window,
+                    prefs.clone(),
+                    profiles.clone(),
+                    &schemes,
+                    keymap.clone(),
+                )
+                .present();
             }
         });
     }
@@ -210,8 +245,13 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
+        let sidebar = sidebar.clone();
+        let keymap = keymap.clone();
+        let window_weak = window.downgrade();
         key_controller.connect_key_pressed(move |_controller, key, _keycode, state| {
-            let Some(action) = keymap::lookup(key, state) else {
+            let Some(action) = keymap.borrow().lookup(key, state) else {
                 return glib::Propagation::Proceed;
             };
 
@@ -220,6 +260,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                     split_focused_and_wire(
                         &session_view,
                         &prefs,
+                        &profiles,
+                        &app,
                         keymap::orientation_for(action).unwrap(),
                     );
                 }
@@ -233,7 +275,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 Action::Navigate(direction) => {
                     session_view.borrow_mut().navigate_focused(direction);
                 }
-                Action::NewSession => new_session_and_wire(&session_view, &prefs),
+                Action::NewSession => new_session_and_wire(&session_view, &prefs, &profiles, &app),
                 Action::CloseSession => close_current_session(&session_view),
                 Action::NextSession => session_view.borrow_mut().next_session(),
                 Action::PrevSession => session_view.borrow_mut().prev_session(),
@@ -248,6 +290,37 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                         terminal.paste_clipboard();
                     }
                 }
+                Action::SwitchToSession(n) => {
+                    let ids = session_view.borrow().session_ids();
+                    let id = n.checked_sub(1).and_then(|i| ids.get(i as usize)).copied();
+                    if let Some(id) = id {
+                        session_view.borrow_mut().select_session(id);
+                    }
+                }
+                Action::ResizePane(direction) => {
+                    session_view.borrow_mut().resize_focused(direction);
+                }
+                Action::ToggleSyncCurrentPane => {
+                    session_view.borrow_mut().toggle_sync_current_pane();
+                }
+                Action::RenameSession => sidebar.start_rename_current(&session_view),
+                Action::RenamePane => session_view.borrow().start_rename_focused_pane(),
+                Action::DetachSession => {
+                    if let Some(window) = window_weak.upgrade() {
+                        detach_session(&window, &session_view);
+                    }
+                }
+                Action::CopyAsHtml => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        terminal.copy_clipboard_format(vte4::Format::Html);
+                    }
+                }
+                Action::PasteAdvanced => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        paste_advanced(&terminal);
+                    }
+                }
+                Action::ToggleMargin => session_view.borrow().toggle_margin_focused(),
             }
 
             glib::Propagation::Stop
@@ -262,6 +335,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         window.set_data("preferences", prefs);
         window.set_data("profiles", profiles);
         window.set_data("schemes", schemes);
+        window.set_data("keymap", keymap);
     }
 
     window
@@ -274,6 +348,8 @@ fn build_toolbar(
     header_bar: &adw::HeaderBar,
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     sidebar: &Rc<SessionSidebar>,
 ) {
     let toggle_sidebar = gtk4::ToggleButton::builder()
@@ -296,8 +372,16 @@ fn build_toolbar(
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         split_h.connect_clicked(move |_| {
-            split_focused_and_wire(&session_view, &prefs, Orientation::Horizontal)
+            split_focused_and_wire(
+                &session_view,
+                &prefs,
+                &profiles,
+                &app,
+                Orientation::Horizontal,
+            )
         });
     }
     header_bar.pack_start(&split_h);
@@ -309,8 +393,16 @@ fn build_toolbar(
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         split_v.connect_clicked(move |_| {
-            split_focused_and_wire(&session_view, &prefs, Orientation::Vertical)
+            split_focused_and_wire(
+                &session_view,
+                &prefs,
+                &profiles,
+                &app,
+                Orientation::Vertical,
+            )
         });
     }
     header_bar.pack_start(&split_v);
@@ -344,6 +436,8 @@ fn build_toolbar(
 fn split_focused_and_wire(
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     orientation: Orientation,
 ) {
     let split = session_view.borrow_mut().split_focused(orientation);
@@ -357,6 +451,8 @@ fn split_focused_and_wire(
             context_menu::attach(
                 session_view.clone(),
                 prefs.clone(),
+                profiles.clone(),
+                app.clone(),
                 session_id,
                 new_id,
                 &terminal,
@@ -365,9 +461,111 @@ fn split_focused_and_wire(
     }
 }
 
-fn new_session_and_wire(session_view: &Rc<RefCell<SessionView>>, prefs: &Rc<RefCell<Preferences>>) {
+/// `Action::PasteAdvanced`: pastes the clipboard's text with the same
+/// cleanup Tilix's own advanced paste applies before feeding it to the
+/// child process — CRLF/CR normalized to LF and trailing whitespace on each
+/// line stripped, so pasted shell commands don't pick up stray `^M`s or
+/// accidentally-included trailing spaces. The heuristic "this looks unsafe
+/// to paste" warning dialog Tilix also has is a separate, later addition
+/// (see `docs/ROADMAP.md` Phase 5) — this is just the transform itself.
+fn paste_advanced(terminal: &vte4::Terminal) {
+    let terminal = terminal.clone();
+    terminal
+        .clipboard()
+        .read_text_async(gio::Cancellable::NONE, move |result| {
+            let Ok(Some(text)) = result else { return };
+            let cleaned: String = text
+                .replace("\r\n", "\n")
+                .replace('\r', "\n")
+                .lines()
+                .map(|line| line.trim_end())
+                .collect::<Vec<_>>()
+                .join("\n");
+            terminal.feed_child(cleaned.as_bytes());
+        });
+}
+
+/// `Action::DetachSession`: pulls the currently selected session out of
+/// `window` and into a brand new one, Tilix-style. Reuses `build_window`
+/// wholesale (it's already fully self-contained per-window) rather than
+/// inventing a second construction path — the new window starts with its
+/// own blank default session, which gets replaced by the detached one and
+/// closed. Like every other session restore, this respawns fresh shells in
+/// the same working directories rather than actually moving the live PTYs
+/// (see `session::persist`'s own doc comment on that same limitation).
+fn detach_session(window: &adw::ApplicationWindow, session_view: &Rc<RefCell<SessionView>>) {
+    let Some(app) = window
+        .application()
+        .and_then(|a| a.downcast::<adw::Application>().ok())
+    else {
+        return;
+    };
+    let Some(session_id) = session_view.borrow().current_session_id() else {
+        return;
+    };
+    let Some(saved) = session_view.borrow().session_snapshot(session_id) else {
+        return;
+    };
+
+    let new_window = build_window(&app);
+    new_window.present();
+
+    let new_session_view = unsafe {
+        new_window
+            .data::<Rc<RefCell<SessionView>>>("session-view")
+            .map(|p| p.as_ref().clone())
+    };
+    let new_profiles = unsafe {
+        new_window
+            .data::<Rc<RefCell<ProfileStore>>>("profiles")
+            .map(|p| p.as_ref().clone())
+    };
+    let new_schemes = unsafe {
+        new_window
+            .data::<Rc<ColorSchemeStore>>("schemes")
+            .map(|p| p.as_ref().clone())
+    };
+    let new_prefs = unsafe {
+        new_window
+            .data::<Rc<RefCell<Preferences>>>("preferences")
+            .map(|p| p.as_ref().clone())
+    };
+
+    if let (Some(new_session_view), Some(new_profiles), Some(new_schemes), Some(new_prefs)) =
+        (new_session_view, new_profiles, new_schemes, new_prefs)
+    {
+        let scheme = resolve_scheme_for(&new_profiles, &new_schemes, &saved.profile_id);
+        let stale_ids = new_session_view.borrow().session_ids();
+
+        let restored_id = new_session_view
+            .borrow_mut()
+            .restore_session(&saved, scheme);
+        for pane_id in new_session_view.borrow().pane_ids_for(restored_id) {
+            wire_pane_context_menu_for(
+                &new_session_view,
+                &new_prefs,
+                &new_profiles,
+                &app,
+                restored_id,
+                pane_id,
+            );
+        }
+        for stale_id in stale_ids {
+            new_session_view.borrow_mut().close_session(stale_id);
+        }
+    }
+
+    session_view.borrow_mut().close_session(session_id);
+}
+
+fn new_session_and_wire(
+    session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
+) {
     let session_id = session_view.borrow_mut().new_session();
-    wire_pane_context_menu(session_view, prefs, session_id);
+    wire_pane_context_menu(session_view, prefs, profiles, app, session_id);
 }
 
 fn close_current_session(session_view: &Rc<RefCell<SessionView>>) {
@@ -428,6 +626,8 @@ fn open_session(
     window: &adw::ApplicationWindow,
     session_view: Rc<RefCell<SessionView>>,
     prefs: Rc<RefCell<Preferences>>,
+    profiles: Rc<RefCell<ProfileStore>>,
+    app: adw::Application,
     resolve_scheme: impl Fn(&crate::profile::ProfileId) -> ColorScheme + 'static,
 ) {
     let dialog = gtk4::FileDialog::builder()
@@ -457,7 +657,14 @@ fn open_session(
         for &session_id in &session_ids {
             let pane_ids = session_view.borrow().pane_ids_for(session_id);
             for pane_id in pane_ids {
-                wire_pane_context_menu_for(&session_view, &prefs, session_id, pane_id);
+                wire_pane_context_menu_for(
+                    &session_view,
+                    &prefs,
+                    &profiles,
+                    &app,
+                    session_id,
+                    pane_id,
+                );
             }
         }
     });
@@ -468,11 +675,13 @@ fn open_session(
 fn wire_pane_context_menu(
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     session_id: SessionId,
 ) {
     let pane_id = session_view.borrow().focused_pane_id(session_id);
     if let Some(pane_id) = pane_id {
-        wire_pane_context_menu_for(session_view, prefs, session_id, pane_id);
+        wire_pane_context_menu_for(session_view, prefs, profiles, app, session_id, pane_id);
     }
 }
 
@@ -483,6 +692,8 @@ fn wire_pane_context_menu(
 fn wire_pane_context_menu_for(
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     session_id: SessionId,
     pane_id: PaneId,
 ) {
@@ -491,6 +702,8 @@ fn wire_pane_context_menu_for(
         context_menu::attach(
             session_view.clone(),
             prefs.clone(),
+            profiles.clone(),
+            app.clone(),
             session_id,
             pane_id,
             &terminal,

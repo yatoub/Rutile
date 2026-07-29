@@ -73,6 +73,11 @@ pub struct SessionView {
     /// round-trip only ever writes a real save file name once the user
     /// actually renamed something.
     session_names: HashMap<SessionId, String>,
+    /// Each pane's header title `EditableLabel` (see `pane_header::attach`),
+    /// kept here so `Action::RenamePane` can trigger `start_editing()` on
+    /// whichever pane is currently focused without `pane_header.rs` having
+    /// to know anything about the keyboard layer.
+    pane_title_labels: HashMap<PaneId, gtk4::EditableLabel>,
 }
 
 impl SessionView {
@@ -93,6 +98,7 @@ impl SessionView {
             default_profile_id,
             session_profiles: HashMap::new(),
             session_names: HashMap::new(),
+            pane_title_labels: HashMap::new(),
         };
         this.new_session();
         this
@@ -304,6 +310,7 @@ impl SessionView {
             for pane_id in pane_view.pane_ids() {
                 self.broadcast.unregister_pane(id, pane_id);
                 self.sync_listeners.remove(&pane_id);
+                self.pane_title_labels.remove(&pane_id);
             }
         }
         self.containers.remove(&id);
@@ -368,6 +375,12 @@ impl SessionView {
         Some(pane_id)
     }
 
+    /// The profile a session was created/restored with — for
+    /// `terminal::monitor` to look up its (live) `silence_seconds` per pane.
+    pub fn profile_id_for(&self, session_id: SessionId) -> Option<ProfileId> {
+        self.session_profiles.get(&session_id).cloned()
+    }
+
     pub fn focused_pane_id(&self, session_id: SessionId) -> Option<PaneId> {
         self.sessions
             .get(&session_id)
@@ -386,6 +399,11 @@ impl SessionView {
 
     pub fn widget_for(&self, session_id: SessionId, pane_id: PaneId) -> Option<vte4::Terminal> {
         self.sessions.get(&session_id)?.widget_for(pane_id).cloned()
+    }
+
+    /// The pane's shell pid, for `terminal::monitor`'s `/proc` polling.
+    pub fn child_pid(&self, session_id: SessionId, pane_id: PaneId) -> Option<i32> {
+        self.sessions.get(&session_id)?.child_pid(pane_id)
     }
 
     /// The currently focused pane's terminal widget, across the currently
@@ -507,6 +525,7 @@ impl SessionView {
             Some(pane_id) => {
                 self.broadcast.unregister_pane(session_id, pane_id);
                 self.sync_listeners.remove(&pane_id);
+                self.pane_title_labels.remove(&pane_id);
                 self.resync_page_child(session_id);
                 ClosePaneOutcome::PaneClosed
             }
@@ -522,6 +541,56 @@ impl SessionView {
             && let Some(pane_view) = self.sessions.get_mut(&session_id)
         {
             pane_view.navigate(direction);
+        }
+    }
+
+    /// Grows/shrinks the focused pane of the current session towards
+    /// `direction` (`Action::ResizePane`). No-op if there's no session, or
+    /// no split on the requested axis (see `PaneView::resize_focused`).
+    pub fn resize_focused(&mut self, direction: Direction) {
+        if let Some(session_id) = self.current_session_id()
+            && let Some(pane_view) = self.sessions.get_mut(&session_id)
+            && pane_view.resize_focused(direction)
+        {
+            self.resync_page_child(session_id);
+        }
+    }
+
+    /// Toggles the broadcast-sync exclusion of the currently focused pane
+    /// (`Action::ToggleSyncCurrentPane` — same effect as clicking its
+    /// header's sync button). No-op if there's no current session/pane.
+    pub fn toggle_sync_current_pane(&mut self) {
+        if let Some(session_id) = self.current_session_id()
+            && let Some(pane_id) = self.focused_pane_id(session_id)
+        {
+            self.toggle_pane_sync_exclusion(pane_id);
+        }
+    }
+
+    /// Registers `pane_id`'s header title label so `start_rename_focused_pane`
+    /// can later trigger `EditableLabel::start_editing()` on it.
+    pub fn register_pane_title_label(&mut self, pane_id: PaneId, label: gtk4::EditableLabel) {
+        self.pane_title_labels.insert(pane_id, label);
+    }
+
+    /// Enters edit mode on the currently focused pane's title
+    /// (`Action::RenamePane`). No-op if there's no current session/pane.
+    pub fn start_rename_focused_pane(&self) {
+        if let Some(session_id) = self.current_session_id()
+            && let Some(pane_id) = self.focused_pane_id(session_id)
+            && let Some(label) = self.pane_title_labels.get(&pane_id)
+        {
+            label.start_editing();
+        }
+    }
+
+    /// Toggles the 80-column margin guide for the focused pane
+    /// (`Action::ToggleMargin`).
+    pub fn toggle_margin_focused(&self) {
+        if let Some(session_id) = self.current_session_id()
+            && let Some(pane_view) = self.sessions.get(&session_id)
+        {
+            pane_view.toggle_margin();
         }
     }
 
