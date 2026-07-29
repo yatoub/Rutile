@@ -1,8 +1,12 @@
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+
 use gtk4::gdk;
 use gtk4::gio;
 use gtk4::prelude::*;
 use vte4::TerminalExt;
 
+use crate::preferences::Preferences;
 use crate::terminal::title;
 
 /// Schemes we'll actually hand to `AppInfo::launch_default_for_uri` for an
@@ -35,8 +39,61 @@ const ALLOWED_SCHEMES: &[&str] = &["http://", "https://", "mailto:", "file://"];
 /// reads the row's text via `text_range_format` (available, unlike
 /// match-checking) and does its own token/existence check instead of
 /// relying on VTE's internal match engine.
-pub fn attach(terminal: &vte4::Terminal) {
-    terminal.set_allow_hyperlink(true);
+///
+/// Gated end-to-end by `Preferences::enable_hyperlinks` (checked live on
+/// every motion/click, not just at attach time, so toggling it in
+/// Preferences takes effect immediately without re-attaching): when off,
+/// `allow-hyperlink` is turned back off too (killing VTE's own native
+/// hover-underline+cursor for real OSC 8 links, not just our click
+/// handler), and the plain-path hover cursor below never fires.
+///
+/// Hover feedback differs by kind because only one of them is something
+/// VTE knows about:
+/// - Real OSC 8 hyperlinks already get a hand cursor and an underline
+///   from VTE itself whenever `allow-hyperlink` is on — nothing to add.
+/// - Plain filesystem paths are entirely our own detection (VTE has no
+///   concept of them), so VTE can't render an underline for one; the
+///   best available affordance is switching to a pointer cursor while
+///   Ctrl is held over a token that resolves to a real path.
+pub fn attach(terminal: &vte4::Terminal, prefs: Rc<RefCell<Preferences>>) {
+    terminal.set_allow_hyperlink(prefs.borrow().enable_hyperlinks);
+
+    let showing_pointer = Rc::new(Cell::new(false));
+
+    let motion = gtk4::EventControllerMotion::new();
+    {
+        let terminal = terminal.clone();
+        let prefs = prefs.clone();
+        let showing_pointer = showing_pointer.clone();
+        motion.connect_motion(move |controller, x, y| {
+            let enabled = prefs.borrow().enable_hyperlinks;
+            terminal.set_allow_hyperlink(enabled);
+
+            let ctrl = controller
+                .current_event_state()
+                .contains(gdk::ModifierType::CONTROL_MASK);
+            let wants_pointer = enabled
+                && ctrl
+                && terminal.check_hyperlink_at(x, y).is_none()
+                && system_path_uri_at(&terminal, x, y).is_some();
+
+            if wants_pointer != showing_pointer.get() {
+                terminal.set_cursor_from_name(if wants_pointer { Some("pointer") } else { None });
+                showing_pointer.set(wants_pointer);
+            }
+        });
+    }
+    {
+        let terminal = terminal.clone();
+        let showing_pointer = showing_pointer.clone();
+        motion.connect_leave(move |_| {
+            if showing_pointer.get() {
+                terminal.set_cursor_from_name(None);
+                showing_pointer.set(false);
+            }
+        });
+    }
+    terminal.add_controller(motion);
 
     let click = gtk4::GestureClick::new();
     click.set_button(gdk::BUTTON_PRIMARY);
@@ -46,6 +103,9 @@ pub fn attach(terminal: &vte4::Terminal) {
     {
         let terminal = terminal.clone();
         click.connect_pressed(move |gesture, _n_press, x, y| {
+            if !prefs.borrow().enable_hyperlinks {
+                return;
+            }
             let state = gesture.current_event_state();
             if !state.contains(gdk::ModifierType::CONTROL_MASK) {
                 return;

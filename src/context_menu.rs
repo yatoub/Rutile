@@ -51,7 +51,7 @@ pub fn attach(
         });
     }
 
-    hyperlinks::attach(terminal);
+    hyperlinks::attach(terminal, prefs.clone());
 
     let motion_controller = gtk4::EventControllerMotion::new();
     {
