@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.0] — 2026-07-29
+
+### Added
+
+- Background notifications (bell + silence-after-activity)
+
+- Extended keyboard actions, configurable TOML keymap, shortcuts prefs page
+
+
+### Fixed
+
+- Stop crashing AdwPreferencesGroup on Shortcuts rebuild
+
+
 ## [0.5.0] — 2026-07-29
 
 ### Added
