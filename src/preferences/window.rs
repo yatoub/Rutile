@@ -154,6 +154,7 @@ fn placeholder_page(title: &str, icon_name: &str, message: &str) -> adw::Prefere
 struct ShortcutsPage {
     page: adw::PreferencesPage,
     group: adw::PreferencesGroup,
+    rows: RefCell<Vec<adw::ActionRow>>,
     keymap: Rc<RefCell<Keymap>>,
 }
 
@@ -172,6 +173,7 @@ impl ShortcutsPage {
         let this = Rc::new(Self {
             page,
             group,
+            rows: RefCell::new(Vec::new()),
             keymap,
         });
         this.rebuild();
@@ -183,7 +185,7 @@ impl ShortcutsPage {
     }
 
     fn rebuild(self: &Rc<Self>) {
-        while let Some(row) = self.group.first_child() {
+        for row in self.rows.borrow_mut().drain(..) {
             self.group.remove(&row);
         }
 
@@ -226,6 +228,7 @@ impl ShortcutsPage {
             }
             row.add_suffix(&edit_button);
             self.group.add(&row);
+            self.rows.borrow_mut().push(row);
         }
     }
 }
