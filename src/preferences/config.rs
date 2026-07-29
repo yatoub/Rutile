@@ -23,6 +23,12 @@ pub struct Preferences {
     /// equivalent to mirror here (Tilix predates OSC 8 support), so
     /// defaults on since it's a strictly additive, opt-out affordance.
     pub enable_hyperlinks: bool,
+    /// Background pane notifications (bell + "command finished after
+    /// silence", see `terminal::monitor`). A single global on/off switch —
+    /// the *timing* of the silence trigger is per-profile
+    /// (`Profile::silence_seconds`), but whether it's active at all isn't
+    /// worth exposing per-profile too.
+    pub enable_notifications: bool,
     /// Which profile (`crate::profile::ProfileStore`) new sessions are
     /// created with. Kept here rather than on `ProfileStore` itself since
     /// it's a cross-cutting *setting* (which profile is active), not part
@@ -37,6 +43,7 @@ impl Default for Preferences {
             close_window_on_last_session_closed: true,
             copy_on_select: true,
             enable_hyperlinks: true,
+            enable_notifications: true,
             default_profile_id: "default".to_string(),
         }
     }

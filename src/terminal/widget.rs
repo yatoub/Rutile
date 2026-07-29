@@ -1,3 +1,6 @@
+use std::cell::Cell;
+use std::rc::Rc;
+
 use gtk4::glib;
 use gtk4::prelude::*;
 use vte4::TerminalExt;
@@ -7,6 +10,12 @@ use crate::profile::ColorScheme;
 
 pub struct TerminalWidget {
     pub terminal: vte4::Terminal,
+    /// The shell's pid, captured from `spawn_async`'s own callback (vte
+    /// doesn't expose a `child_pid()` getter) — `None` until the spawn
+    /// actually completes, and forever `None` if it failed. Used by
+    /// `terminal::monitor` to poll `/proc/<pid>/stat` for its "silence
+    /// after activity" notification.
+    pid: Rc<Cell<Option<i32>>>,
 }
 
 impl TerminalWidget {
@@ -27,24 +36,33 @@ impl TerminalWidget {
         let palette_refs: Vec<&gtk4::gdk::RGBA> = palette.iter().collect();
         terminal.set_colors(Some(&foreground), Some(&background), &palette_refs);
 
+        let pid = Rc::new(Cell::new(None));
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-        terminal.spawn_async(
-            vte4::PtyFlags::DEFAULT,
-            cwd,
-            &[&shell],
-            &[],
-            glib::SpawnFlags::DEFAULT,
-            || {},
-            -1,
-            gtk4::gio::Cancellable::NONE,
-            |result| {
-                if let Err(err) = result {
-                    eprintln!("[rutile] spawn_async failed: {err}");
-                }
-            },
-        );
+        {
+            let pid = pid.clone();
+            terminal.spawn_async(
+                vte4::PtyFlags::DEFAULT,
+                cwd,
+                &[&shell],
+                &[],
+                glib::SpawnFlags::DEFAULT,
+                || {},
+                -1,
+                gtk4::gio::Cancellable::NONE,
+                move |result| match result {
+                    Ok(child_pid) => pid.set(Some(child_pid.0)),
+                    Err(err) => eprintln!("[rutile] spawn_async failed: {err}"),
+                },
+            );
+        }
 
-        Self { terminal }
+        Self { terminal, pid }
+    }
+
+    /// The shell's pid, once `spawn_async` has completed. See the `pid`
+    /// field's doc comment.
+    pub fn child_pid(&self) -> Option<i32> {
+        self.pid.get()
     }
 
     pub fn widget(&self) -> &vte4::Terminal {

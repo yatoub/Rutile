@@ -195,6 +195,11 @@ impl PaneView {
         self.widgets.get(&id).map(|w| w.widget())
     }
 
+    /// The pane's shell pid, for `terminal::monitor`'s `/proc` polling.
+    pub fn child_pid(&self, id: PaneId) -> Option<i32> {
+        self.widgets.get(&id)?.child_pid()
+    }
+
     /// The empty per-pane header box for `id`, for the caller to fill with
     /// the sync/maximize/close bar.
     pub fn header_for(&self, id: PaneId) -> Option<&gtk4::Box> {

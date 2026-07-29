@@ -1,6 +1,7 @@
 pub mod broadcast;
 pub mod hyperlinks;
 pub mod margin;
+pub mod monitor;
 pub mod search;
 pub mod title;
 pub mod widget;

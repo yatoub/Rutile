@@ -83,7 +83,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let sidebar = SessionSidebar::new(session_view.clone());
     sidebar.widget().set_visible(false);
 
-    build_toolbar(&header_bar, &session_view, &prefs, &sidebar);
+    build_toolbar(&header_bar, &session_view, &prefs, &profiles, app, &sidebar);
 
     let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
     body.set_vexpand(true);
@@ -115,7 +115,14 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         for session_id in session_ids {
             let pane_ids = session_view.borrow().pane_ids_for(session_id);
             for pane_id in pane_ids {
-                wire_pane_context_menu_for(&session_view, &prefs, session_id, pane_id);
+                wire_pane_context_menu_for(
+                    &session_view,
+                    &prefs,
+                    &profiles,
+                    app,
+                    session_id,
+                    pane_id,
+                );
             }
         }
     }
@@ -172,6 +179,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         let window_weak = window.downgrade();
         let resolve_scheme = resolve_scheme.clone();
         session_open_action.connect_activate(move |_, _| {
@@ -182,6 +191,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 &window,
                 session_view.clone(),
                 prefs.clone(),
+                profiles.clone(),
+                app.clone(),
                 resolve_scheme.clone(),
             );
         });
@@ -192,8 +203,11 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
-        new_session_action
-            .connect_activate(move |_, _| new_session_and_wire(&session_view, &prefs));
+        let profiles = profiles.clone();
+        let app = app.clone();
+        new_session_action.connect_activate(move |_, _| {
+            new_session_and_wire(&session_view, &prefs, &profiles, &app)
+        });
     }
     window.add_action(&new_session_action);
 
@@ -231,6 +245,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         let sidebar = sidebar.clone();
         let keymap = keymap.clone();
         let window_weak = window.downgrade();
@@ -244,6 +260,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                     split_focused_and_wire(
                         &session_view,
                         &prefs,
+                        &profiles,
+                        &app,
                         keymap::orientation_for(action).unwrap(),
                     );
                 }
@@ -257,7 +275,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 Action::Navigate(direction) => {
                     session_view.borrow_mut().navigate_focused(direction);
                 }
-                Action::NewSession => new_session_and_wire(&session_view, &prefs),
+                Action::NewSession => new_session_and_wire(&session_view, &prefs, &profiles, &app),
                 Action::CloseSession => close_current_session(&session_view),
                 Action::NextSession => session_view.borrow_mut().next_session(),
                 Action::PrevSession => session_view.borrow_mut().prev_session(),
@@ -330,6 +348,8 @@ fn build_toolbar(
     header_bar: &adw::HeaderBar,
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     sidebar: &Rc<SessionSidebar>,
 ) {
     let toggle_sidebar = gtk4::ToggleButton::builder()
@@ -352,8 +372,16 @@ fn build_toolbar(
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         split_h.connect_clicked(move |_| {
-            split_focused_and_wire(&session_view, &prefs, Orientation::Horizontal)
+            split_focused_and_wire(
+                &session_view,
+                &prefs,
+                &profiles,
+                &app,
+                Orientation::Horizontal,
+            )
         });
     }
     header_bar.pack_start(&split_h);
@@ -365,8 +393,16 @@ fn build_toolbar(
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         split_v.connect_clicked(move |_| {
-            split_focused_and_wire(&session_view, &prefs, Orientation::Vertical)
+            split_focused_and_wire(
+                &session_view,
+                &prefs,
+                &profiles,
+                &app,
+                Orientation::Vertical,
+            )
         });
     }
     header_bar.pack_start(&split_v);
@@ -400,6 +436,8 @@ fn build_toolbar(
 fn split_focused_and_wire(
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     orientation: Orientation,
 ) {
     let split = session_view.borrow_mut().split_focused(orientation);
@@ -413,6 +451,8 @@ fn split_focused_and_wire(
             context_menu::attach(
                 session_view.clone(),
                 prefs.clone(),
+                profiles.clone(),
+                app.clone(),
                 session_id,
                 new_id,
                 &terminal,
@@ -501,7 +541,14 @@ fn detach_session(window: &adw::ApplicationWindow, session_view: &Rc<RefCell<Ses
             .borrow_mut()
             .restore_session(&saved, scheme);
         for pane_id in new_session_view.borrow().pane_ids_for(restored_id) {
-            wire_pane_context_menu_for(&new_session_view, &new_prefs, restored_id, pane_id);
+            wire_pane_context_menu_for(
+                &new_session_view,
+                &new_prefs,
+                &new_profiles,
+                &app,
+                restored_id,
+                pane_id,
+            );
         }
         for stale_id in stale_ids {
             new_session_view.borrow_mut().close_session(stale_id);
@@ -511,9 +558,14 @@ fn detach_session(window: &adw::ApplicationWindow, session_view: &Rc<RefCell<Ses
     session_view.borrow_mut().close_session(session_id);
 }
 
-fn new_session_and_wire(session_view: &Rc<RefCell<SessionView>>, prefs: &Rc<RefCell<Preferences>>) {
+fn new_session_and_wire(
+    session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
+) {
     let session_id = session_view.borrow_mut().new_session();
-    wire_pane_context_menu(session_view, prefs, session_id);
+    wire_pane_context_menu(session_view, prefs, profiles, app, session_id);
 }
 
 fn close_current_session(session_view: &Rc<RefCell<SessionView>>) {
@@ -574,6 +626,8 @@ fn open_session(
     window: &adw::ApplicationWindow,
     session_view: Rc<RefCell<SessionView>>,
     prefs: Rc<RefCell<Preferences>>,
+    profiles: Rc<RefCell<ProfileStore>>,
+    app: adw::Application,
     resolve_scheme: impl Fn(&crate::profile::ProfileId) -> ColorScheme + 'static,
 ) {
     let dialog = gtk4::FileDialog::builder()
@@ -603,7 +657,14 @@ fn open_session(
         for &session_id in &session_ids {
             let pane_ids = session_view.borrow().pane_ids_for(session_id);
             for pane_id in pane_ids {
-                wire_pane_context_menu_for(&session_view, &prefs, session_id, pane_id);
+                wire_pane_context_menu_for(
+                    &session_view,
+                    &prefs,
+                    &profiles,
+                    &app,
+                    session_id,
+                    pane_id,
+                );
             }
         }
     });
@@ -614,11 +675,13 @@ fn open_session(
 fn wire_pane_context_menu(
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     session_id: SessionId,
 ) {
     let pane_id = session_view.borrow().focused_pane_id(session_id);
     if let Some(pane_id) = pane_id {
-        wire_pane_context_menu_for(session_view, prefs, session_id, pane_id);
+        wire_pane_context_menu_for(session_view, prefs, profiles, app, session_id, pane_id);
     }
 }
 
@@ -629,6 +692,8 @@ fn wire_pane_context_menu(
 fn wire_pane_context_menu_for(
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     session_id: SessionId,
     pane_id: PaneId,
 ) {
@@ -637,6 +702,8 @@ fn wire_pane_context_menu_for(
         context_menu::attach(
             session_view.clone(),
             prefs.clone(),
+            profiles.clone(),
+            app.clone(),
             session_id,
             pane_id,
             &terminal,

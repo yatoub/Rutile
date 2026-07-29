@@ -375,6 +375,12 @@ impl SessionView {
         Some(pane_id)
     }
 
+    /// The profile a session was created/restored with — for
+    /// `terminal::monitor` to look up its (live) `silence_seconds` per pane.
+    pub fn profile_id_for(&self, session_id: SessionId) -> Option<ProfileId> {
+        self.session_profiles.get(&session_id).cloned()
+    }
+
     pub fn focused_pane_id(&self, session_id: SessionId) -> Option<PaneId> {
         self.sessions
             .get(&session_id)
@@ -393,6 +399,11 @@ impl SessionView {
 
     pub fn widget_for(&self, session_id: SessionId, pane_id: PaneId) -> Option<vte4::Terminal> {
         self.sessions.get(&session_id)?.widget_for(pane_id).cloned()
+    }
+
+    /// The pane's shell pid, for `terminal::monitor`'s `/proc` polling.
+    pub fn child_pid(&self, session_id: SessionId, pane_id: PaneId) -> Option<i32> {
+        self.sessions.get(&session_id)?.child_pid(pane_id)
     }
 
     /// The currently focused pane's terminal widget, across the currently

@@ -121,6 +121,21 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     }
     behavior_group.add(&hyperlinks_row);
 
+    let notifications_row = adw::SwitchRow::builder()
+        .title("Enable notifications")
+        .subtitle("Desktop notification on bell, or when a pane goes quiet after activity")
+        .active(prefs.borrow().enable_notifications)
+        .build();
+    {
+        let prefs = prefs.clone();
+        notifications_row.connect_active_notify(move |row| {
+            let mut prefs = prefs.borrow_mut();
+            prefs.enable_notifications = row.is_active();
+            prefs.save();
+        });
+    }
+    behavior_group.add(&notifications_row);
+
     page.add(&behavior_group);
     page
 }
@@ -397,6 +412,26 @@ impl ProfilesPage {
             });
         }
         group.add(&scheme_row);
+
+        let silence_adjustment =
+            gtk4::Adjustment::new(profile.silence_seconds as f64, 1.0, 300.0, 1.0, 5.0, 0.0);
+        let silence_row = adw::SpinRow::builder()
+            .title("Notify after silence")
+            .subtitle(
+                "Seconds of no output, after activity, before a \"command finished\" notification",
+            )
+            .adjustment(&silence_adjustment)
+            .build();
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            silence_row.connect_value_notify(move |row| {
+                this.profiles
+                    .borrow_mut()
+                    .set_silence_seconds(&profile_id, row.value() as u32);
+            });
+        }
+        group.add(&silence_row);
 
         let default_row = adw::SwitchRow::builder()
             .title("Default profile")

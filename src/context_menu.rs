@@ -3,14 +3,16 @@ use std::rc::Rc;
 
 use gtk4::gdk;
 use gtk4::prelude::*;
+use libadwaita as adw;
 use vte4::TerminalExt;
 
 use crate::layout::{Orientation, PaneId};
 use crate::pane_header;
 use crate::preferences::Preferences;
+use crate::profile::ProfileStore;
 use crate::session::SessionView;
 use crate::terminal::broadcast::{BroadcastGroup, SessionId};
-use crate::terminal::hyperlinks;
+use crate::terminal::{hyperlinks, monitor};
 
 /// Wires up interaction for a pane: its Tilix-style header bar (sync
 /// toggle, maximize, close) and its terminal's mouse/keyboard behavior:
@@ -27,6 +29,8 @@ use crate::terminal::hyperlinks;
 pub fn attach(
     session_view: Rc<RefCell<SessionView>>,
     prefs: Rc<RefCell<Preferences>>,
+    profiles: Rc<RefCell<ProfileStore>>,
+    app: adw::Application,
     session_id: SessionId,
     pane_id: PaneId,
     terminal: &vte4::Terminal,
@@ -53,6 +57,29 @@ pub fn attach(
 
     hyperlinks::attach(terminal, prefs.clone());
 
+    {
+        let pid = {
+            let session_view = session_view.clone();
+            move || session_view.borrow().child_pid(session_id, pane_id)
+        };
+        let enabled = {
+            let prefs = prefs.clone();
+            move || prefs.borrow().enable_notifications
+        };
+        let silence_seconds = {
+            let session_view = session_view.clone();
+            let profiles = profiles.clone();
+            move || {
+                session_view
+                    .borrow()
+                    .profile_id_for(session_id)
+                    .and_then(|id| profiles.borrow().get(&id).map(|p| p.silence_seconds))
+                    .unwrap_or(10)
+            }
+        };
+        monitor::attach(app.clone(), terminal, pid, enabled, silence_seconds);
+    }
+
     let motion_controller = gtk4::EventControllerMotion::new();
     {
         let session_view = session_view.clone();
@@ -73,10 +100,14 @@ pub fn attach(
     let terminal_for_menu = terminal.clone();
     let session_view_for_menu = session_view.clone();
     let prefs_for_menu = prefs.clone();
+    let profiles_for_menu = profiles.clone();
+    let app_for_menu = app.clone();
     gesture.connect_pressed(move |_gesture, _n_press, x, y| {
         show_menu(
             session_view_for_menu.clone(),
             prefs_for_menu.clone(),
+            profiles_for_menu.clone(),
+            app_for_menu.clone(),
             session_id,
             pane_id,
             &terminal_for_menu,
@@ -141,9 +172,12 @@ pub fn attach(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn show_menu(
     session_view: Rc<RefCell<SessionView>>,
     prefs: Rc<RefCell<Preferences>>,
+    profiles: Rc<RefCell<ProfileStore>>,
+    app: adw::Application,
     session_id: SessionId,
     pane_id: PaneId,
     terminal: &vte4::Terminal,
@@ -193,10 +227,14 @@ fn show_menu(
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         add_action(&menu_box, &popover, "Diviser horizontalement", move || {
             split_and_wire(
                 &session_view,
                 &prefs,
+                &profiles,
+                &app,
                 session_id,
                 pane_id,
                 Orientation::Horizontal,
@@ -206,10 +244,14 @@ fn show_menu(
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();
+        let profiles = profiles.clone();
+        let app = app.clone();
         add_action(&menu_box, &popover, "Diviser verticalement", move || {
             split_and_wire(
                 &session_view,
                 &prefs,
+                &profiles,
+                &app,
                 session_id,
                 pane_id,
                 Orientation::Vertical,
@@ -263,6 +305,8 @@ fn add_action(
 fn split_and_wire(
     session_view: &Rc<RefCell<SessionView>>,
     prefs: &Rc<RefCell<Preferences>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    app: &adw::Application,
     session_id: SessionId,
     pane_id: PaneId,
     orientation: Orientation,
@@ -279,6 +323,8 @@ fn split_and_wire(
         attach(
             session_view.clone(),
             prefs.clone(),
+            profiles.clone(),
+            app.clone(),
             session_id,
             new_id,
             &terminal,
