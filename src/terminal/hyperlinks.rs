@@ -10,53 +10,74 @@ use crate::preferences::Preferences;
 use crate::terminal::title;
 
 /// Schemes we'll actually hand to `AppInfo::launch_default_for_uri` for an
-/// OSC 8 hyperlink. OSC 8 payloads come straight from whatever's running
-/// in the terminal (an attacker-controlled `cat`/`curl` output, a
-/// compromised build script, ...), so this isn't optional hardening: an
-/// unfiltered scheme lets arbitrary output silently trigger any URI
-/// handler registered on the system (custom app schemes, `javascript:`
-/// under some handler, etc.), not just "open a browser tab".
+/// OSC 8 hyperlink or a plain-text URL match. Both come straight from
+/// whatever's running in the terminal (an attacker-controlled `cat`/`curl`
+/// output, a compromised build script, ...), so this isn't optional
+/// hardening: an unfiltered scheme lets arbitrary output silently trigger
+/// any URI handler registered on the system (custom app schemes,
+/// `javascript:` under some handler, etc.), not just "open a browser tab".
 const ALLOWED_SCHEMES: &[&str] = &["http://", "https://", "mailto:", "file://"];
 
-/// Wires up Ctrl+Click-to-open on a terminal, in priority order:
+/// PCRE2 pattern VTE matches natively against every visible line to decide
+/// what to underline+hand-cursor on mere hover (see `sync_url_match`) —
+/// this is what actually gives Tilix-parity underlining for bare
+/// `http(s)://` URLs in plain output, independent of Ctrl.
+const URL_PATTERN: &str = r"https?://[^\s<>\x22']+";
+
+/// PCRE2's `PCRE2_MULTILINE` compile flag — VTE requires (and asserts at
+/// runtime on) every regex passed to `match_add_regex` to have been
+/// compiled with it, since it matches against one screen row at a time.
+/// `vte4`/`pcre2` don't export this constant, so it's inlined from
+/// `pcre2.h` (`0x00000400`).
+const PCRE2_MULTILINE: u32 = 0x0000_0400;
+
+/// Wires up hover feedback and Ctrl+Click-to-open on a terminal, in
+/// priority order:
 /// 1. An OSC 8 hyperlink (the escape sequence modern CLI tools —
 ///    `ls --hyperlink`, `rg`, various formatters — use to mark up a piece
-///    of output as a real link) under the pointer, if any.
-/// 2. Otherwise, a plain filesystem path token under the pointer (e.g. a
+///    of output as a real link) under the pointer, if any. VTE underlines
+///    these itself the moment `allow-hyperlink` is on — nothing to add.
+/// 2. A plain `http(s)://` URL token in the output — VTE doesn't know
+///    these are links either, but `Terminal::match_add_regex` (see
+///    `sync_url_match`) makes it treat the pattern as one purely for
+///    hover styling (underline + hand cursor on mere hover, no Ctrl
+///    needed), matching Tilix. Actually *opening* it on Ctrl+Click still
+///    goes through our own token extraction below, not VTE's match
+///    engine (see the next doc paragraph for why).
+/// 3. Otherwise, a plain filesystem path token under the pointer (e.g. a
 ///    bare path in `ls`/`grep`/error output) that actually exists on
 ///    disk — opened the same way, so a directory opens in the file
 ///    manager (its registered default handler) and a file opens in
 ///    whatever app is default for it.
 ///
-/// Bare-URL detection (arbitrary `https://...` text that isn't a real OSC
-/// 8 hyperlink) is deliberately NOT attempted: `docs/ROADMAP.md`'s Phase 3
-/// plan flagged that as the riskiest item, contingent on
-/// `vte_terminal_match_check_event` — a call the `vte4` crate doesn't
-/// bind at all (checked: no `match_check`/`hyperlink_check` binding
-/// anywhere in its generated API). Reaching for raw FFI onto a function
-/// the crate doesn't expose was rejected as disproportionate for one
-/// feature. The plain-path case above sidesteps that gap entirely: it
-/// reads the row's text via `text_range_format` (available, unlike
-/// match-checking) and does its own token/existence check instead of
-/// relying on VTE's internal match engine.
+/// Cases 2 and 3 both resolve *what to open* via our own
+/// `text_range_format`-based token extraction, not VTE's match engine:
+/// `docs/ROADMAP.md`'s Phase 3 plan flagged "click a bare URL" as the
+/// riskiest item, contingent on `vte_terminal_match_check_event` — a call
+/// the `vte4` crate doesn't bind at all (checked: no
+/// `match_check`/`hyperlink_check` binding anywhere in its generated
+/// API). `match_add_regex` alone (no `match_check`) is enough for VTE's
+/// *visual* hover feedback since that's driven entirely inside VTE's own
+/// mouse handling, but doesn't let an app ask "what matched here" —
+/// that's still exactly the missing piece, so the actual open action
+/// keeps using our own detection instead.
 ///
 /// Gated end-to-end by `Preferences::enable_hyperlinks` (checked live on
 /// every motion/click, not just at attach time, so toggling it in
 /// Preferences takes effect immediately without re-attaching): when off,
-/// `allow-hyperlink` is turned back off too (killing VTE's own native
-/// hover-underline+cursor for real OSC 8 links, not just our click
-/// handler), and the plain-path hover cursor below never fires.
+/// `allow-hyperlink` goes back off (killing native OSC 8 hover styling)
+/// and the URL match registered in (2) is removed (killing its hover
+/// styling too), on top of our own click handler no-op'ing.
 ///
-/// Hover feedback differs by kind because only one of them is something
-/// VTE knows about:
-/// - Real OSC 8 hyperlinks already get a hand cursor and an underline
-///   from VTE itself whenever `allow-hyperlink` is on — nothing to add.
-/// - Plain filesystem paths are entirely our own detection (VTE has no
-///   concept of them), so VTE can't render an underline for one; the
-///   best available affordance is switching to a pointer cursor while
-///   Ctrl is held over a token that resolves to a real path.
+/// Hover *cursor* feedback for the plain-path case (3) is still manual
+/// (Ctrl held + pointer cursor) since, unlike a URL regex, "is this a
+/// real path" can only be answered by resolving it against the
+/// filesystem — not something `match_add_regex` alone can express.
 pub fn attach(terminal: &vte4::Terminal, prefs: Rc<RefCell<Preferences>>) {
     terminal.set_allow_hyperlink(prefs.borrow().enable_hyperlinks);
+
+    let url_match_tag: Rc<Cell<Option<i32>>> = Rc::new(Cell::new(None));
+    sync_url_match(terminal, prefs.borrow().enable_hyperlinks, &url_match_tag);
 
     let showing_pointer = Rc::new(Cell::new(false));
 
@@ -65,9 +86,11 @@ pub fn attach(terminal: &vte4::Terminal, prefs: Rc<RefCell<Preferences>>) {
         let terminal = terminal.clone();
         let prefs = prefs.clone();
         let showing_pointer = showing_pointer.clone();
+        let url_match_tag = url_match_tag.clone();
         motion.connect_motion(move |controller, x, y| {
             let enabled = prefs.borrow().enable_hyperlinks;
             terminal.set_allow_hyperlink(enabled);
+            sync_url_match(&terminal, enabled, &url_match_tag);
 
             let ctrl = controller
                 .current_event_state()
@@ -75,7 +98,7 @@ pub fn attach(terminal: &vte4::Terminal, prefs: Rc<RefCell<Preferences>>) {
             let wants_pointer = enabled
                 && ctrl
                 && terminal.check_hyperlink_at(x, y).is_none()
-                && system_path_uri_at(&terminal, x, y).is_some();
+                && plain_text_uri_at(&terminal, x, y).is_some();
 
             if wants_pointer != showing_pointer.get() {
                 terminal.set_cursor_from_name(if wants_pointer { Some("pointer") } else { None });
@@ -114,7 +137,7 @@ pub fn attach(terminal: &vte4::Terminal, prefs: Rc<RefCell<Preferences>>) {
             let uri = terminal
                 .check_hyperlink_at(x, y)
                 .map(|uri| uri.to_string())
-                .or_else(|| system_path_uri_at(&terminal, x, y));
+                .or_else(|| plain_text_uri_at(&terminal, x, y));
 
             let Some(uri) = uri else { return };
             if !ALLOWED_SCHEMES.iter().any(|scheme| uri.starts_with(scheme)) {
@@ -131,12 +154,36 @@ pub fn attach(terminal: &vte4::Terminal, prefs: Rc<RefCell<Preferences>>) {
     terminal.add_controller(click);
 }
 
+/// Registers (or unregisters) `URL_PATTERN` as a VTE match so it gets
+/// underlined with a hand cursor on mere hover — purely visual, VTE does
+/// this hit-testing itself on every mouse-motion event internally, no
+/// polling needed from us. Idempotent: cheap to call from the motion
+/// handler on every event to keep it in sync with a live preference
+/// toggle.
+fn sync_url_match(terminal: &vte4::Terminal, enabled: bool, tag: &Cell<Option<i32>>) {
+    match (enabled, tag.get()) {
+        (true, None) => {
+            if let Ok(regex) = vte4::Regex::for_match(URL_PATTERN, PCRE2_MULTILINE) {
+                let new_tag = terminal.match_add_regex(&regex, 0);
+                terminal.match_set_cursor_name(new_tag, "pointer");
+                tag.set(Some(new_tag));
+            }
+        }
+        (false, Some(old_tag)) => {
+            terminal.match_remove(old_tag);
+            tag.set(None);
+        }
+        _ => {}
+    }
+}
+
 /// If the token of non-whitespace text under pixel position `(x, y)`
-/// looks like (and resolves to) a real filesystem path, returns its
-/// `file://` URI. `None` for anything that doesn't exist on disk — this
-/// is the guard against false positives (`col + 1` off some unrelated
-/// word, a partially-selected token, ...), not just a nicety.
-fn system_path_uri_at(terminal: &vte4::Terminal, x: f64, y: f64) -> Option<String> {
+/// is a `http(s)://` URL, or looks like (and resolves to) a real
+/// filesystem path, returns the URI to open. `None` for a path that
+/// doesn't exist on disk — the guard against false positives (`col + 1`
+/// off some unrelated word, a partially-selected token, ...), not just a
+/// nicety.
+fn plain_text_uri_at(terminal: &vte4::Terminal, x: f64, y: f64) -> Option<String> {
     let char_width = terminal.char_width();
     let char_height = terminal.char_height();
     if char_width <= 0 || char_height <= 0 {
@@ -153,6 +200,10 @@ fn system_path_uri_at(terminal: &vte4::Terminal, x: f64, y: f64) -> Option<Strin
     let token = token.trim_matches(|c: char| "\"'()[]{}:,;".contains(c));
     if token.is_empty() {
         return None;
+    }
+
+    if token.starts_with("http://") || token.starts_with("https://") {
+        return Some(token.to_string());
     }
 
     let path = resolve_path(terminal, token)?;
@@ -217,5 +268,13 @@ mod tests {
     #[test]
     fn word_at_returns_none_past_end_of_line() {
         assert_eq!(word_at("short", 50), None);
+    }
+
+    #[test]
+    fn word_at_finds_url_token() {
+        assert_eq!(
+            word_at("see https://example.com/path for details", 5),
+            Some("https://example.com/path")
+        );
     }
 }
