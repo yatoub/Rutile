@@ -10,6 +10,7 @@ use crate::pane_header;
 use crate::preferences::Preferences;
 use crate::session::SessionView;
 use crate::terminal::broadcast::{BroadcastGroup, SessionId};
+use crate::terminal::hyperlinks;
 
 /// Wires up interaction for a pane: its Tilix-style header bar (sync
 /// toggle, maximize, close) and its terminal's mouse/keyboard behavior:
@@ -49,6 +50,8 @@ pub fn attach(
             }
         });
     }
+
+    hyperlinks::attach(terminal);
 
     let motion_controller = gtk4::EventControllerMotion::new();
     {
