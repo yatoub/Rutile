@@ -124,20 +124,15 @@ pub fn attach(
     });
     terminal.add_controller(gesture);
 
-    // Middle-click paste from the PRIMARY selection (X11/Wayland's
-    // separate "last thing you selected" buffer, distinct from the
-    // Ctrl+C/Ctrl+Shift+C clipboard) — standard xterm/VTE convention, not
-    // wired anywhere else (the context menu's "Paste" and Ctrl+Shift+V
-    // both target the regular clipboard via `paste_clipboard`).
-    let middle_click = gtk4::GestureClick::new();
-    middle_click.set_button(gdk::BUTTON_MIDDLE);
-    {
-        let terminal = terminal.clone();
-        middle_click.connect_pressed(move |_gesture, _n_press, _x, _y| {
-            terminal.paste_primary();
-        });
-    }
-    terminal.add_controller(middle_click);
+    // NB: no app-level middle-click handler here. `vte4::Terminal`
+    // already pastes the PRIMARY selection on middle-click internally
+    // (standard xterm/VTE convention) — a `GestureClick` on
+    // `gdk::BUTTON_MIDDLE` used to be added here too, but that just fired
+    // `paste_primary()` a second time on top of VTE's own handling,
+    // producing a double paste (reported on KDE Plasma/Wayland, issue
+    // #39; the "second copy ends up selected" symptom is VTE's own paste
+    // selecting the inserted text afterwards, with the app-level paste
+    // having already inserted an unselected copy just before it).
 
     let session_view_for_focus = session_view.clone();
     let focus_controller = gtk4::EventControllerFocus::new();
