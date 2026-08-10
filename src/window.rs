@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gtk4::gio;
@@ -8,12 +8,12 @@ use libadwaita as adw;
 use vte4::TerminalExt;
 
 use crate::context_menu;
+use crate::dialogs::confirm_close;
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, Preferences};
 use crate::profile::{ColorScheme, ColorSchemeStore, ProfileId, ProfileStore};
 use crate::session::persist::{self, SavedWindow};
-use crate::session::session_view::ClosePaneOutcome;
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
 
@@ -80,7 +80,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // Tilix-style session switcher: a left sidebar of session rows instead
     // of a top tab strip. Hidden by default — revealed via the toolbar's
     // sidebar button, which also opens a new session at the same time.
-    let sidebar = SessionSidebar::new(session_view.clone());
+    let sidebar = SessionSidebar::new(session_view.clone(), prefs.clone());
     sidebar.widget().set_visible(false);
 
     build_toolbar(&header_bar, &session_view, &prefs, &profiles, app, &sidebar);
@@ -152,12 +152,27 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // launch can auto-restore it (see the load above).
     {
         let session_view = session_view.clone();
+        let prefs = prefs.clone();
+        // Set once the user has confirmed closing despite an active
+        // process, so the `window.close()` call that re-enters this same
+        // handler (see below) doesn't just prompt again forever.
+        let confirmed_close = Rc::new(Cell::new(false));
         window.connect_close_request(move |window| {
-            let saved = snapshot_window(&session_view.borrow(), window);
-            if let Err(err) = saved.save_to_file(&persist::last_session_path()) {
-                eprintln!("[rutile] failed to auto-save session: {err}");
+            let has_process = !confirmed_close.get()
+                && prefs.borrow().prompt_on_close_with_process
+                && session_view.borrow().any_pane_has_foreground_process();
+
+            if !has_process {
+                return auto_save_on_close(&session_view.borrow(), window);
             }
-            glib::Propagation::Proceed
+
+            let confirmed_close = confirmed_close.clone();
+            let window_for_close = window.clone();
+            confirm_close::confirm_close(window, true, move || {
+                confirmed_close.set(true);
+                window_for_close.close();
+            });
+            glib::Propagation::Stop
         });
     }
 
@@ -214,7 +229,13 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let close_session_action = gio::SimpleAction::new("close-session", None);
     {
         let session_view = session_view.clone();
-        close_session_action.connect_activate(move |_, _| close_current_session(&session_view));
+        let prefs = prefs.clone();
+        let window_weak = window.downgrade();
+        close_session_action.connect_activate(move |_, _| {
+            if let Some(window) = window_weak.upgrade() {
+                close_current_session(&session_view, &prefs, &window);
+            }
+        });
     }
     window.add_action(&close_session_action);
 
@@ -266,17 +287,30 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                     );
                 }
                 Action::ClosePane => {
-                    let outcome = session_view.borrow_mut().close_focused_pane();
-                    match outcome {
-                        ClosePaneOutcome::PaneClosed | ClosePaneOutcome::SessionClosed(_) => {}
-                        ClosePaneOutcome::Nothing => return glib::Propagation::Stop,
+                    if let Some(window) = window_weak.upgrade() {
+                        let has_process = prefs.borrow().prompt_on_close_with_process && {
+                            let view = session_view.borrow();
+                            view.current_session_id().is_some_and(|session_id| {
+                                view.focused_pane_id(session_id).is_some_and(|pane_id| {
+                                    view.pane_has_foreground_process(session_id, pane_id)
+                                })
+                            })
+                        };
+                        let session_view = session_view.clone();
+                        confirm_close::confirm_close(&window, has_process, move || {
+                            session_view.borrow_mut().close_focused_pane();
+                        });
                     }
                 }
                 Action::Navigate(direction) => {
                     session_view.borrow_mut().navigate_focused(direction);
                 }
                 Action::NewSession => new_session_and_wire(&session_view, &prefs, &profiles, &app),
-                Action::CloseSession => close_current_session(&session_view),
+                Action::CloseSession => {
+                    if let Some(window) = window_weak.upgrade() {
+                        close_current_session(&session_view, &prefs, &window);
+                    }
+                }
                 Action::NextSession => session_view.borrow_mut().next_session(),
                 Action::PrevSession => session_view.borrow_mut().prev_session(),
                 Action::ToggleSearch => session_view.borrow().toggle_search_focused(),
@@ -568,11 +602,20 @@ fn new_session_and_wire(
     wire_pane_context_menu(session_view, prefs, profiles, app, session_id);
 }
 
-fn close_current_session(session_view: &Rc<RefCell<SessionView>>) {
-    let current = session_view.borrow().current_session_id();
-    if let Some(id) = current {
+fn close_current_session(
+    session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
+    window: &adw::ApplicationWindow,
+) {
+    let Some(id) = session_view.borrow().current_session_id() else {
+        return;
+    };
+    let has_process = prefs.borrow().prompt_on_close_with_process
+        && session_view.borrow().session_has_foreground_process(id);
+    let session_view = session_view.clone();
+    confirm_close::confirm_close(window, has_process, move || {
         session_view.borrow_mut().close_session(id);
-    }
+    });
 }
 
 /// Snapshots every session (tree, profile, per-pane cwd), the active tab,
@@ -597,6 +640,19 @@ fn snapshot_window(session_view: &SessionView, window: &adw::ApplicationWindow) 
         window_height: window.height(),
         broadcast_group: session_view.broadcast_group(),
     }
+}
+
+/// Snapshots and auto-saves the window, then allows the close to proceed —
+/// the "nothing to confirm" path of the `close-request` handler above.
+fn auto_save_on_close(
+    session_view: &SessionView,
+    window: &adw::ApplicationWindow,
+) -> glib::Propagation {
+    let saved = snapshot_window(session_view, window);
+    if let Err(err) = saved.save_to_file(&persist::last_session_path()) {
+        eprintln!("[rutile] failed to auto-save session: {err}");
+    }
+    glib::Propagation::Proceed
 }
 
 fn session_file_filter() -> gtk4::FileFilter {

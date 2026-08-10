@@ -42,7 +42,14 @@ pub fn attach(
     // `pane_header::attach` below would panic ("already borrowed").
     let header = session_view.borrow().header_for(session_id, pane_id);
     if let Some(header) = header {
-        pane_header::attach(session_view.clone(), session_id, pane_id, &header, terminal);
+        pane_header::attach(
+            session_view.clone(),
+            prefs.clone(),
+            session_id,
+            pane_id,
+            &header,
+            terminal,
+        );
     }
 
     {

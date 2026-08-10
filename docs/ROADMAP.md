@@ -102,23 +102,30 @@ Dépend de Phase 1 (champs `Profile`), indépendante de Phase 2.
 - Vérifier les signatures exactes vte4 0.10 (context7/`cargo doc`) avant de
   coder cette phase.
 
-### Phase 4 — Notifications, clavier étendu, confirmation de fermeture
+### Phase 4 — Notifications, clavier étendu, confirmation de fermeture ✅
 
-- **Notifications** : `terminal/monitor.rs`, poll `/proc/<pid>` via
+- [x] **Notifications** : `terminal/monitor.rs`, poll `/proc/<pid>` via
   `glib::timeout_add_seconds` (Linux-only), `gio::Notification` via
   `application.send_notification()` (pas de dépendance `notify-rust`).
   Silence via `connect_contents_changed` + timeout par profil. Cloche via
   `connect_bell`.
-- **Clavier étendu** : `Action` gagne `SwitchToSessionN(u8)`,
+- [x] **Clavier étendu** : `Action` gagne `SwitchToSessionN(u8)`,
   `ResizePane(Direction)`, `ToggleSyncCurrentPane`, `RenameSession`,
   `RenamePane`, `DetachSession`, `CopyAsHtml`, `PasteAdvanced`,
   `ToggleMargin`. Table statique → `Keymap` chargé/sauvé en TOML
   (`$XDG_CONFIG_HOME/rutile/keybindings.toml`, table statique = défauts) —
   remplit enfin la page Préférences "Raccourcis".
-- **Confirmation de fermeture** : `dialogs/confirm_close.rs`, détecte un
-  process actif au premier plan par pane (`tcgetpgrp` sur le fd du PTY),
-  `adw::AlertDialog` avant fermeture. **Nouvelle dépendance à valider** :
-  `rustix` ou `libc` (premier vrai nouveau crate du plan).
+- [x] **Confirmation de fermeture** : `dialogs/confirm_close.rs`, détecte un
+  process actif au premier plan par pane (`tcgetpgrp` sur le fd du PTY via
+  `vte4::Terminal::pty()`, comparé au pid du shell capturé par
+  `TerminalWidget::child_pid()`), `adw::AlertDialog` avant fermeture —
+  câblé sur les 5 points de fermeture (pane clavier/bouton header, session
+  clavier/menu/sidebar, fenêtre entière via `close-request`). Nouvelle
+  dépendance `libc` (pas `rustix`) pour `tcgetpgrp`. A nécessité de monter
+  la feature `libadwaita` de `v1_4` à `v1_5` (`AlertDialog` n'existe qu'à
+  partir de 1.5 ; toujours dans le plancher Ubuntu 24.04/GNOME 46). Réglage
+  `Preferences::prompt_on_close_with_process` (défaut `true`, parité
+  Tilix) pour désactiver l'invite.
 
 ### Phase 5 — Drag&drop sidebar, CLI, collage avancé, signets
 
