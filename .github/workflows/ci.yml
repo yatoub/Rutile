@@ -159,7 +159,7 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32  # v2
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9  # v2
+        uses: taiki-e/install-action@6c6fd71fe4fb72c3697d269963d0e15df8adedad  # v2
         with:
           tool: cargo-llvm-cov
 
@@ -171,7 +171,7 @@ jobs:
             --ignore-filename-regex 'src/(main\.rs|app\.rs|window\.rs|context_menu\.rs|pane_header\.rs|preferences/window\.rs|session/sidebar\.rs)'
 
       - name: Upload to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac  # v5
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
