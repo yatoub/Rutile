@@ -4,7 +4,9 @@ use std::rc::Rc;
 use gtk4::prelude::*;
 use vte4::TerminalExt;
 
+use crate::dialogs::confirm_close;
 use crate::layout::PaneId;
+use crate::preferences::Preferences;
 use crate::session::SessionView;
 use crate::terminal::broadcast::SessionId;
 use crate::terminal::title;
@@ -50,6 +52,7 @@ fn refresh_title(label: &gtk4::EditableLabel, state: &PaneTitleState, pane_id: P
 /// maximize/restore toggle, and a close button.
 pub fn attach(
     session_view: Rc<RefCell<SessionView>>,
+    prefs: Rc<RefCell<Preferences>>,
     session_id: SessionId,
     pane_id: PaneId,
     header: &gtk4::Box,
@@ -148,9 +151,19 @@ pub fn attach(
     let close_button = gtk4::Button::from_icon_name("window-close-symbolic");
     close_button.add_css_class("flat");
     close_button.set_tooltip_text(Some("Fermer le pane"));
-    close_button.connect_clicked(move |_| {
-        session_view.borrow_mut().close_pane(session_id, pane_id);
-    });
+    {
+        let header = header.clone();
+        close_button.connect_clicked(move |_| {
+            let has_process = prefs.borrow().prompt_on_close_with_process
+                && session_view
+                    .borrow()
+                    .pane_has_foreground_process(session_id, pane_id);
+            let session_view = session_view.clone();
+            confirm_close::confirm_close(&header, has_process, move || {
+                session_view.borrow_mut().close_pane(session_id, pane_id);
+            });
+        });
+    }
     header.append(&close_button);
 }
 

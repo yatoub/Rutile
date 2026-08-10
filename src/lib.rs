@@ -1,5 +1,6 @@
 pub mod app;
 pub mod context_menu;
+pub mod dialogs;
 pub mod keymap;
 pub mod layout;
 pub mod pane_header;

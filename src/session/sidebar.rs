@@ -3,6 +3,8 @@ use std::rc::Rc;
 
 use gtk4::prelude::*;
 
+use crate::dialogs::confirm_close;
+use crate::preferences::Preferences;
 use crate::session::SessionView;
 use crate::terminal::broadcast::SessionId;
 
@@ -19,10 +21,17 @@ pub struct SessionSidebar {
     /// view) must not re-trigger the "user clicked a row" handler, and
     /// vice versa.
     syncing: Rc<Cell<bool>>,
+    /// Threaded into `build_row`'s close button so it can check
+    /// `prompt_on_close_with_process` before closing a session with a
+    /// running process (`dialogs::confirm_close`).
+    prefs: Rc<RefCell<Preferences>>,
 }
 
 impl SessionSidebar {
-    pub fn new(session_view: Rc<RefCell<SessionView>>) -> Rc<Self> {
+    pub fn new(
+        session_view: Rc<RefCell<SessionView>>,
+        prefs: Rc<RefCell<Preferences>>,
+    ) -> Rc<Self> {
         let list_box = gtk4::ListBox::new();
         list_box.add_css_class("navigation-sidebar");
         list_box.set_selection_mode(gtk4::SelectionMode::Single);
@@ -56,6 +65,7 @@ impl SessionSidebar {
             root,
             list_box,
             syncing,
+            prefs,
         });
 
         // Follow AdwTabView's own selection changes (keyboard session
@@ -103,7 +113,7 @@ impl SessionSidebar {
         };
 
         for session_id in ids {
-            let (row, label) = build_row(session_view, session_id);
+            let (row, label) = build_row(session_view, &self.prefs, session_id);
             unsafe {
                 row.set_data("session-id", session_id);
                 row.set_data("title-label", label);
@@ -172,6 +182,7 @@ const THUMBNAIL_HEIGHT: i32 = 90;
 
 fn build_row(
     session_view: &Rc<RefCell<SessionView>>,
+    prefs: &Rc<RefCell<Preferences>>,
     session_id: SessionId,
 ) -> (gtk4::ListBoxRow, gtk4::EditableLabel) {
     let vbox = gtk4::Box::new(gtk4::Orientation::Vertical, 2);
@@ -226,8 +237,17 @@ fn build_row(
     close_button.set_tooltip_text(Some("Fermer la session"));
     {
         let session_view = session_view.clone();
+        let prefs = prefs.clone();
+        let close_button_for_parent = close_button.clone();
         close_button.connect_clicked(move |_| {
-            session_view.borrow_mut().close_session(session_id);
+            let has_process = prefs.borrow().prompt_on_close_with_process
+                && session_view
+                    .borrow()
+                    .session_has_foreground_process(session_id);
+            let session_view = session_view.clone();
+            confirm_close::confirm_close(&close_button_for_parent, has_process, move || {
+                session_view.borrow_mut().close_session(session_id);
+            });
         });
     }
     hbox.append(&close_button);

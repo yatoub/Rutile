@@ -34,6 +34,11 @@ pub struct Preferences {
     /// it's a cross-cutting *setting* (which profile is active), not part
     /// of any one profile's own data.
     pub default_profile_id: String,
+    /// Show a confirmation dialog (`dialogs::confirm_close`) before closing
+    /// a pane/session/window that has a foreground child process running
+    /// (e.g. `vim`, a long `ssh`). Mirrors Tilix's own
+    /// `prompt-on-close-process` setting, including its default of `true`.
+    pub prompt_on_close_with_process: bool,
 }
 
 impl Default for Preferences {
@@ -45,6 +50,7 @@ impl Default for Preferences {
             enable_hyperlinks: true,
             enable_notifications: true,
             default_profile_id: "default".to_string(),
+            prompt_on_close_with_process: true,
         }
     }
 }
