@@ -406,6 +406,32 @@ impl SessionView {
         self.sessions.get(&session_id)?.child_pid(pane_id)
     }
 
+    /// Whether a specific pane has a foreground child process, for
+    /// `dialogs::confirm_close`'s prompt before closing it.
+    pub fn pane_has_foreground_process(&self, session_id: SessionId, pane_id: PaneId) -> bool {
+        let Some(terminal) = self.widget_for(session_id, pane_id) else {
+            return false;
+        };
+        let shell_pid = self.child_pid(session_id, pane_id);
+        crate::dialogs::confirm_close::pane_has_foreground_process(&terminal, shell_pid)
+    }
+
+    /// Whether any pane in `session_id` has a foreground child process,
+    /// for confirming a whole-session close.
+    pub fn session_has_foreground_process(&self, session_id: SessionId) -> bool {
+        self.pane_ids_for(session_id)
+            .into_iter()
+            .any(|pane_id| self.pane_has_foreground_process(session_id, pane_id))
+    }
+
+    /// Whether any pane in any session has a foreground child process, for
+    /// confirming the whole window closing.
+    pub fn any_pane_has_foreground_process(&self) -> bool {
+        self.session_ids()
+            .into_iter()
+            .any(|session_id| self.session_has_foreground_process(session_id))
+    }
+
     /// The currently focused pane's terminal widget, across the currently
     /// selected session — for global keyboard shortcuts (copy/paste) that
     /// act on "whatever's focused" rather than a specific pane.

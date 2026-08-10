@@ -526,6 +526,7 @@ version = "0.6.1"
 dependencies = [
  "gtk4",
  "libadwaita",
+ "libc",
  "serde",
  "toml",
  "vte4",

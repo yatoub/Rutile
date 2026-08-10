@@ -136,6 +136,21 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     }
     behavior_group.add(&notifications_row);
 
+    let prompt_on_close_row = adw::SwitchRow::builder()
+        .title("Prompt before closing a running process")
+        .subtitle("Confirm before closing a pane, session, or window with an active process")
+        .active(prefs.borrow().prompt_on_close_with_process)
+        .build();
+    {
+        let prefs = prefs.clone();
+        prompt_on_close_row.connect_active_notify(move |row| {
+            let mut prefs = prefs.borrow_mut();
+            prefs.prompt_on_close_with_process = row.is_active();
+            prefs.save();
+        });
+    }
+    behavior_group.add(&prompt_on_close_row);
+
     page.add(&behavior_group);
     page
 }
