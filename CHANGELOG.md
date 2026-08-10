@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.1] — 2026-08-10
+
+### Added
+
+- Background notifications (bell + silence-after-activity)
+
+- Extended keyboard actions, configurable TOML keymap, shortcuts prefs page
+
+- Ctrl+shift+c/v and middle-click paste beyond the context menu
+
+- Add a toggle for hyperlink handling, cursor on path hover
+
+- Open OSC 8 hyperlinks on ctrl+click
+
+- Live pane/session titles with rename support
+
+- In-terminal search overlay (Ctrl+Shift+F)
+
+- Save/restore session layout, cwd, and profile
+
+- Profile model, bundled color schemes, real Profiles page
+
+- Tilix-parity context menu with copy-on-select
+
+- Enforce Conventional Commits and automate releases with release-plz
+
+
+### Fixed
+
+- Stop crashing AdwPreferencesGroup on Shortcuts rebuild
+
+- Underline plain http(s) URLs on hover, Tilix-parity
+
+- Restrict hyperlink schemes and open system paths on ctrl+click
+
+- Persist split ratio across drag and rebuild
+
+- Rename crates.io package to avoid name collision
+
+- Repair broken RPM build and drop unavailable Ubuntu 22.04 target
+
+
 ## [0.6.0] — 2026-07-29
 
 ### Added
