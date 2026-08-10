@@ -1,0 +1,87 @@
+name: Bug report
+description: Report unexpected or incorrect behavior in Rutile
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. The more precise the
+        report, the faster it can be fixed — issue #39 (middle-click
+        double-paste) is a good example of the level of detail that helps
+        most: exact environment, a minimal repro, and what you've already
+        ruled out.
+
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      description: Distribution and version (e.g. Debian 13 "Trixie", Ubuntu 24.04)
+    validations:
+      required: true
+
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop environment / compositor
+      description: e.g. "KDE Plasma (Wayland)", "GNOME (X11)"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Rutile version
+      description: "`rutile --version`, or the release/commit you built from"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: What happened, as precisely as possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: ruled-out
+    attributes:
+      label: What you've ruled out
+      description: >-
+        Anything you've already tested that narrows down the cause — e.g.
+        "reproduces with another terminal too" (points away from Rutile),
+        "only happens on Wayland, not X11", "disabled extension X, still
+        happens". Optional, but this is usually what turns a vague report
+        into a fixable one.
+
+  - type: textarea
+    id: likely-cause
+    attributes:
+      label: Likely cause (optional)
+      description: >-
+        If you've looked at the code or have a hypothesis, share it —
+        even a wrong guess narrows the search.
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots / logs / anything else
