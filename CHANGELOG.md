@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.2] — 2026-08-10
+
+### Fixed
+
+- Stop double-pasting on middle-click (fixes #39)
+
+
 ## [0.6.1] — 2026-08-10
 
 ### Added
