@@ -1,2 +1,13 @@
 extends:
   - "@commitlint/config-conventional"
+rules:
+  # Dependabot's commit body embeds a full compare-URL line (two 40-char
+  # commit SHAs) for every github-actions bump — expected here, since
+  # CLAUDE.md's security policy pins every action by commit SHA rather
+  # than tag. That line routinely exceeds 100 chars and can't be wrapped
+  # without breaking the link, which was failing this rule on every
+  # single Dependabot PR (confirmed via the "Commitlint" check log on
+  # PRs #34-40) and silently blocking dependabot-auto-merge.yml's
+  # `gh pr merge --auto`. Doesn't weaken the type/scope/subject rules
+  # `config-conventional` still enforces on every commit.
+  body-max-line-length: [0, "always"]
