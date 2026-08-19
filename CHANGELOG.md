@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.6.3] — 2026-08-19
+
+### Fixed
+
+- Restore a blank session when the last saved window was empty
+
+
 ## [0.6.2] — 2026-08-10
 
 ### Fixed
