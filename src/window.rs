@@ -71,6 +71,15 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         let mut session_view_mut = session_view.borrow_mut();
         session_view_mut.replace_all_with(&saved.sessions, &resolve_scheme);
         session_view_mut.set_broadcast_group(saved.broadcast_group);
+        // A clean shutdown after closing every session (Ctrl+D on the last
+        // pane) saves an empty `sessions` list — `replace_all_with` above
+        // then closes the blank session `SessionView::new` created without
+        // replaying anything to take its place, leaving zero sessions.
+        // Fall back to a fresh blank session rather than reopening onto an
+        // empty window.
+        if session_view_mut.session_ids().is_empty() {
+            session_view_mut.new_session();
+        }
         let session_ids = session_view_mut.session_ids();
         if let Some(&session_id) = session_ids.get(saved.active_session_index) {
             session_view_mut.select_session(session_id);
