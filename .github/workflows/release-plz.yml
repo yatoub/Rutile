@@ -79,7 +79,7 @@ jobs:
       # install-action to avoid a crates.io lookup, release-plz itself via
       # cargo-binstall since install-action's release cadence lags).
       - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@6c6fd71fe4fb72c3697d269963d0e15df8adedad  # v2.85.10
+        uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29  # v2.87.21
         with:
           tool: cargo-semver-checks@0.49
 
