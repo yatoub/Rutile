@@ -90,7 +90,8 @@ pas des chantiers actifs.
 
 ## Roadmap
 
-**État réel : v0.6.2.** Les 4 piliers (split, broadcast, sessions, thème)
+**État réel (série v0.6, version exacte : badge Release du README /
+`CHANGELOG.md`).** Les 4 piliers (split, broadcast, sessions, thème)
 sont stables et utilisés au quotidien, et la parité Tilix a déjà été
 étendue bien au-delà du MVP : profils + schémas de couleurs, persistance
 de session, recherche, hyperliens, titres live, notifications de fond,

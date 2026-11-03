@@ -1,6 +1,7 @@
 # 🦫 Rutile
 
 [![CI](https://img.shields.io/github/actions/workflow/status/yatoub/Rutile/ci.yml?branch=main&style=flat-square)](https://github.com/yatoub/Rutile/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/yatoub/Rutile?style=flat-square)](https://github.com/yatoub/Rutile/releases/latest)
 [![License](https://img.shields.io/github/license/yatoub/Rutile?style=flat-square)](LICENSE)
 [![Maintenance](https://img.shields.io/badge/maintenance-active-brightgreen?style=flat-square)](https://github.com/yatoub/Rutile)
 

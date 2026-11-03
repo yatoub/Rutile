@@ -1,6 +1,7 @@
 # Roadmap
 
-> **État réel au 2026-11-03 : v0.6.2.** Ce document a été réaligné sur le
+> **État réel au 2026-11-03 : série v0.6** (version exacte : badge Release
+> du README / `CHANGELOG.md`, jamais en dur ici). Ce document a été réaligné sur le
 > code livré — l'ancien décrivait encore un « MVP v0.1 » alors que le socle
 > et une grosse partie de la parité étaient déjà codés, livrés et utilisés
 > au quotidien. La numérotation a été **renumérotée** : ce qui est déjà
@@ -13,7 +14,7 @@
 > stables et utilisés au quotidien, et couvre tout ce qui manque pour la
 > **parité fonctionnelle** avec Tilix.
 
-## ✅ Déjà livré (v0.1 → v0.6.2)
+## ✅ Déjà livré (v0.1 → v0.6)
 
 Ci-dessous ce qui est codé et fonctionnel aujourd'hui — le socle sur
 lequel la suite se construit.
@@ -121,10 +122,12 @@ phase est livrable et testable indépendamment. Les références `M#` renvoient
 Corriger la documentation devenue fausse et les placeholders avant toute
 nouvelle feature.
 
-- [ ] Mettre à jour `README.md` (features/version/clé publique) et
-  `GUIDELINE.md` pour refléter l'état v0.6.2 (pas le MVP v0.1)
-- [ ] Reclasser les pages Préférences placeholder comme telles et lister
-  leur contenu réel restant
+- [x] Mettre à jour `README.md` (features) et `GUIDELINE.md` pour refléter
+  l'état réel (série v0.6, pas le MVP v0.1). Plus aucune version en dur dans
+  la doc : le README affiche la dernière release via un badge shields.io
+- [x] Reclasser les pages Préférences placeholder comme telles et lister
+  leur contenu réel restant (Appearance/Encoding → Phase 2, Bookmarks →
+  Phase 4, Advanced → Phase 5)
 - [ ] S'assurer que `CHANGELOG.md` et la page `About`/version suivent
 
 ### Phase 1 — Profondeur des profils (M1) — le plus gros levier de parité
