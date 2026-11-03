@@ -256,9 +256,19 @@ pour l'instant — à ajouter plus tard si besoin) :
   advisories yanked=deny, sources inconnues refusées.
 - `.mega-linter.yml` : liste blanche volontairement restreinte aux linters
   de sécurité (actionlint, shellcheck, yamllint, scan CVE Grype/Trivy,
-  détection de secrets Gitleaks/Secretlint/TruffleHog, analyse statique
+  détection de secrets Betterleaks/Secretlint/TruffleHog, analyse statique
   Semgrep/Checkov, SBOM Syft) — `RUST_CLIPPY` n'est pas dans la liste
   puisque le job `lint` le fait déjà séparément (pas de double emploi).
+  **Deux linters ne tournaient en fait pas, sans aucune erreur** (vu en
+  lisant les logs d'un run MegaLinter, pas son statut, resté vert) :
+  `REPOSITORY_GITLEAKS` a été retiré de MegaLinter v10 (simple warning
+  « removed linters… ignored » dans le log) — remplacé par
+  `REPOSITORY_BETTERLEAKS`, du même auteur, qui relit les
+  `.gitleaks.toml`/`.gitleaksignore` ; et Semgrep est ignoré hors des
+  flavors `security`/`standalone` tant que `REPOSITORY_SEMGREP_RULESETS`
+  n'est pas défini (`p/rust`, `p/github-actions`, `p/secrets` ici). Après
+  une montée de version de MegaLinter, vérifier la ligne
+  `--custom-flavor-linters` du log : c'est la liste réelle de ce qui tourne.
 - Avant de pousser, toujours vérifier localement :
   `cargo fmt --all -- --check && cargo clippy --all-targets --all-features
   -- -D warnings && cargo test`. `cargo fmt` a dû reformater 8 fichiers
@@ -292,7 +302,7 @@ ne suffit pas — la chaîne de distribution compte tout autant :
   Dependabot alerts + Dependabot security updates (activés via `gh api -X
   PUT repos/yatoub/Rutile/vulnerability-alerts` et
   `.../automated-security-fixes` — étaient désactivés par défaut), secret
-  scanning + push protection (déjà actifs par défaut). Complète Gitleaks/
+  scanning + push protection (déjà actifs par défaut). Complète Betterleaks/
   Secretlint/TruffleHog déjà dans MegaLinter sans coût CI.
 - **Toutes les actions GitHub sont épinglées par SHA de commit**, pas par
   tag (`actions/checkout@<sha>  # v7`, etc. — commentaire du tag gardé pour
