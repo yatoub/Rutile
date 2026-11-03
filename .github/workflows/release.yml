@@ -288,9 +288,14 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install build + runtime dependencies
+        # -Syu, never -Sy: the image is pinned (so, old), and -Sy alone
+        # installs today's gtk4 on top of the image's own older glib2 — a
+        # partial upgrade Arch doesn't support, which broke v0.8.0's smoke
+        # test with "libgtk-4.so.1: undefined symbol: g_timeout_source_new_ns".
+        # github-cli: the notify-failure action below needs `gh`.
         run: |
-          pacman -Sy --noconfirm git base-devel curl xorg-server-xvfb dbus \
-            gtk4 libadwaita vte4
+          pacman -Syu --noconfirm git base-devel curl xorg-server-xvfb dbus \
+            gtk4 libadwaita vte4 github-cli
 
       - name: Compute checksums (source archive + Linux binary)
         id: checksums
@@ -408,7 +413,7 @@ jobs:
             -w /pkg \
             archlinux@sha256:fe6972d4dc1f660c0c10f4c41b2de8986bab89e7e2955378f8beadb8ebcd7433 \
             bash -c "
-              pacman -Sy --noconfirm base-devel > /dev/null 2>&1
+              pacman -Syu --noconfirm base-devel > /dev/null 2>&1
               useradd -m builder
               chown -R builder:builder /pkg
               su builder -s /bin/bash -c 'cd /pkg && makepkg --printsrcinfo > /pkg/.SRCINFO'

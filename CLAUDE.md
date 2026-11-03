@@ -529,6 +529,20 @@ a du sens pour l'instant.
   - `update-pkgbuild` : régénère `PKGBUILD`/`PKGBUILD.bin`/`.SRCINFO`/
     `rutile.spec` (version + b2sums) via `scripts/update-pkgbuild.sh`,
     commit direct sur `main` — déclenche ensuite `aur-publish.yml`.
+- **Conteneurs Arch : toujours `pacman -Syu`, jamais `-Sy`** (smoke test
+  `smoke-arch` et régénération de `.SRCINFO` dans `release.yml`). L'image
+  `archlinux` est épinglée par digest, donc vieille : `-Sy` seul installe
+  le `gtk4` du jour sur la `glib2` d'origine de l'image — mise à jour
+  partielle non supportée par Arch. Vécu sur v0.8.0 : `rutile: symbol
+  lookup error: /usr/lib/libgtk-4.so.1: undefined symbol:
+  g_timeout_source_new_ns`, alors que les releases précédentes passaient
+  (le gtk4 du moment se contentait encore de la glib2 de l'image). Le
+  même run a montré que `notify-failure` (qui appelle `gh`) échoue dans
+  ce conteneur faute de `gh` : `github-cli` est installé avec le reste.
+  Pour republier un tag après un correctif de workflow :
+  `gh workflow run release.yml --ref main -f tag=vX.Y.Z` — le workflow
+  vient alors de `main`, le code compilé reste celui du tag (les uploads
+  sont en `overwrite: true`).
 - `.github/workflows/aur-publish.yml` : publie `rutile` (source) et
   `rutile-bin` (binaire pré-compilé) sur l'AUR via
   `KSXGitHub/github-actions-deploy-aur`.
