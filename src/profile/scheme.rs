@@ -39,8 +39,9 @@ impl ColorScheme {
 
 /// Falls back to opaque black on a malformed hex string (e.g. a
 /// hand-edited user override file) rather than panicking — a broken color
-/// shouldn't be able to crash terminal creation.
-fn parse_or_fallback(hex: &str) -> gdk::RGBA {
+/// shouldn't be able to crash terminal creation. Also used for a profile's
+/// own color overrides (`ProfileColors`).
+pub fn parse_or_fallback(hex: &str) -> gdk::RGBA {
     gdk::RGBA::parse(hex).unwrap_or(gdk::RGBA::BLACK)
 }
 

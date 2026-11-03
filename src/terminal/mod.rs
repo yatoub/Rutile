@@ -1,3 +1,4 @@
+pub mod badge;
 pub mod broadcast;
 pub mod hyperlinks;
 pub mod margin;

@@ -167,11 +167,18 @@ rétro-compatible) :
 - [x] **Cloche** : terminal bell (none/sound/icon/icon+sound) — icône
   `alarm-symbolic` (pas de `bell` dans Adwaita) dans le header du pane
   pendant 5 s, comme Tilix
-- [ ] **Couleurs étendues** : 16 couleurs + fg/bg déjà portées par schéma,
-  ajouter curseur/highlight/bold/badge couleurs + `bold_is_bright`
-- [ ] **Badge** (feature VTE `background-draw`) : texte avec variables,
-  position (NW/NE/SW/SE), custom font, couleur — dépend de `EVENT_SCREEN`
-  dispo dans la version vte4 utilisée (à spike)
+- [x] **Couleurs étendues** : 16 couleurs + fg/bg déjà portées par schéma,
+  ajouté curseur/highlight (paires texte/fond), bold, badge + `bold_is_bright`
+  — `ProfileColors`, réglages du profil par-dessus le schéma (les schémas
+  Tilix eux-mêmes n'ont que fg/bg/palette), onglet Color de l'éditeur
+- [x] **Badge** : texte avec variables (`terminal::title`), position
+  (NW/NE/SW/SE), police (2× celle du terminal par défaut, comme Tilix, ou
+  perso), couleur (fg du schéma par défaut) — onglet Badge de l'éditeur.
+  **Écart assumé avec Tilix** : pas de dessin dans le fond de vte (le spike
+  `background-draw`/`EVENT_SCREEN` n'a pas été nécessaire), mais un
+  `gtk4::Label` en overlay semi-transparent (`terminal/badge.rs`), qui
+  ignore la souris — il passe donc *au-dessus* du texte au lieu d'en
+  dessous
 - [ ] **Switch automatique de profil** : liste de match
   `user@host:dir`/`host:dir`
 - [x] Éditeur de profil réel à onglets dans la fenêtre Préférences au lieu

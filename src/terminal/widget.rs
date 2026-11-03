@@ -8,10 +8,13 @@ use libadwaita as adw;
 use vte4::TerminalExt;
 use vte4::TerminalExtManual;
 
+use crate::layout::PaneId;
+use crate::profile::scheme::parse_or_fallback;
 use crate::profile::spawn::{self, SpawnCommand};
 use crate::profile::{
-    CursorBlink, CursorShape, ExitAction, TerminalConfig, TerminalOptions, TextBlink,
+    CursorBlink, CursorShape, ExitAction, ProfileColors, TerminalConfig, TerminalOptions, TextBlink,
 };
+use crate::terminal::badge::BadgeOverlay;
 
 /// A command that exits sooner than this after being (re)spawned is held
 /// instead of restarted under `ExitAction::Restart` — otherwise a typo'd
@@ -25,8 +28,9 @@ const BELL_ICON_DURATION: Duration = Duration::from_secs(5);
 pub struct TerminalWidget {
     pub terminal: vte4::Terminal,
     /// What `PaneView` actually places in the pane: the terminal inside a
-    /// `ScrolledWindow`, which is what draws its scrollbar.
-    root: gtk4::ScrolledWindow,
+    /// `ScrolledWindow` (which draws its scrollbar), with the badge
+    /// overlaid on top.
+    root: gtk4::Overlay,
     /// Shown in the pane header for a few seconds when the terminal rings
     /// its bell, if the profile's `BellMode` asks for an icon.
     bell_icon: gtk4::Image,
@@ -105,11 +109,12 @@ impl Spawner {
 }
 
 impl TerminalWidget {
-    /// `cwd`: the command's starting directory when restoring a saved
+    /// `pane_id` is only used for the badge's `${id}`. `cwd`: the command's
+    /// starting directory when restoring a saved
     /// session (`session::persist`) — `None` falls back to the profile's
     /// `working_directory`, then to vte's own default (inherited from this
     /// process). See `profile::spawn::working_directory_for`.
-    pub fn new(config: &TerminalConfig, cwd: Option<&str>) -> Self {
+    pub fn new(config: &TerminalConfig, pane_id: PaneId, cwd: Option<&str>) -> Self {
         let terminal = vte4::Terminal::new();
         // Without this, a terminal nested inside a Paned doesn't claim its
         // share of space, so deeper splits can collapse a pane down to
@@ -124,8 +129,9 @@ impl TerminalWidget {
         let palette_refs: Vec<&gtk4::gdk::RGBA> = palette.iter().collect();
         terminal.set_colors(Some(&foreground), Some(&background), &palette_refs);
         apply_options(&terminal, &config.profile.options);
+        apply_colors(&terminal, &config.profile.colors);
 
-        let root = gtk4::ScrolledWindow::builder()
+        let scrolled = gtk4::ScrolledWindow::builder()
             .hscrollbar_policy(gtk4::PolicyType::Never)
             // `External` rather than `Never` when hidden: the terminal
             // still scrolls through its scrollback (mouse wheel,
@@ -140,6 +146,17 @@ impl TerminalWidget {
             .vexpand(true)
             .child(&terminal)
             .build();
+
+        let badge_color = config
+            .profile
+            .colors
+            .badge_color
+            .as_deref()
+            .map(parse_or_fallback)
+            .unwrap_or(foreground);
+        let badge = BadgeOverlay::new(&terminal, &config.profile.badge, &badge_color, pane_id);
+        let root = gtk4::Overlay::builder().child(&scrolled).build();
+        root.add_overlay(badge.widget());
 
         let bell_icon = gtk4::Image::builder()
             .icon_name("alarm-symbolic")
@@ -189,8 +206,9 @@ impl TerminalWidget {
         &self.terminal
     }
 
-    /// The widget to place in the pane (the terminal plus its scrollbar).
-    pub fn root(&self) -> &gtk4::ScrolledWindow {
+    /// The widget to place in the pane (the terminal, its scrollbar and
+    /// its badge).
+    pub fn root(&self) -> &gtk4::Overlay {
         &self.root
     }
 
@@ -293,6 +311,28 @@ fn apply_options(terminal: &vte4::Terminal, options: &TerminalOptions) {
     });
 
     terminal.set_audible_bell(options.bell.plays_sound());
+}
+
+/// Applies a profile's color overrides on top of the scheme `set_colors`
+/// already applied. Unset colors are passed as `None`, which keeps vte's
+/// default for that element.
+fn apply_colors(terminal: &vte4::Terminal, colors: &ProfileColors) {
+    terminal.set_bold_is_bright(colors.bold_is_bright);
+
+    let cursor = colors.cursor_colors.as_ref();
+    let cursor_bg = cursor.map(|pair| parse_or_fallback(&pair.background));
+    let cursor_fg = cursor.map(|pair| parse_or_fallback(&pair.foreground));
+    terminal.set_color_cursor(cursor_bg.as_ref());
+    terminal.set_color_cursor_foreground(cursor_fg.as_ref());
+
+    let highlight = colors.highlight_colors.as_ref();
+    let highlight_bg = highlight.map(|pair| parse_or_fallback(&pair.background));
+    let highlight_fg = highlight.map(|pair| parse_or_fallback(&pair.foreground));
+    terminal.set_color_highlight(highlight_bg.as_ref());
+    terminal.set_color_highlight_foreground(highlight_fg.as_ref());
+
+    let bold = colors.bold_color.as_deref().map(parse_or_fallback);
+    terminal.set_color_bold(bold.as_ref());
 }
 
 /// GNOME's monospace font setting, if its GSettings schema is installed —

@@ -45,6 +45,13 @@ pub struct Profile {
     /// table.
     #[serde(flatten)]
     pub options: TerminalOptions,
+    /// Colors set on top of the color scheme (cursor, highlight, bold,
+    /// badge). Flattened like `options`.
+    #[serde(flatten)]
+    pub colors: ProfileColors,
+    /// Text drawn in a corner of the terminal. Flattened like `options`.
+    #[serde(flatten)]
+    pub badge: Badge,
 }
 
 impl Profile {
@@ -61,6 +68,8 @@ impl Profile {
             working_directory: None,
             exit_action: ExitAction::default(),
             options: TerminalOptions::default(),
+            colors: ProfileColors::default(),
+            badge: Badge::default(),
         }
     }
 }
@@ -118,6 +127,111 @@ impl Default for TerminalOptions {
             scrollback_unlimited: false,
             scrollback_lines: 8192,
             bell: BellMode::default(),
+        }
+    }
+}
+
+/// Tilix's per-profile color overrides: a color scheme only carries the
+/// foreground, background and 16-color palette, these optional colors go
+/// on top of it. `None` leaves vte's own behavior (e.g. a cursor drawn in
+/// the reverse of the text under it). Hex strings, like `ColorScheme`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProfileColors {
+    /// Draw bold text in the bright variant of its color (palette 8–15).
+    pub bold_is_bright: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor_colors: Option<ColorPair>,
+    /// Colors of selected text.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub highlight_colors: Option<ColorPair>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bold_color: Option<String>,
+    /// `None` draws the badge in the scheme's foreground color, like
+    /// Tilix.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub badge_color: Option<String>,
+}
+
+impl Default for ProfileColors {
+    fn default() -> Self {
+        Self {
+            bold_is_bright: true,
+            cursor_colors: None,
+            highlight_colors: None,
+            bold_color: None,
+            badge_color: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ColorPair {
+    pub foreground: String,
+    pub background: String,
+}
+
+impl ColorPair {
+    /// What a color pair starts as when first turned on in Preferences —
+    /// Tilix's defaults for both cursor and highlight colors.
+    pub fn tilix_default() -> Self {
+        Self {
+            foreground: "#ffffff".to_string(),
+            background: "#000000".to_string(),
+        }
+    }
+}
+
+/// Tilix's badge: text (with the same `${title}`/`${directory}`/...
+/// variables as pane titles, see `terminal::title`) drawn large in one
+/// corner of the terminal, to tell terminals apart at a glance. An empty
+/// `badge_text` means no badge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Badge {
+    pub badge_text: String,
+    pub badge_position: BadgePosition,
+    /// Twice the terminal's font size when set, like Tilix; otherwise
+    /// `badge_font`.
+    pub badge_use_system_font: bool,
+    pub badge_font: String,
+}
+
+impl Default for Badge {
+    fn default() -> Self {
+        Self {
+            badge_text: String::new(),
+            badge_position: BadgePosition::default(),
+            badge_use_system_font: true,
+            badge_font: "Monospace 12".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BadgePosition {
+    Northwest,
+    #[default]
+    Northeast,
+    Southwest,
+    Southeast,
+}
+
+impl BadgePosition {
+    pub const ALL: [BadgePosition; 4] = [
+        BadgePosition::Northwest,
+        BadgePosition::Northeast,
+        BadgePosition::Southwest,
+        BadgePosition::Southeast,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            BadgePosition::Northwest => "Top left",
+            BadgePosition::Northeast => "Top right",
+            BadgePosition::Southwest => "Bottom left",
+            BadgePosition::Southeast => "Bottom right",
         }
     }
 }
@@ -453,6 +567,33 @@ mod tests {
         assert!(profile.options.show_scrollbar);
         assert_eq!(profile.options.bell, BellMode::Sound);
         assert_eq!(profile.options.cell_height_scale, 1.0);
+    }
+
+    #[test]
+    fn colors_and_badge_round_trip_and_stay_flat() {
+        let mut a = Profile::new("a", "A", "catppuccin-mocha");
+        a.colors.cursor_colors = Some(ColorPair {
+            foreground: "#111111".to_string(),
+            background: "#eeeeee".to_string(),
+        });
+        a.colors.bold_is_bright = false;
+        a.badge.badge_text = "${title}".to_string();
+        a.badge.badge_position = BadgePosition::Southwest;
+        let b = Profile::new("b", "B", "tango");
+        let store = ProfileStore {
+            profile: vec![a.clone(), b],
+        };
+
+        let toml = toml::to_string_pretty(&store).unwrap();
+        assert!(toml.contains(r#"badge_position = "southwest""#), "{toml}");
+        assert!(toml.contains("bold_is_bright = false"), "{toml}");
+        // Unset optional colors aren't written out at all.
+        assert!(!toml.contains("highlight_colors"), "{toml}");
+
+        let back: ProfileStore = toml::from_str(&toml).unwrap();
+        assert_eq!(back.profile[0].colors, a.colors);
+        assert_eq!(back.profile[0].badge, a.badge);
+        assert_eq!(back.profile[1].colors, ProfileColors::default());
     }
 
     #[test]
