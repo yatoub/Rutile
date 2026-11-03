@@ -12,8 +12,9 @@ ENABLE_LINTERS:
   # CVE / vulnerability scanning
   - REPOSITORY_GRYPE
   - REPOSITORY_TRIVY
-  # Secret detection (three independent scanners)
-  - REPOSITORY_GITLEAKS
+  # Secret detection (three independent scanners). Betterleaks replaces
+  # Gitleaks, removed from MegaLinter v10 (and silently ignored if listed).
+  - REPOSITORY_BETTERLEAKS
   - REPOSITORY_SECRETLINT
   - REPOSITORY_TRUFFLEHOG
   # Static security analysis
@@ -21,3 +22,17 @@ ENABLE_LINTERS:
   - REPOSITORY_CHECKOV
   # SBOM (informational — does not fail the job)
   - REPOSITORY_SYFT
+
+# Outside the security/standalone flavors, Semgrep is skipped without any
+# error unless rulesets are listed explicitly.
+REPOSITORY_SEMGREP_RULESETS:
+  - p/rust
+  - p/github-actions
+  - p/secrets
+# `unsafe-usage` flags every `unsafe` block regardless of what it does — an
+# inventory, not a finding. Rutile's are libc FFI (`tcgetpgrp`) and glib's
+# object data API (`set_data`/`data`), both unsafe by construction; auditing
+# unsafe code belongs to a dedicated tool (cargo-geiger, see CLAUDE.md).
+REPOSITORY_SEMGREP_ARGUMENTS:
+  - --exclude-rule
+  - rust.lang.security.unsafe-usage.unsafe-usage
