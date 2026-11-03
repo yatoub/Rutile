@@ -17,32 +17,57 @@ The value Rutile is built around — and the reason it's worth writing rather th
 3. **Multiple independent sessions**, each with its own split tree
 4. **The Catppuccin Mocha theme**, since GNOME is the daily desktop this targets
 
-Everything else Tilix does (session save/restore, Quake mode, Nautilus integration, notifications, per-terminal title/color) is explicitly secondary and deferred until the four pillars above are stable and usable daily — see [`GUIDELINE.md`](GUIDELINE.md) for the full vision and [`docs/ROADMAP.md`](docs/ROADMAP.md) for current status.
+The four pillars above are stable and usable daily; everything else (session save/restore, notifications, per-terminal title/color, search, hyperlinks) has been layered on since. The remaining Tilix-parity work (deep profiles, appearance options, CLI, bookmarks, quake mode, Nautilus) is tracked in [`docs/ROADMAP.md`](docs/ROADMAP.md) — see [`GUIDELINE.md`](GUIDELINE.md) for the full vision.
 
-## Features (v0.1)
+## Features
 
-- Recursive pane splitting (horizontal/vertical), with directional keyboard navigation between panes
+### Core (stable, daily-driver)
+
+- Recursive pane splitting (horizontal/vertical), with directional keyboard navigation between panes and split ratios that survive dragging/rebuilds
 - Synchronized input per session, with a per-pane toggle to temporarily opt a pane out
-- Multiple independent sessions, switched via a Tilix-style sidebar with live thumbnail previews (hidden by default, toggle in the header bar)
-- Per-pane header bar: sync toggle, maximize/restore, close
-- Right-click context menu on any pane (split, broadcast group)
-- Catppuccin Mocha theme, embedded and applied over libadwaita's own chrome
+- Multiple independent sessions, switched via a Tilix-style sidebar with live thumbnail previews (hidden by default, toggle in the header bar), or detached into their own window
+- Per-pane header bar: sync toggle, maximize/restore, close, rename
+- Right-click context menu on any pane (split, broadcast group), copy-on-select
+- Catppuccin theme, embedded and applied over libadwaita's own chrome
 - Standard terminal behavior: a pane closes automatically when its shell exits (`exit`, Ctrl+D, or a crash) — no keystroke is special-cased
+- Configurable profiles with 11 bundled color schemes, and a real Preferences window (General / Profiles / Shortcuts)
+
+### UX
+
+- In-terminal search overlay (Ctrl+Shift+F, PCRE2-backed)
+- Hyperlinks: OSC 8 + bare `http(s)` URLs + filesystem paths, opened on Ctrl+Click with a strict scheme whitelist
+- Live pane/session titles with rename support and `${title}`/`${directory}` templates
+- Background notifications: terminal bell + "command finished after silence" (`/proc` polling)
+- Copy as HTML, advanced paste (CRLF/whitespace normalization), an 80-column margin guide
+- Confirm-before-close dialog when a pane/session/window still has a foreground process
+- Session save/restore (layout + cwd + profile, TOML) and detach-session-into-new-window
+
+### Yet to come (see [`docs/ROADMAP.md`](docs/ROADMAP.md))
+
+Deep profiles (custom command, font, cursor, scrollback, badge, triggers), appearance options (theme variant/transparency/background image), non-UTF-8 encodings, a CLI, bookmarks, sidebar drag-and-drop, advanced paste warnings, and (deferred, on request) quake mode, Nautilus integration, libsecret passwords, and i18n.
 
 ## Keybindings
 
-Tilix-parity, all `Ctrl+Shift+<key>`:
+Tilix-parity, all `Ctrl+Shift+<key>` (shortcuts are fully configurable via the Preferences → Shortcuts page, persisted as TOML — the defaults below):
 
 | Key            | Action                              |
 | -------------- | ------------------------------------ |
-| `O`            | Split horizontally                  |
-| `E`            | Split vertically                    |
+| `O` / `E`      | Split horizontally / vertically      |
 | `W`            | Close focused pane                  |
+| `C` / `V`      | Copy / paste                        |
+| `Alt+Shift+C/V`| Copy as HTML / paste (advanced)     |
 | `↑ ↓ ← →`      | Navigate to the pane in that direction |
+| `Alt+Shift+↑↓←→` | Resize the focused split         |
+| `M`            | Toggle the 80-column margin guide  |
+| `F`            | Toggle in-terminal search          |
 | `T`            | New session                         |
 | `Q`            | Close current session               |
+| `D`            | Detach current session into a new window |
+| `S`            | Toggle sync for current pane       |
+| `F2` / `F6`    | Rename session / pane              |
 | `Page Down`    | Next session                        |
 | `Page Up`      | Previous session                    |
+| `1`–`9`        | Switch directly to that session     |
 
 All of the above are also reachable from the toolbar or a pane's right-click menu / header bar.
 

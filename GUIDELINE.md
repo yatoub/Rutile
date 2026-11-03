@@ -12,10 +12,14 @@ un autre terminal existant, c'est :
 4. **Le thème Catppuccin**, GNOME étant maintenant le desktop utilisé au quotidien
 
 Tout le reste (sauvegarde/restauration de session, quake mode, intégration
-Nautilus, notifications, titre/couleur par terminal, packaging) reste
-**secondaire et non bloquant** pour la v0.1. Ne pas commencer ces chantiers
-tant que split + broadcast + sessions + thème ne sont pas stables et
-utilisables au quotidien.
+Nautilus, notifications, titre/couleur par terminal, packaging) était
+**secondaire et non bloquant** pour le MVP — ce MVP (les 4 piliers ci-dessus)
+est maintenant stable et utilisé au quotidien, et la plupart de ces chantiers
+secondaires ont depuis été livrés (sessions, notifications, titres, couleurs
+par schéma, packaging AUR/deb/rpm). Ce qui reste à construire pour la parité
+Tilix est priorisé dans [`docs/ROADMAP.md`](docs/ROADMAP.md) (profondeur des
+profils d'abord), avec les chantiers sensibles (quake, libsecret, Nautilus,
+i18n) réservés à la Phase 6 sur demande explicite.
 
 ## Stack technique
 
@@ -34,24 +38,45 @@ utilisables au quotidien.
 rutile/
 ├── Cargo.toml
 ├── src/
-│   ├── main.rs
-│   ├── app.rs               # gtk::Application / adw::Application
-│   ├── window.rs            # AdwApplicationWindow
-│   ├── terminal/
+│   ├── main.rs / lib.rs       # binaire mince + lib
+│   ├── app.rs                 # gtk::Application / adw::Application
+│   ├── window.rs              # AdwApplicationWindow, toolbar, raccourcis
+│   ├── keymap.rs              # Action enum + Keymap TOML (défauts Tilix)
+│   ├── context_menu.rs        # clic droit, focus souris, broadcast, fermeture
+│   ├── pane_header.rs         # barre par-pane (sync/maximize/close/rename)
+│   ├── preferences/
 │   │   ├── mod.rs
-│   │   ├── widget.rs         # wrapper autour de vte4::Terminal
-│   │   └── broadcast.rs      # groupes de saisie synchronisée
+│   │   ├── config.rs          # Preferences (serde, TOML)
+│   │   └── window.rs          # AdwPreferencesWindow (General/Profiles/Shortcuts + placeholders)
+│   ├── profile/
+│   │   ├── mod.rs
+│   │   ├── model.rs           # Profile + ProfileStore (TOML)
+│   │   └── scheme.rs          # ColorScheme + ColorSchemeStore (bundled + user)
 │   ├── layout/
 │   │   ├── mod.rs
-│   │   ├── split_tree.rs     # modèle de l'arbre de splits (indépendant de GTK)
-│   │   └── pane_view.rs      # rendu récursif via GtkPaned
+│   │   ├── split_tree.rs      # modèle de l'arbre de splits (indépendant de GTK)
+│   │   └── pane_view.rs       # rendu récursif via GtkPaned
 │   ├── session/
 │   │   ├── mod.rs
-│   │   └── session_view.rs   # AdwTabView, une session = un arbre de splits
-│   └── config/                # placeholder, vide tant que non nécessaire
+│   │   ├── session_view.rs    # AdwTabView, une session = un arbre de splits
+│   │   ├── sidebar.rs         # panneau latéral façon Tilix + vignettes live
+│   │   └── persist.rs         # sauvegarde/restauration de session (TOML)
+│   ├── terminal/
+│   │   ├── mod.rs
+│   │   ├── widget.rs          # wrapper autour de vte4::Terminal
+│   │   ├── broadcast.rs       # groupes de saisie synchronisée (GTK-free)
+│   │   ├── search.rs          # recherche in-terminal (PCRE2 VTE)
+│   │   ├── hyperlinks.rs      # OSC 8 + URLs + chemins, Ctrl+Click
+│   │   ├── title.rs           # templates de titres (GTK-free)
+│   │   ├── monitor.rs         # notifications fond (bell + silence)
+│   │   └── margin.rs          # guide de marge 80 cols
+│   └── dialogs/
+│       ├── mod.rs
+│       └── confirm_close.rs   # confirmation de fermeture process
 ├── resources/
-│   ├── catppuccin-mocha.css
-│   └── catppuccin-latte.css
+│   ├── catppuccin-mocha.css / catppuccin-latte.css
+│   ├── rutile.desktop
+│   └── schemes/bundled.toml   # 11 schémas (9 Tilix + Catppuccin Mocha/Latte)
 ├── tests/
 │   ├── split_tree.rs          # tests unitaires du modèle, sans fenêtre GTK
 │   └── broadcast.rs           # tests unitaires des groupes, sans event GTK
@@ -59,38 +84,35 @@ rutile/
     └── ROADMAP.md
 ```
 
-Pas de dossier `dbus/` ou `nautilus/` avant la Phase 2 — les créer en avance
-ne fait qu'ajouter du bruit dans le repo pendant que le MVP n'est pas fini.
+Pas de dossier `dbus/` ou `nautilus/` avant la Phase 6 (sur demande
+explicite) — les créer en avance n'ajoute que du bruit tant qu'ils ne sont
+pas des chantiers actifs.
 
-## Roadmap priorisée
+## Roadmap
 
-### v0.1 — MVP split + broadcast + sessions + thème (objectif actuel)
+**État réel : v0.6.2.** Les 4 piliers (split, broadcast, sessions, thème)
+sont stables et utilisés au quotidien, et la parité Tilix a déjà été
+étendue bien au-delà du MVP : profils + schémas de couleurs, persistance
+de session, recherche, hyperliens, titres live, notifications de fond,
+confirmation de fermeture, clavier étendu configurable, détacher une
+session, copy-as-HTML, paste avancé, margin guide.
 
-- [ ] Fenêtre GTK4/libadwaita minimale, un seul `vte4::Terminal`
-- [ ] Modèle `split_tree.rs` : arbre binaire de splits (Leaf(Terminal) / Split{Horizontal|Vertical, gauche, droite})
-- [ ] Rendu `pane_view.rs` : traduction de l'arbre en `GtkPaned` imbriqués
-- [ ] Split horizontal / split vertical au clavier sur le pane focus
-- [ ] Fermeture d'un pane + rebalance de l'arbre (le pane voisin récupère l'espace)
-- [ ] Navigation clavier entre panes (focus suivant/précédent, ou directionnel)
-- [ ] `broadcast.rs` : groupes de diffusion (aucun / session / tous) + `feed_child()` synchronisé sur le groupe cible
-- [ ] Raccourcis clavier configurables (même en dur au départ, un `HashMap` statique suffit pour la v0.1)
-- [ ] Sessions multiples via `AdwTabView` — chaque onglet porte son propre arbre de splits, indépendant des autres
-- [ ] Création / fermeture / navigation entre sessions au clavier
-- [ ] Thème Catppuccin Mocha embarqué via `gtk::CssProvider`, appliqué par-dessus la structure libadwaita
+Voir [`docs/ROADMAP.md`](docs/ROADMAP.md) pour la liste coordonnée (ce qui
+est livré) et la feuille de route vers la parité complète (profondeur des
+profils, appearance/encodage, CLI, signets, DnD sidebar, triggers, puis —
+sur demande explicite — quake, Nautilus, libsecret, i18n).
 
-**Definition of done v0.1** : utilisable au quotidien pour remplacer Tilix sur
-GNOME — split, broadcast et sessions multiples fonctionnels, rendu Catppuccin,
-sans crash sur split/fermeture/broadcast/changement de session répétés.
+Règles de planification rappelées ici :
 
-### v0.2+ — Reste des fonctionnalités Tilix (après stabilisation du MVP)
-
-- Sauvegarde/restauration de session (TOML)
-- Variante Catppuccin Latte pour le mode clair
-- Intégration GNOME/Nautilus native (extension `nautilus-python` + D-Bus)
-- Titre et couleur personnalisés par terminal
-- Notifications de fin de process en arrière-plan
-- Quake mode (service D-Bus + toggle, façon zoha4)
-- Packaging AUR (PKGBUILD)
+- La **profondeur des profils** est le goulot d'étranglement actuel : toute
+  feature « par terminal » (encodage, badge, triggers, commande perso,
+  action à la sortie, curseur, scrollback, cloche) en dépend. À traiter en
+  premier (Phase 1 de la roadmap).
+- **CLI** et **DnD sidebar** sont parallélisables en même temps
+  (indépendantes des profils) — ils débloquent ensuite Nautilus et le quake.
+- Les chantiers à **forte tension avec le Wayland-first** de GTK4 (quake,
+  keep-on-top, hide-on-lose-focus) et ceux à **dépendance native** (libsecret)
+  restent différés et ne démarreront que sur demande explicite.
 
 ## Conventions de code
 
@@ -98,9 +120,10 @@ sans crash sur split/fermeture/broadcast/changement de session répétés.
 - `split_tree.rs` et `broadcast.rs` doivent rester **indépendants de GTK** —
   testables en `cargo test` sans afficher de fenêtre. Le couplage GTK vit
   uniquement dans `pane_view.rs` et `widget.rs`.
-- Pas de dépendance ajoutée au `Cargo.toml` qui ne sert pas le MVP en cours
-  (pas de `zbus`, pas de `serde`/`toml` tant que la config n'est pas un
-  besoin réel).
+- Pas de dépendance ajoutée au `Cargo.toml` qui ne sert pas le chantier en
+  cours. `serde`/`toml` sont déjà là (config persistée) ; `zbus`, `clap`
+  (CLI), et les bindings `libsecret` restent **réservés** tant qu'un chantier
+  de la roadmap ne les requiert pas explicitement.
 
 ## Nom du projet
 
