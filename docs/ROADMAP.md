@@ -174,9 +174,13 @@ rétro-compatible) :
   dispo dans la version vte4 utilisée (à spike)
 - [ ] **Switch automatique de profil** : liste de match
   `user@host:dir`/`host:dir`
-- [ ] Éditeur de profil réel à onglets dans la fenêtre Préférences
-  (General/Command/Couleur/Scrolling/Compatibilité/Badge/Advanced) au lieu
-  du CRUD sommaire actuel
+- [x] Éditeur de profil réel à onglets dans la fenêtre Préférences au lieu
+  du CRUD sommaire : la page Profils liste les profils (schéma, badge
+  « Default »), chaque ligne ouvre une sous-page
+  (`PreferencesWindow::push_subpage`) avec un `adw::ViewSwitcher` sur
+  General / Command / Color / Scrolling (`src/preferences/profiles.rs`).
+  Les onglets Compatibilité (encodage, Phase 2), Badge et Advanced
+  (triggers, Phase 5) seront ajoutés avec leur contenu
 - [ ] Vérifier que `TerminalWidget::new(profile)` applique tous ces champs
   au spawn et au rendu
 
