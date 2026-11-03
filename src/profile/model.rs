@@ -40,6 +40,11 @@ pub struct Profile {
     /// What happens to the pane once its command exits.
     #[serde(default)]
     pub exit_action: ExitAction,
+    /// Font, cursor, scrolling and bell settings. Flattened so they sit
+    /// next to the other keys in `profiles.toml` rather than in a nested
+    /// table.
+    #[serde(flatten)]
+    pub options: TerminalOptions,
 }
 
 impl Profile {
@@ -55,12 +60,180 @@ impl Profile {
             login_shell: false,
             working_directory: None,
             exit_action: ExitAction::default(),
+            options: TerminalOptions::default(),
         }
     }
 }
 
 fn default_silence_seconds() -> u32 {
     10
+}
+
+/// How a terminal looks and behaves, as opposed to what it runs. Every
+/// default matches Tilix's own profile defaults (its GSettings schema),
+/// not vte's — e.g. 8192 scrollback lines instead of vte's 512.
+/// Container-level `#[serde(default)]` so a `profiles.toml` written before
+/// any of these existed still loads.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TerminalOptions {
+    /// Use the desktop's monospace font (GNOME's
+    /// `org.gnome.desktop.interface monospace-font-name`) instead of
+    /// `font`.
+    pub use_system_font: bool,
+    /// A Pango font description, e.g. `"Monospace 12"`.
+    pub font: String,
+    /// Extra spacing between cells, as a multiplier of the font's own
+    /// cell size — vte accepts 1.0 to 2.0.
+    pub cell_width_scale: f64,
+    pub cell_height_scale: f64,
+    pub text_blink: TextBlink,
+    pub cursor_shape: CursorShape,
+    pub cursor_blink: CursorBlink,
+    /// Characters that count as part of a word on double-click selection,
+    /// on top of alphanumerics.
+    pub word_chars: String,
+    pub show_scrollbar: bool,
+    pub scroll_on_output: bool,
+    pub scroll_on_keystroke: bool,
+    pub scrollback_unlimited: bool,
+    pub scrollback_lines: u32,
+    pub bell: BellMode,
+}
+
+impl Default for TerminalOptions {
+    fn default() -> Self {
+        Self {
+            use_system_font: true,
+            font: "Monospace 12".to_string(),
+            cell_width_scale: 1.0,
+            cell_height_scale: 1.0,
+            text_blink: TextBlink::default(),
+            cursor_shape: CursorShape::default(),
+            cursor_blink: CursorBlink::default(),
+            word_chars: "-,./?%&#:_".to_string(),
+            show_scrollbar: true,
+            scroll_on_output: false,
+            scroll_on_keystroke: true,
+            scrollback_unlimited: false,
+            scrollback_lines: 8192,
+            bell: BellMode::default(),
+        }
+    }
+}
+
+/// When text with the SGR "blink" attribute actually blinks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TextBlink {
+    Never,
+    Focused,
+    Unfocused,
+    #[default]
+    Always,
+}
+
+impl TextBlink {
+    pub const ALL: [TextBlink; 4] = [
+        TextBlink::Never,
+        TextBlink::Focused,
+        TextBlink::Unfocused,
+        TextBlink::Always,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            TextBlink::Never => "Never",
+            TextBlink::Focused => "When focused",
+            TextBlink::Unfocused => "When unfocused",
+            TextBlink::Always => "Always",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CursorShape {
+    #[default]
+    Block,
+    Ibeam,
+    Underline,
+}
+
+impl CursorShape {
+    pub const ALL: [CursorShape; 3] = [
+        CursorShape::Block,
+        CursorShape::Ibeam,
+        CursorShape::Underline,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            CursorShape::Block => "Block",
+            CursorShape::Ibeam => "I-beam",
+            CursorShape::Underline => "Underline",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CursorBlink {
+    /// Follow the desktop's cursor-blink setting.
+    #[default]
+    System,
+    On,
+    Off,
+}
+
+impl CursorBlink {
+    pub const ALL: [CursorBlink; 3] = [CursorBlink::System, CursorBlink::On, CursorBlink::Off];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            CursorBlink::System => "Follow system",
+            CursorBlink::On => "On",
+            CursorBlink::Off => "Off",
+        }
+    }
+}
+
+/// Tilix's "Terminal bell" setting: an audible beep, a bell icon in the
+/// pane header for a few seconds, both, or nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum BellMode {
+    None,
+    #[default]
+    Sound,
+    Icon,
+    IconSound,
+}
+
+impl BellMode {
+    pub const ALL: [BellMode; 4] = [
+        BellMode::None,
+        BellMode::Sound,
+        BellMode::Icon,
+        BellMode::IconSound,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            BellMode::None => "None",
+            BellMode::Sound => "Sound",
+            BellMode::Icon => "Icon",
+            BellMode::IconSound => "Icon and sound",
+        }
+    }
+
+    pub fn plays_sound(self) -> bool {
+        matches!(self, BellMode::Sound | BellMode::IconSound)
+    }
+
+    pub fn shows_icon(self) -> bool {
+        matches!(self, BellMode::Icon | BellMode::IconSound)
+    }
 }
 
 /// Tilix's "When command exits" setting, same three values (and same
@@ -240,5 +413,60 @@ fn slugify(name: &str) -> String {
         "profile".to_string()
     } else {
         slug
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn terminal_options_round_trip_as_flat_toml_keys() {
+        let mut profile = Profile::new("t", "T", "catppuccin-mocha");
+        profile.options.bell = BellMode::IconSound;
+        profile.options.cursor_shape = CursorShape::Ibeam;
+        profile.options.cell_width_scale = 1.5;
+        profile.options.scrollback_lines = 100;
+        profile.options.use_system_font = false;
+
+        let toml = toml::to_string(&profile).unwrap();
+        assert!(toml.contains(r#"bell = "icon-sound""#), "{toml}");
+        assert!(toml.contains(r#"cursor_shape = "ibeam""#), "{toml}");
+        assert!(toml.contains("scrollback_lines = 100"), "{toml}");
+        assert!(!toml.contains("[options]"), "{toml}");
+
+        let back: Profile = toml::from_str(&toml).unwrap();
+        assert_eq!(back.options, profile.options);
+    }
+
+    #[test]
+    fn missing_terminal_options_fall_back_to_tilix_defaults() {
+        let old = r#"
+            id = "default"
+            name = "Default"
+            scheme_id = "catppuccin-mocha"
+            scrollback_lines = 500
+        "#;
+        let profile: Profile = toml::from_str(old).unwrap();
+        assert_eq!(profile.options.scrollback_lines, 500);
+        assert!(profile.options.use_system_font);
+        assert!(profile.options.show_scrollbar);
+        assert_eq!(profile.options.bell, BellMode::Sound);
+        assert_eq!(profile.options.cell_height_scale, 1.0);
+    }
+
+    #[test]
+    fn store_with_several_profiles_round_trips() {
+        let mut a = Profile::new("a", "A", "catppuccin-mocha");
+        a.options.text_blink = TextBlink::Never;
+        let b = Profile::new("b", "B", "tango");
+        let store = ProfileStore {
+            profile: vec![a, b],
+        };
+        let toml = toml::to_string_pretty(&store).unwrap();
+        let back: ProfileStore = toml::from_str(&toml).unwrap();
+        assert_eq!(back.profile.len(), 2);
+        assert_eq!(back.profile[0].options.text_blink, TextBlink::Never);
+        assert_eq!(back.profile[1].scheme_id, "tango");
     }
 }
