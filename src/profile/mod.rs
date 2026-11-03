@@ -3,8 +3,8 @@ pub mod scheme;
 pub mod spawn;
 
 pub use model::{
-    BellMode, CursorBlink, CursorShape, ExitAction, Profile, ProfileId, ProfileStore,
-    TerminalOptions, TextBlink,
+    Badge, BadgePosition, BellMode, ColorPair, CursorBlink, CursorShape, ExitAction, Profile,
+    ProfileColors, ProfileId, ProfileStore, TerminalOptions, TextBlink,
 };
 pub use scheme::{ColorScheme, ColorSchemeStore};
 

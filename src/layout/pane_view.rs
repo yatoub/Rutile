@@ -107,7 +107,7 @@ impl PaneView {
     }
 
     fn create_pane_with_cwd(&mut self, id: PaneId, cwd: Option<&str>) {
-        let widget = TerminalWidget::new(&self.config, cwd);
+        let widget = TerminalWidget::new(&self.config, id, cwd);
 
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header.add_css_class("pane-header");

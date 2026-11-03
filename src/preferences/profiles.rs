@@ -8,8 +8,8 @@ use libadwaita::prelude::*;
 
 use crate::preferences::config::Preferences;
 use crate::profile::{
-    BellMode, ColorSchemeStore, CursorBlink, CursorShape, ExitAction, Profile, ProfileStore,
-    TerminalOptions, TextBlink,
+    BadgePosition, BellMode, ColorPair, ColorSchemeStore, CursorBlink, CursorShape, ExitAction,
+    Profile, ProfileColors, ProfileStore, TerminalOptions, TextBlink,
 };
 
 /// The "Profiles" page: one row per profile (name, scheme, a "Default"
@@ -171,6 +171,12 @@ impl ProfilesPage {
             Some("scrolling"),
             "Scrolling",
             "view-continuous-symbolic",
+        );
+        stack.add_titled_with_icon(
+            &self.badge_tab(profile),
+            Some("badge"),
+            "Badge",
+            "text-x-generic-symbolic",
         );
 
         let header = adw::HeaderBar::builder()
@@ -586,6 +592,148 @@ impl ProfilesPage {
             });
         }
         group.add(&scheme_row);
+        page.add(&group);
+
+        let colors = &profile.colors;
+        let overrides = adw::PreferencesGroup::builder()
+            .title("Colors")
+            .description("Set on top of the color scheme")
+            .build();
+        overrides.add(&{
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            let row = adw::SwitchRow::builder()
+                .title("Show bold text in bright colors")
+                .active(colors.bold_is_bright)
+                .build();
+            row.connect_active_notify(move |row| {
+                let active = row.is_active();
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.colors.bold_is_bright = active);
+            });
+            row
+        });
+        overrides.add(&color_pair_expander(
+            &self.profiles,
+            &profile.id,
+            "Custom cursor colors",
+            colors.cursor_colors.clone(),
+            |c| &mut c.cursor_colors,
+        ));
+        overrides.add(&color_pair_expander(
+            &self.profiles,
+            &profile.id,
+            "Custom highlight colors",
+            colors.highlight_colors.clone(),
+            |c| &mut c.highlight_colors,
+        ));
+        overrides.add(&color_expander(
+            &self.profiles,
+            &profile.id,
+            "Custom bold color",
+            colors.bold_color.clone(),
+            |c| &mut c.bold_color,
+        ));
+        page.add(&overrides);
+
+        page
+    }
+
+    fn badge_tab(self: &Rc<Self>, profile: &Profile) -> adw::PreferencesPage {
+        let page = adw::PreferencesPage::new();
+        let badge = &profile.badge;
+        let group = adw::PreferencesGroup::builder()
+            .description(
+                "Large text in a corner of the terminal. Same variables as titles: \
+                 ${title}, ${directory}, ${host}, ${user}, ${id}.",
+            )
+            .build();
+
+        let text_row = adw::EntryRow::builder()
+            .title("Badge text (empty: no badge)")
+            .text(badge.badge_text.clone())
+            .show_apply_button(true)
+            .build();
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            text_row.connect_apply(move |row| {
+                let text = row.text().to_string();
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.badge.badge_text = text);
+            });
+        }
+        group.add(&text_row);
+
+        group.add(&enum_combo_row(
+            "Position",
+            &BadgePosition::ALL,
+            BadgePosition::label,
+            badge.badge_position,
+            {
+                let profiles = self.profiles.clone();
+                let profile_id = profile.id.clone();
+                move |position| {
+                    profiles
+                        .borrow_mut()
+                        .update(&profile_id, |p| p.badge.badge_position = position)
+                }
+            },
+        ));
+
+        let font_dialog = gtk4::FontDialog::builder().title("Badge font").build();
+        let font_button = gtk4::FontDialogButton::builder()
+            .dialog(&font_dialog)
+            .font_desc(&gtk4::pango::FontDescription::from_string(
+                &badge.badge_font,
+            ))
+            .valign(gtk4::Align::Center)
+            .build();
+        let font_row = adw::ActionRow::builder()
+            .title("Custom font")
+            .sensitive(!badge.badge_use_system_font)
+            .build();
+        font_row.add_suffix(&font_button);
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            font_button.connect_font_desc_notify(move |button| {
+                if let Some(desc) = button.font_desc() {
+                    let font = desc.to_string();
+                    profiles
+                        .borrow_mut()
+                        .update(&profile_id, |p| p.badge.badge_font = font);
+                }
+            });
+        }
+        let system_font_row = adw::SwitchRow::builder()
+            .title("Twice the terminal font size")
+            .active(badge.badge_use_system_font)
+            .build();
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            let font_row = font_row.clone();
+            system_font_row.connect_active_notify(move |row| {
+                let active = row.is_active();
+                font_row.set_sensitive(!active);
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.badge.badge_use_system_font = active);
+            });
+        }
+        group.add(&system_font_row);
+        group.add(&font_row);
+
+        group.add(&color_expander(
+            &self.profiles,
+            &profile.id,
+            "Custom badge color",
+            profile.colors.badge_color.clone(),
+            |c| &mut c.badge_color,
+        ));
 
         page.add(&group);
         page
@@ -752,4 +900,130 @@ fn options_spin_row(
             .update(&profile_id, |p| set(&mut p.options, value));
     });
     row
+}
+
+/// `#rrggbb` for a color picked in a `ColorDialogButton` (alpha dropped —
+/// vte draws these colors opaque anyway).
+fn rgba_to_hex(rgba: &gtk4::gdk::RGBA) -> String {
+    let channel = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        channel(rgba.red()),
+        channel(rgba.green()),
+        channel(rgba.blue())
+    )
+}
+
+fn color_button(hex: &str) -> gtk4::ColorDialogButton {
+    gtk4::ColorDialogButton::builder()
+        .dialog(&gtk4::ColorDialog::builder().with_alpha(false).build())
+        .rgba(&crate::profile::scheme::parse_or_fallback(hex))
+        .valign(gtk4::Align::Center)
+        .build()
+}
+
+/// An expander whose built-in switch turns an optional foreground/
+/// background color pair of `ProfileColors` on (`Some`, with the two
+/// buttons' colors) or off (`None`, vte's default). The buttons keep their
+/// colors while it's off, so turning it back on restores them.
+fn color_pair_expander(
+    profiles: &Rc<RefCell<ProfileStore>>,
+    profile_id: &str,
+    title: &str,
+    current: Option<ColorPair>,
+    field: fn(&mut ProfileColors) -> &mut Option<ColorPair>,
+) -> adw::ExpanderRow {
+    let enabled = current.is_some();
+    let initial = current.unwrap_or_else(ColorPair::tilix_default);
+    let foreground = color_button(&initial.foreground);
+    let background = color_button(&initial.background);
+
+    let expander = adw::ExpanderRow::builder()
+        .title(title)
+        .show_enable_switch(true)
+        .enable_expansion(enabled)
+        .build();
+    for (label, button) in [("Text", &foreground), ("Background", &background)] {
+        let row = adw::ActionRow::builder().title(label).build();
+        row.add_suffix(button);
+        expander.add_row(&row);
+    }
+
+    let save: Rc<dyn Fn()> = {
+        let profiles = profiles.clone();
+        let profile_id = profile_id.to_string();
+        let expander = expander.downgrade();
+        let (foreground, background) = (foreground.downgrade(), background.downgrade());
+        Rc::new(move || {
+            let (Some(expander), Some(foreground), Some(background)) = (
+                expander.upgrade(),
+                foreground.upgrade(),
+                background.upgrade(),
+            ) else {
+                return;
+            };
+            let value = expander.enables_expansion().then(|| ColorPair {
+                foreground: rgba_to_hex(&foreground.rgba()),
+                background: rgba_to_hex(&background.rgba()),
+            });
+            profiles
+                .borrow_mut()
+                .update(&profile_id, |p| *field(&mut p.colors) = value);
+        })
+    };
+    {
+        let save = save.clone();
+        expander.connect_enable_expansion_notify(move |_| save());
+    }
+    for button in [&foreground, &background] {
+        let save = save.clone();
+        button.connect_rgba_notify(move |_| save());
+    }
+    expander
+}
+
+/// `color_pair_expander` for a single optional color (bold, badge).
+fn color_expander(
+    profiles: &Rc<RefCell<ProfileStore>>,
+    profile_id: &str,
+    title: &str,
+    current: Option<String>,
+    field: fn(&mut ProfileColors) -> &mut Option<String>,
+) -> adw::ExpanderRow {
+    let enabled = current.is_some();
+    // Tilix's default for both the bold and badge colors.
+    let button = color_button(current.as_deref().unwrap_or("#ffffff"));
+
+    let expander = adw::ExpanderRow::builder()
+        .title(title)
+        .show_enable_switch(true)
+        .enable_expansion(enabled)
+        .build();
+    let row = adw::ActionRow::builder().title("Color").build();
+    row.add_suffix(&button);
+    expander.add_row(&row);
+
+    let save: Rc<dyn Fn()> = {
+        let profiles = profiles.clone();
+        let profile_id = profile_id.to_string();
+        let expander = expander.downgrade();
+        let button = button.downgrade();
+        Rc::new(move || {
+            let (Some(expander), Some(button)) = (expander.upgrade(), button.upgrade()) else {
+                return;
+            };
+            let value = expander
+                .enables_expansion()
+                .then(|| rgba_to_hex(&button.rgba()));
+            profiles
+                .borrow_mut()
+                .update(&profile_id, |p| *field(&mut p.colors) = value);
+        })
+    };
+    {
+        let save = save.clone();
+        expander.connect_enable_expansion_notify(move |_| save());
+    }
+    button.connect_rgba_notify(move |_| save());
+    expander
 }
