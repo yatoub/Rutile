@@ -114,6 +114,13 @@ pub struct TerminalOptions {
     pub scrollback_unlimited: bool,
     pub scrollback_lines: u32,
     pub bell: BellMode,
+    /// Character encoding of the child's I/O, a name from
+    /// `terminal::encoding::supported_encodings()`. UTF-8 unless the
+    /// profile targets a legacy system (Tilix's per-profile "Encoding").
+    pub encoding: String,
+    /// How wide East Asian "ambiguous width" characters are drawn — Tilix's
+    /// "Ambiguous-width characters".
+    pub cjk_ambiguous_width: CjkWidth,
 }
 
 impl Default for TerminalOptions {
@@ -133,6 +140,8 @@ impl Default for TerminalOptions {
             scrollback_unlimited: false,
             scrollback_lines: 8192,
             bell: BellMode::default(),
+            encoding: "UTF-8".to_string(),
+            cjk_ambiguous_width: CjkWidth::default(),
         }
     }
 }
@@ -243,6 +252,35 @@ impl BadgePosition {
             BadgePosition::Northeast => "Top right",
             BadgePosition::Southwest => "Bottom left",
             BadgePosition::Southeast => "Bottom right",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CjkWidth {
+    /// One cell, vte's default (and Tilix's).
+    #[default]
+    Narrow,
+    /// Two cells, as East Asian fonts usually expect.
+    Wide,
+}
+
+impl CjkWidth {
+    pub const ALL: [CjkWidth; 2] = [CjkWidth::Narrow, CjkWidth::Wide];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            CjkWidth::Narrow => "Narrow",
+            CjkWidth::Wide => "Wide",
+        }
+    }
+
+    /// The value `vte4::Terminal::set_cjk_ambiguous_width` takes.
+    pub fn cells(self) -> i32 {
+        match self {
+            CjkWidth::Narrow => 1,
+            CjkWidth::Wide => 2,
         }
     }
 }
@@ -578,6 +616,8 @@ mod tests {
         assert!(profile.options.show_scrollbar);
         assert_eq!(profile.options.bell, BellMode::Sound);
         assert_eq!(profile.options.cell_height_scale, 1.0);
+        assert_eq!(profile.options.encoding, "UTF-8");
+        assert_eq!(profile.options.cjk_ambiguous_width, CjkWidth::Narrow);
     }
 
     #[test]

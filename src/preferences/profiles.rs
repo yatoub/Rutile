@@ -8,8 +8,8 @@ use libadwaita::prelude::*;
 
 use crate::preferences::config::Preferences;
 use crate::profile::{
-    BadgePosition, BellMode, ColorPair, ColorSchemeStore, CursorBlink, CursorShape, ExitAction,
-    Profile, ProfileColors, ProfileStore, TerminalOptions, TextBlink,
+    BadgePosition, BellMode, CjkWidth, ColorPair, ColorSchemeStore, CursorBlink, CursorShape,
+    ExitAction, Profile, ProfileColors, ProfileStore, TerminalOptions, TextBlink,
 };
 
 /// The "Profiles" page: one row per profile (name, scheme, a "Default"
@@ -171,6 +171,12 @@ impl ProfilesPage {
             Some("scrolling"),
             "Scrolling",
             "view-continuous-symbolic",
+        );
+        stack.add_titled_with_icon(
+            &self.compatibility_tab(profile),
+            Some("compatibility"),
+            "Compatibility",
+            "text-x-generic-symbolic",
         );
         stack.add_titled_with_icon(
             &self.badge_tab(profile),
@@ -721,6 +727,56 @@ impl ProfilesPage {
             });
         }
         refresh();
+
+        page.add(&group);
+        page
+    }
+
+    /// Encoding and ambiguous-width characters — Tilix's Compatibility tab.
+    fn compatibility_tab(self: &Rc<Self>, profile: &Profile) -> adw::PreferencesPage {
+        let page = adw::PreferencesPage::new();
+        let group = adw::PreferencesGroup::new();
+
+        let encodings = crate::terminal::encoding::supported_encodings();
+        let names: Vec<&str> = encodings.iter().map(String::as_str).collect();
+        let encoding_row = adw::ComboRow::builder()
+            .title("Encoding")
+            .subtitle("For legacy systems — the shell and programs must use the same one")
+            .model(&gtk4::StringList::new(&names))
+            .enable_search(true)
+            .expression(gtk4::PropertyExpression::new(
+                gtk4::StringObject::static_type(),
+                None::<gtk4::Expression>,
+                "string",
+            ))
+            .build();
+        let current = encodings
+            .iter()
+            .position(|e| e.eq_ignore_ascii_case(&profile.options.encoding))
+            .unwrap_or(0);
+        encoding_row.set_selected(current as u32);
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            encoding_row.connect_selected_notify(move |row| {
+                if let Some(encoding) = encodings.get(row.selected() as usize).cloned() {
+                    profiles
+                        .borrow_mut()
+                        .update(&profile_id, |p| p.options.encoding = encoding);
+                }
+            });
+        }
+        group.add(&encoding_row);
+
+        group.add(&options_combo_row(
+            &self.profiles,
+            &profile.id,
+            "Ambiguous-width characters",
+            &CjkWidth::ALL,
+            CjkWidth::label,
+            profile.options.cjk_ambiguous_width,
+            |o, v| o.cjk_ambiguous_width = v,
+        ));
 
         page.add(&group);
         page

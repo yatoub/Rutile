@@ -11,11 +11,78 @@ use crate::context_menu;
 use crate::dialogs::confirm_close;
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
-use crate::preferences::{self, Preferences};
+use crate::preferences::{self, Preferences, SidebarPosition, WindowStyle};
 use crate::profile::{ColorSchemeStore, ProfileId, ProfileResolver, ProfileStore, TerminalConfig};
 use crate::session::persist::{self, SavedWindow};
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
+
+const TOOLBAR_NAME: &str = "rutile-toolbar";
+const BODY_NAME: &str = "rutile-body";
+const SIDEBAR_SEPARATOR_NAME: &str = "rutile-sidebar-separator";
+
+fn child_named(parent: &gtk4::Widget, name: &str) -> Option<gtk4::Widget> {
+    let mut child = parent.first_child();
+    while let Some(widget) = child {
+        if widget.widget_name() == name {
+            return Some(widget);
+        }
+        child = widget.next_sibling();
+    }
+    None
+}
+
+/// Applies the window style and sidebar position from `prefs` to one of
+/// Rutile's main windows — at creation, and again from Preferences when
+/// either changes (see `apply_window_preferences_to_all`).
+pub fn apply_window_preferences(window: &adw::ApplicationWindow, prefs: &Preferences) {
+    window.set_decorated(prefs.window_style != WindowStyle::Borderless);
+    let Some(content) = adw::prelude::AdwApplicationWindowExt::content(window) else {
+        return;
+    };
+    if let Some(toolbar) = child_named(&content, TOOLBAR_NAME) {
+        toolbar.set_visible(prefs.window_style == WindowStyle::Normal);
+    }
+
+    let Some(body) = child_named(&content, BODY_NAME).and_downcast::<gtk4::Box>() else {
+        return;
+    };
+    let Some(separator) = child_named(body.upcast_ref(), SIDEBAR_SEPARATOR_NAME) else {
+        return;
+    };
+    let mut sidebar = None;
+    let mut tabs = None;
+    let mut child = body.first_child();
+    while let Some(widget) = child {
+        if widget.has_css_class("rutile-sidebar") {
+            sidebar = Some(widget.clone());
+        } else if widget.is::<adw::TabView>() {
+            tabs = Some(widget.clone());
+        }
+        child = widget.next_sibling();
+    }
+    let (Some(sidebar), Some(tabs)) = (sidebar, tabs) else {
+        return;
+    };
+    let order = match prefs.sidebar_position {
+        SidebarPosition::Left => [&sidebar, &separator, &tabs],
+        SidebarPosition::Right => [&tabs, &separator, &sidebar],
+    };
+    body.reorder_child_after(order[0], None::<&gtk4::Widget>);
+    body.reorder_child_after(order[1], Some(order[0]));
+    body.reorder_child_after(order[2], Some(order[1]));
+}
+
+/// `apply_window_preferences` on every open Rutile window.
+pub fn apply_window_preferences_to_all(prefs: &Preferences) {
+    for window in gtk4::Window::list_toplevels() {
+        if let Ok(window) = window.downcast::<adw::ApplicationWindow>()
+            && window.has_css_class("rutile-window")
+        {
+            apply_window_preferences(&window, prefs);
+        }
+    }
+}
 
 pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let header_bar = adw::HeaderBar::new();
@@ -78,10 +145,16 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
 
     build_toolbar(&header_bar, &session_view, &prefs, &profiles, app, &sidebar);
 
+    // Named so `apply_window_preferences` can find them again, to hide the
+    // header bar or move the sidebar to the other side.
+    header_bar.set_widget_name(TOOLBAR_NAME);
     let body = gtk4::Box::new(gtk4::Orientation::Horizontal, 0);
+    body.set_widget_name(BODY_NAME);
     body.set_vexpand(true);
     body.append(sidebar.widget());
-    body.append(&gtk4::Separator::new(gtk4::Orientation::Vertical));
+    let sidebar_separator = gtk4::Separator::new(gtk4::Orientation::Vertical);
+    sidebar_separator.set_widget_name(SIDEBAR_SEPARATOR_NAME);
+    body.append(&sidebar_separator);
     let tab_view = session_view.borrow().tab_view().clone();
     tab_view.set_hexpand(true);
     tab_view.set_vexpand(true);
@@ -102,6 +175,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // shows the desktop behind the terminal (chrome.css) — every chrome
     // widget paints its own opaque background instead.
     window.add_css_class("rutile-window");
+    apply_window_preferences(&window, &prefs.borrow());
 
     // Wire the context menu (right-click: split + broadcast group) for
     // every pane of every session that exists so far — just the one blank
@@ -352,6 +426,11 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                     }
                 }
                 Action::ToggleMargin => session_view.borrow().toggle_margin_focused(),
+                Action::OpenPreferences => {
+                    if let Some(window) = window_weak.upgrade() {
+                        let _ = WidgetExt::activate_action(&window, "win.preferences", None);
+                    }
+                }
             }
 
             glib::Propagation::Stop

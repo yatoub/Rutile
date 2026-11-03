@@ -32,6 +32,9 @@ pub enum Action {
     CopyAsHtml,
     PasteAdvanced,
     ToggleMargin,
+    /// Opens the Preferences window — also reachable without the header
+    /// bar's menu, which `WindowStyle::HideToolbar`/`Borderless` hide.
+    OpenPreferences,
 }
 
 const CTRL_SHIFT: gdk::ModifierType =
@@ -105,6 +108,12 @@ const DEFAULT_KEYBINDINGS: &[(gdk::Key, gdk::ModifierType, Action)] = &[
     (gdk::Key::C, CTRL_SHIFT_ALT, Action::CopyAsHtml),
     (gdk::Key::V, CTRL_SHIFT_ALT, Action::PasteAdvanced),
     (gdk::Key::M, CTRL_SHIFT, Action::ToggleMargin),
+    // GNOME's standard "Preferences" shortcut.
+    (
+        gdk::Key::comma,
+        gdk::ModifierType::CONTROL_MASK,
+        Action::OpenPreferences,
+    ),
 ];
 
 const RELEVANT_MODIFIERS: gdk::ModifierType = gdk::ModifierType::CONTROL_MASK
@@ -158,9 +167,32 @@ impl Keymap {
     /// `Keymap::default()` if the file doesn't exist yet or fails to parse.
     pub fn load() -> Self {
         match std::fs::read_to_string(config_path()) {
-            Ok(contents) => toml::from_str(&contents).unwrap_or_default(),
+            Ok(contents) => Self::from_toml(&contents),
             Err(_) => Self::default(),
         }
+    }
+
+    /// A saved keymap lists every binding it had when written, so an
+    /// action added to `DEFAULT_KEYBINDINGS` since then would otherwise
+    /// stay unbound for anyone who ever rebound a shortcut: missing
+    /// actions get their default chord back, unless the user already uses
+    /// that chord for something else.
+    fn from_toml(contents: &str) -> Self {
+        let Ok(mut keymap) = toml::from_str::<Self>(contents) else {
+            return Self::default();
+        };
+        for (key, modifiers, action) in DEFAULT_KEYBINDINGS {
+            let chord = format_chord(*key, *modifiers);
+            let bound = keymap.bindings.iter().any(|b| b.action == *action);
+            let taken = keymap.bindings.iter().any(|b| b.chord == chord);
+            if !bound && !taken {
+                keymap.bindings.push(Binding {
+                    chord,
+                    action: *action,
+                });
+            }
+        }
+        keymap
     }
 
     pub fn save(&self) {
@@ -280,6 +312,7 @@ pub fn action_label(action: Action) -> String {
         Action::CopyAsHtml => "Copy as HTML".to_string(),
         Action::PasteAdvanced => "Paste (advanced)".to_string(),
         Action::ToggleMargin => "Toggle margin guide".to_string(),
+        Action::OpenPreferences => "Open preferences".to_string(),
     }
 }
 
@@ -288,5 +321,51 @@ pub fn orientation_for(action: Action) -> Option<Orientation> {
         Action::SplitHorizontal => Some(Orientation::Horizontal),
         Action::SplitVertical => Some(Orientation::Vertical),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn saved_keymap_gains_actions_added_since() {
+        let saved = r#"
+            [[bindings]]
+            chord = "Ctrl+Shift+O"
+            action = "SplitHorizontal"
+        "#;
+        let keymap = Keymap::from_toml(saved);
+        assert_eq!(
+            keymap.chord_for(Action::OpenPreferences),
+            Some(format_chord(
+                gdk::Key::comma,
+                gdk::ModifierType::CONTROL_MASK
+            ))
+        );
+        assert!(keymap.chord_for(Action::ToggleMargin).is_some());
+    }
+
+    #[test]
+    fn a_rebound_chord_is_not_handed_back_to_its_default_action() {
+        // The user moved "Split horizontally" onto Ctrl+Comma: Preferences
+        // must not get it back (nor steal it), it stays unbound instead.
+        let saved = r#"
+            [[bindings]]
+            chord = "Ctrl+comma"
+            action = "SplitHorizontal"
+        "#;
+        let keymap = Keymap::from_toml(saved);
+        assert_eq!(
+            keymap.lookup(gdk::Key::comma, gdk::ModifierType::CONTROL_MASK),
+            Some(Action::SplitHorizontal)
+        );
+        assert_eq!(keymap.chord_for(Action::OpenPreferences), None);
+    }
+
+    #[test]
+    fn unparsable_file_falls_back_to_defaults() {
+        let keymap = Keymap::from_toml("not toml at all [[[");
+        assert_eq!(keymap.entries().len(), DEFAULT_KEYBINDINGS.len());
     }
 }

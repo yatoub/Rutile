@@ -1,5 +1,6 @@
 pub mod badge;
 pub mod broadcast;
+pub mod encoding;
 pub mod hyperlinks;
 pub mod margin;
 pub mod monitor;

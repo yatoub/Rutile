@@ -218,13 +218,29 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
     comme Tilix : règle CSS `background-image` sur `rutile-window`, ajoutée
     à la feuille du chrome par `app::load_theme` — visible à travers les
     terminaux transparents uniquement. Fichier introuvable → ignoré
-  - Style de fenêtre (normal / disable-CSD / disable-CSD+hidétoolbar /
-    borderless) — `GtkHeaderBar`/CSD conditionnel
-  - Position des onglets (left/right/top/bottom), poignées larges, overlay
-    scrollbar, « show title even when single »
-- [ ] **Encodage** (page réelle + sélecteur par terminal `encoding-select`) :
-  liste des ~80 encodages Tilix, encodage par profil (`Profile::encoding`),
-  largeur CJK (narrow/wide)
+  - [x] Style de fenêtre : normal / barre d'outils masquée / sans bordure
+    (`Preferences::window_style`, appliqué en direct à toutes les fenêtres
+    par `window::apply_window_preferences`). Les variantes « disable-CSD »
+    de Tilix n'ont pas d'équivalent : GTK4/libadwaita ne sait pas repasser
+    en décorations serveur. Sans barre d'outils, les Préférences restent
+    accessibles par **Ctrl+,** (nouvelle `Action::OpenPreferences`) et par
+    le menu contextuel du terminal. Au passage, un `keybindings.toml`
+    existant reçoit désormais les actions ajoutées depuis (sauf si leur
+    raccourci est déjà pris)
+  - [x] Position du panneau de sessions gauche/droite
+    (`Preferences::sidebar_position`) — Rutile n'a pas de barre d'onglets,
+    l'équivalent de la « position des onglets » de Tilix est le panneau
+    latéral, d'où seulement gauche/droite
+  - [ ] Poignées larges, « show title even when single »
+- [x] **Encodage** par profil (onglet Compatibility de l'éditeur) + largeur
+  CJK narrow/wide. Le crate `vte4` sûr n'enveloppe plus `set_encoding`
+  (déprécié par vte), appelé via `vte4::ffi` (`terminal/encoding.rs`) ; la
+  liste vient de `vte_get_encodings` à l'exécution (221 encodages avec ICU,
+  UTF-8 seul sinon) plutôt que des ~80 de Tilix codés en dur. Encodage
+  invalide → message, le terminal reste en UTF-8
+- [ ] Page Préférences « Encoding » globale de Tilix (choisir les encodages
+  proposés dans le menu du terminal) et sélecteur par terminal
+  (`encoding-select`)
 
 ### Phase 3 — CLI (M2)
 
