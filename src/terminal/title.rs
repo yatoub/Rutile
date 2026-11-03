@@ -49,6 +49,15 @@ pub fn current_user() -> Option<String> {
     std::env::var("USER").ok().filter(|s| !s.is_empty())
 }
 
+/// The host part of the `file://host/path` URI VTE reports via
+/// `current_directory_uri()` (OSC 7) — `None` when the URI has no host
+/// (`file:///path`, i.e. local) or isn't `file://`.
+pub fn host_from_uri(uri: &str) -> Option<String> {
+    let after_scheme = uri.strip_prefix("file://")?;
+    let host = &after_scheme[..after_scheme.find('/').unwrap_or(after_scheme.len())];
+    (!host.is_empty()).then(|| host.to_string())
+}
+
 /// Extracts a filesystem path from the `file://[host]/path` URI VTE
 /// reports via `current_directory_uri()` (OSC 7). Percent-decodes the
 /// path portion; drops the URI entirely if it isn't `file://`.
@@ -79,6 +88,16 @@ fn percent_decode(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn host_from_uri_reads_the_authority() {
+        assert_eq!(
+            super::host_from_uri("file://box/home/u").as_deref(),
+            Some("box")
+        );
+        assert_eq!(super::host_from_uri("file:///home/u"), None);
+        assert_eq!(super::host_from_uri("https://box/x"), None);
+    }
+
     use super::*;
 
     #[test]

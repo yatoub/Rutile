@@ -178,6 +178,12 @@ impl ProfilesPage {
             "Badge",
             "text-x-generic-symbolic",
         );
+        stack.add_titled_with_icon(
+            &self.advanced_tab(profile),
+            Some("advanced"),
+            "Advanced",
+            "applications-system-symbolic",
+        );
 
         let header = adw::HeaderBar::builder()
             .title_widget(
@@ -640,6 +646,62 @@ impl ProfilesPage {
         page
     }
 
+    /// Tilix's "Automatic Profile Switching" list: one row per rule with a
+    /// remove button, and an entry to add one.
+    fn advanced_tab(self: &Rc<Self>, profile: &Profile) -> adw::PreferencesPage {
+        let page = adw::PreferencesPage::new();
+        let group = adw::PreferencesGroup::builder()
+            .title("Automatic profile switching")
+            .description(
+                "Switch a terminal to this profile while it is in a matching place: \
+                 user@host:directory, every part optional (e.g. prod-db, \
+                 :~/projets/work, root@server:/etc). A directory matches its \
+                 subdirectories too. Rules are checked when the shell reports \
+                 its directory (OSC 7).",
+            )
+            .build();
+        let rows: Rc<RefCell<Vec<adw::ActionRow>>> = Rc::default();
+
+        let add_row = adw::EntryRow::builder()
+            .title("Add a rule")
+            .show_apply_button(true)
+            .build();
+        group.add(&add_row);
+
+        let refresh: Rc<dyn Fn()> = {
+            let group = group.downgrade();
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            let rows = rows.clone();
+            Rc::new(move || {
+                let Some(group) = group.upgrade() else {
+                    return;
+                };
+                rebuild_rule_rows(&group, &rows, &profiles, &profile_id);
+            })
+        };
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            let refresh = refresh.clone();
+            add_row.connect_apply(move |row| {
+                let rule = row.text().trim().to_string();
+                if rule.is_empty() {
+                    return;
+                }
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.automatic_switch.push(rule));
+                row.set_text("");
+                refresh();
+            });
+        }
+        refresh();
+
+        page.add(&group);
+        page
+    }
+
     fn badge_tab(self: &Rc<Self>, profile: &Profile) -> adw::PreferencesPage {
         let page = adw::PreferencesPage::new();
         let badge = &profile.badge;
@@ -1026,4 +1088,50 @@ fn color_expander(
     }
     button.connect_rgba_notify(move |_| save());
     expander
+}
+
+/// Re-lists a profile's automatic switch rules below the "Add a rule"
+/// entry, each with a button removing it (by index, then re-listing).
+fn rebuild_rule_rows(
+    group: &adw::PreferencesGroup,
+    rows: &Rc<RefCell<Vec<adw::ActionRow>>>,
+    profiles: &Rc<RefCell<ProfileStore>>,
+    profile_id: &str,
+) {
+    for row in rows.borrow_mut().drain(..) {
+        group.remove(&row);
+    }
+    let rules = profiles
+        .borrow()
+        .get(profile_id)
+        .map(|p| p.automatic_switch.clone())
+        .unwrap_or_default();
+    for (index, rule) in rules.iter().enumerate() {
+        let row = adw::ActionRow::builder().title(rule.as_str()).build();
+        let remove = gtk4::Button::builder()
+            .icon_name("user-trash-symbolic")
+            .tooltip_text("Remove rule")
+            .valign(gtk4::Align::Center)
+            .build();
+        remove.add_css_class("flat");
+        {
+            let group = group.downgrade();
+            let rows = rows.clone();
+            let profiles = profiles.clone();
+            let profile_id = profile_id.to_string();
+            remove.connect_clicked(move |_| {
+                profiles.borrow_mut().update(&profile_id, |p| {
+                    if index < p.automatic_switch.len() {
+                        p.automatic_switch.remove(index);
+                    }
+                });
+                if let Some(group) = group.upgrade() {
+                    rebuild_rule_rows(&group, &rows, &profiles, &profile_id);
+                }
+            });
+        }
+        row.add_suffix(&remove);
+        group.add(&row);
+        rows.borrow_mut().push(row);
+    }
 }

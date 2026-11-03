@@ -52,6 +52,11 @@ pub struct Profile {
     /// Text drawn in a corner of the terminal. Flattened like `options`.
     #[serde(flatten)]
     pub badge: Badge,
+    /// Tilix's "Automatic Profile Switching": `user@host:directory` rules
+    /// (every part optional, see `profile::auto_switch`). A terminal whose
+    /// current host/directory matches one switches to this profile.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub automatic_switch: Vec<String>,
 }
 
 impl Profile {
@@ -70,6 +75,7 @@ impl Profile {
             options: TerminalOptions::default(),
             colors: ProfileColors::default(),
             badge: Badge::default(),
+            automatic_switch: Vec::new(),
         }
     }
 }

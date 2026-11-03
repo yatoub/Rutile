@@ -179,8 +179,15 @@ rétro-compatible) :
   `gtk4::Label` en overlay semi-transparent (`terminal/badge.rs`), qui
   ignore la souris — il passe donc *au-dessus* du texte au lieu d'en
   dessous
-- [ ] **Switch automatique de profil** : liste de match
-  `user@host:dir`/`host:dir`
+- [x] **Switch automatique de profil** : liste de règles
+  `user@host:dir` (chaque partie optionnelle, `~` développé, un répertoire
+  couvre ses sous-répertoires) dans l'onglet Advanced de l'éditeur,
+  réévaluées à chaque OSC 7 comme Tilix — premier profil qui matche, retour
+  au profil de la session quand plus rien ne matche. Logique pure dans
+  `profile/auto_switch.rs` (testée) ; le terminal ré-applique couleurs,
+  options et badge (`Appearance::apply` dans `terminal/widget.rs`) sans
+  relancer la commande. L'utilisateur est toujours l'utilisateur local (Tilix
+  ne le change que via les triggers, Phase 5)
 - [x] Éditeur de profil réel à onglets dans la fenêtre Préférences au lieu
   du CRUD sommaire : la page Profils liste les profils (schéma, badge
   « Default »), chaque ligne ouvre une sous-page

@@ -23,6 +23,7 @@ const MARGIN: i32 = 12;
 /// drawing.
 pub struct BadgeOverlay {
     label: gtk4::Label,
+    state: Rc<RefCell<BadgeState>>,
 }
 
 /// What the template is rendered from, updated by the terminal's signals.
@@ -51,75 +52,79 @@ impl BadgeState {
 }
 
 impl BadgeOverlay {
-    /// `color`: the profile's badge color, or the scheme's foreground.
-    /// Call after the terminal's font is set — a "system font" badge is
-    /// sized from it.
-    pub fn new(
-        terminal: &vte4::Terminal,
-        badge: &Badge,
-        color: &gdk::RGBA,
-        pane_id: PaneId,
-    ) -> Self {
-        let (halign, valign) = match badge.badge_position {
-            BadgePosition::Northwest => (gtk4::Align::Start, gtk4::Align::Start),
-            BadgePosition::Northeast => (gtk4::Align::End, gtk4::Align::Start),
-            BadgePosition::Southwest => (gtk4::Align::Start, gtk4::Align::End),
-            BadgePosition::Southeast => (gtk4::Align::End, gtk4::Align::End),
-        };
+    /// An empty, hidden badge — `update` gives it the profile's settings.
+    /// It tracks the terminal's title and directory from the start, so a
+    /// later `update` (automatic profile switching) renders right away.
+    pub fn new(terminal: &vte4::Terminal, pane_id: PaneId) -> Self {
         let label = gtk4::Label::builder()
-            .halign(halign)
-            .valign(valign)
             .margin_top(MARGIN)
             .margin_bottom(MARGIN)
             .margin_start(MARGIN)
             .margin_end(MARGIN)
             .wrap(true)
             .wrap_mode(pango::WrapMode::WordChar)
-            .justify(if halign == gtk4::Align::End {
-                gtk4::Justification::Right
-            } else {
-                gtk4::Justification::Left
-            })
             .opacity(0.35)
             .can_target(false)
+            .visible(false)
             .build();
-        label.set_attributes(Some(&attributes(terminal, badge, color)));
 
         let state = Rc::new(RefCell::new(BadgeState {
-            template: badge.badge_text.clone(),
+            template: String::new(),
             pane_id,
             title: None,
             directory: None,
         }));
-        refresh(&label, &state.borrow());
-
-        if !badge.badge_text.trim().is_empty() {
-            {
-                let state = state.clone();
-                let label = label.downgrade();
-                terminal.connect_window_title_changed(move |terminal| {
-                    let Some(label) = label.upgrade() else {
-                        return;
-                    };
-                    state.borrow_mut().title = terminal.window_title().map(|s| s.to_string());
-                    refresh(&label, &state.borrow());
-                });
-            }
-            {
-                let label = label.downgrade();
-                terminal.connect_current_directory_uri_changed(move |terminal| {
-                    let Some(label) = label.upgrade() else {
-                        return;
-                    };
-                    state.borrow_mut().directory = terminal
-                        .current_directory_uri()
-                        .and_then(|uri| title::directory_from_uri(&uri));
-                    refresh(&label, &state.borrow());
-                });
-            }
+        {
+            let state = state.clone();
+            let label = label.downgrade();
+            terminal.connect_window_title_changed(move |terminal| {
+                let Some(label) = label.upgrade() else {
+                    return;
+                };
+                state.borrow_mut().title = terminal.window_title().map(|s| s.to_string());
+                refresh(&label, &state.borrow());
+            });
+        }
+        {
+            let state = state.clone();
+            let label = label.downgrade();
+            terminal.connect_current_directory_uri_changed(move |terminal| {
+                let Some(label) = label.upgrade() else {
+                    return;
+                };
+                state.borrow_mut().directory = terminal
+                    .current_directory_uri()
+                    .and_then(|uri| title::directory_from_uri(&uri));
+                refresh(&label, &state.borrow());
+            });
         }
 
-        Self { label }
+        Self { label, state }
+    }
+
+    /// Applies a profile's badge settings. `color`: the profile's badge
+    /// color, or the scheme's foreground. Call after the terminal's font
+    /// is set — a "system font" badge is sized from it.
+    pub fn update(&self, terminal: &vte4::Terminal, badge: &Badge, color: &gdk::RGBA) {
+        let (halign, valign) = match badge.badge_position {
+            BadgePosition::Northwest => (gtk4::Align::Start, gtk4::Align::Start),
+            BadgePosition::Northeast => (gtk4::Align::End, gtk4::Align::Start),
+            BadgePosition::Southwest => (gtk4::Align::Start, gtk4::Align::End),
+            BadgePosition::Southeast => (gtk4::Align::End, gtk4::Align::End),
+        };
+        self.label.set_halign(halign);
+        self.label.set_valign(valign);
+        self.label.set_justify(if halign == gtk4::Align::End {
+            gtk4::Justification::Right
+        } else {
+            gtk4::Justification::Left
+        });
+        self.label
+            .set_attributes(Some(&attributes(terminal, badge, color)));
+
+        let mut state = self.state.borrow_mut();
+        state.template = badge.badge_text.clone();
+        refresh(&self.label, &state);
     }
 
     pub fn widget(&self) -> &gtk4::Label {
