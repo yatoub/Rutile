@@ -157,6 +157,10 @@ pub struct ProfileColors {
     /// Tilix.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub badge_color: Option<String>,
+    /// How see-through the terminal's background is, in percent (0 =
+    /// opaque) — Tilix's per-profile "Transparency". Clamped to 0–100 when
+    /// applied.
+    pub background_transparency: u8,
 }
 
 impl Default for ProfileColors {
@@ -167,6 +171,7 @@ impl Default for ProfileColors {
             highlight_colors: None,
             bold_color: None,
             badge_color: None,
+            background_transparency: 0,
         }
     }
 }

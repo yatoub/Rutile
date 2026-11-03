@@ -210,7 +210,10 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
     (`catppuccin-{mocha,latte}.css`, des `@define-color`), rechargées en
     direct par `app::load_theme`. **Sombre par défaut** (pas System comme
     Tilix) : la DA de Rutile est Mocha, le clair est une option
-  - Transparence de fond (+ transparence par profil de Phase 1)
+  - [x] Transparence de fond, par profil comme Tilix
+    (`ProfileColors::background_transparency`, onglet Color) : la fenêtre
+    est transparente (`rutile-window` dans chrome.css), chaque élément du
+    chrome peint son propre fond, le terminal applique l'alpha à son fond
   - Image de fond + mode (scale/tile/center/stretch)
   - Style de fenêtre (normal / disable-CSD / disable-CSD+hidétoolbar /
     borderless) — `GtkHeaderBar`/CSD conditionnel

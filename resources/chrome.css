@@ -13,6 +13,17 @@ headerbar,
   color: @rutile_fg;
 }
 
+/* The main window itself is see-through, for profiles with a transparent
+   terminal background: everything drawn on top of it paints its own
+   background (headerbar, sidebar, pane headers, the terminals). */
+window.rutile-window.background {
+  background-color: transparent;
+}
+
+.rutile-sidebar {
+  background-color: @rutile_bg_0;
+}
+
 headerbar {
   background-color: @rutile_bg_1;
   border-bottom: 1px solid @rutile_bg_2;

@@ -568,7 +568,17 @@ même (accrochent les artefacts à la Release GitHub) ; seuls
 - Pas d'outil de capture d'écran fiable ici (ni X11 `import`/ImageMagick,
   ni le portail D-Bus GNOME Screenshot — `AccessDenied`). Pour "voir" l'UI,
   passer par des exemples pilotés par code qui logguent l'état des widgets
-  plutôt que par une vraie capture visuelle.
+  plutôt que par une vraie capture visuelle. Pour vérifier un **rendu**
+  (transparence, couleurs effectivement peintes), on peut lire les pixels
+  sans capture d'écran : `gtk4::WidgetPaintable::new(Some(&window))` →
+  `snapshot` → `snapshot.to_node()` → `window.native().renderer()
+  .render_texture(node, None)` → `texture.download(&mut bytes, stride)`
+  (BGRA prémultiplié, alpha à l'octet 3). Utilisé pour valider la
+  transparence de fond (terminal à alpha 127 pour 50 %, chrome à 255).
+  Lancer ces exemples avec `XDG_CONFIG_HOME`/`XDG_STATE_HOME` pointant vers
+  un dossier temporaire dès qu'ils construisent une vraie fenêtre
+  (`window::build_window` restaure puis sauvegarde la session) ou
+  modifient des profils.
 - Ctrl+D/EOF simulé via `feed_child` peut ne pas fermer un shell interactif
   dans ce sandbox (zsh y a probablement `ignoreeof` ou équivalent) — ce
   n'est pas un bug de l'app, juste une limite de vérification ici. Le
