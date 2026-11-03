@@ -43,6 +43,63 @@ pub struct Preferences {
     /// variant". Defaults to dark rather than following the system like
     /// Tilix does: Rutile's look is Catppuccin Mocha, Latte is opt-in.
     pub theme_variant: ThemeVariant,
+    /// An image drawn behind every terminal — visible through profiles
+    /// with background transparency, like Tilix's. `None`: no image.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub background_image: Option<PathBuf>,
+    pub background_image_mode: BackgroundImageMode,
+}
+
+/// How the background image fills the window — Tilix's four modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BackgroundImageMode {
+    /// Scaled to cover the whole window, keeping its aspect ratio
+    /// (cropped if needed), centered.
+    #[default]
+    Scale,
+    /// Repeated at its own size from the top-left corner.
+    Tile,
+    /// At its own size, centered.
+    Center,
+    /// Stretched to the window's size, ignoring its aspect ratio.
+    Stretch,
+}
+
+impl BackgroundImageMode {
+    pub const ALL: [BackgroundImageMode; 4] = [
+        BackgroundImageMode::Scale,
+        BackgroundImageMode::Tile,
+        BackgroundImageMode::Center,
+        BackgroundImageMode::Stretch,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            BackgroundImageMode::Scale => "Scale",
+            BackgroundImageMode::Tile => "Tile",
+            BackgroundImageMode::Center => "Center",
+            BackgroundImageMode::Stretch => "Stretch",
+        }
+    }
+
+    /// The CSS background properties for this mode.
+    pub fn css(self) -> &'static str {
+        match self {
+            BackgroundImageMode::Scale => {
+                "background-size: cover; background-position: center; background-repeat: no-repeat;"
+            }
+            BackgroundImageMode::Tile => {
+                "background-size: auto; background-position: left top; background-repeat: repeat;"
+            }
+            BackgroundImageMode::Center => {
+                "background-size: auto; background-position: center; background-repeat: no-repeat;"
+            }
+            BackgroundImageMode::Stretch => {
+                "background-size: 100% 100%; background-position: center; background-repeat: no-repeat;"
+            }
+        }
+    }
 }
 
 /// Tilix's "Theme variant" setting.
@@ -83,6 +140,8 @@ impl Default for Preferences {
             default_profile_id: "default".to_string(),
             prompt_on_close_with_process: true,
             theme_variant: ThemeVariant::default(),
+            background_image: None,
+            background_image_mode: BackgroundImageMode::default(),
         }
     }
 }
@@ -116,5 +175,36 @@ impl Preferences {
         if let Ok(contents) = toml::to_string_pretty(self) {
             let _ = std::fs::write(path, contents);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn background_image_round_trips_and_defaults_to_none() {
+        let prefs = Preferences {
+            background_image: Some(PathBuf::from("/home/u/wall.png")),
+            background_image_mode: BackgroundImageMode::Tile,
+            ..Preferences::default()
+        };
+        let toml = toml::to_string(&prefs).unwrap();
+        assert!(toml.contains(r#"background_image_mode = "tile""#), "{toml}");
+        let back: Preferences = toml::from_str(&toml).unwrap();
+        assert_eq!(back.background_image, prefs.background_image);
+        assert_eq!(back.background_image_mode, BackgroundImageMode::Tile);
+
+        // An unset image isn't written at all, and an older file without
+        // these keys gets the defaults.
+        let default_toml = toml::to_string(&Preferences::default()).unwrap();
+        assert!(
+            !default_toml.contains("background_image ="),
+            "{default_toml}"
+        );
+        let old: Preferences = toml::from_str("focus_follows_mouse = false").unwrap();
+        assert_eq!(old.background_image, None);
+        assert_eq!(old.background_image_mode, BackgroundImageMode::Scale);
+        assert_eq!(old.theme_variant, ThemeVariant::Dark);
     }
 }
