@@ -60,7 +60,12 @@ impl Appearance {
     fn apply(&self, config: &TerminalConfig) {
         let scheme = &config.scheme;
         let foreground = scheme.foreground_rgba();
-        let background = scheme.background_rgba();
+        // The window behind the terminal is see-through (`rutile-window`
+        // in chrome.css), so the background's alpha is all it takes.
+        let transparency = f32::from(config.profile.colors.background_transparency.min(100));
+        let background = scheme
+            .background_rgba()
+            .with_alpha(1.0 - transparency / 100.0);
         let palette = scheme.palette_rgba();
         let palette_refs: Vec<&gtk4::gdk::RGBA> = palette.iter().collect();
         self.terminal

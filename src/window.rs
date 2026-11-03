@@ -98,6 +98,10 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         .default_height(600)
         .content(&content)
         .build();
+    // See-through background, so a profile's background transparency
+    // shows the desktop behind the terminal (chrome.css) — every chrome
+    // widget paints its own opaque background instead.
+    window.add_css_class("rutile-window");
 
     // Wire the context menu (right-click: split + broadcast group) for
     // every pane of every session that exists so far — just the one blank

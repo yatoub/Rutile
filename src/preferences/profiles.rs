@@ -620,6 +620,30 @@ impl ProfilesPage {
             });
             row
         });
+        overrides.add(&{
+            let adjustment = gtk4::Adjustment::new(
+                f64::from(colors.background_transparency),
+                0.0,
+                100.0,
+                5.0,
+                10.0,
+                0.0,
+            );
+            let row = adw::SpinRow::builder()
+                .title("Background transparency")
+                .subtitle("Percent — 0 is opaque")
+                .adjustment(&adjustment)
+                .build();
+            let profiles = self.profiles.clone();
+            let profile_id = profile.id.clone();
+            row.connect_value_notify(move |row| {
+                let percent = row.value().clamp(0.0, 100.0) as u8;
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.colors.background_transparency = percent);
+            });
+            row
+        });
         overrides.add(&color_pair_expander(
             &self.profiles,
             &profile.id,

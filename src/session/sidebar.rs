@@ -37,6 +37,7 @@ impl SessionSidebar {
         list_box.set_selection_mode(gtk4::SelectionMode::Single);
 
         let root = gtk4::ScrolledWindow::builder()
+            .css_classes(["rutile-sidebar"])
             .child(&list_box)
             .hscrollbar_policy(gtk4::PolicyType::Never)
             .width_request(180)
