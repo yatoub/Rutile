@@ -431,6 +431,23 @@ même Release.
   PAT doit avoir le scope `Pull requests: Read and write` ajouté en plus
   de `Contents: Read and write`** (pas modifiable via API, à faire dans
   GitHub Settings → Developer settings → Fine-grained tokens).
+- **Nettoyage des branches `release-plz-*`** : job `cleanup-branches` de
+  `release.yml` (porté de susshi), après `update-pkgbuild` sur une release
+  de tag — supprime toute branche `release-plz-*` sans PR ouverte (16
+  s'étaient accumulées jusqu'à v0.8.0). **Piège trouvé en le portant** : le
+  job n'a pas de checkout, et `gh pr list` sans `--repo` a besoin d'un
+  dépôt git local pour deviner le repo — hors dépôt il échoue, et la
+  version de susshi avale l'erreur (`open` vide ≠ `"0"`), donc ne supprime
+  jamais rien sans rien signaler. Ici `--repo` est passé et un échec de
+  `gh pr list` fait échouer le job.
+- **Un seul déclencheur AUR par release** : `aur-publish.yml` ne réagit à
+  `workflow_run` que pour une release de *tag* (`push`). Une republication
+  manuelle de `release.yml` (`workflow_dispatch` depuis `main`) passe par
+  son job `trigger-aur-publish`, qui fournit le tag explicitement : le
+  `workflow_run` qu'elle déclenche aussi porte le `head_sha` de `main`, sur
+  lequel aucun tag ne pointe, et échouait en doublon (`Invalid tag
+  format:` lors de la republication de v0.8.0, probablement aussi les deux
+  échecs AUR du 10 août).
 - **`CHANGELOG.md`** créé avec juste l'en-tête (aucune entrée encore,
   Rutile n'a pas de tag de version) — release-plz y ajoute une section à
   chaque release.
