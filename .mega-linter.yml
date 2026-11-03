@@ -29,3 +29,10 @@ REPOSITORY_SEMGREP_RULESETS:
   - p/rust
   - p/github-actions
   - p/secrets
+# `unsafe-usage` flags every `unsafe` block regardless of what it does — an
+# inventory, not a finding. Rutile's are libc FFI (`tcgetpgrp`) and glib's
+# object data API (`set_data`/`data`), both unsafe by construction; auditing
+# unsafe code belongs to a dedicated tool (cargo-geiger, see CLAUDE.md).
+REPOSITORY_SEMGREP_ARGUMENTS:
+  - --exclude-rule
+  - rust.lang.security.unsafe-usage.unsafe-usage

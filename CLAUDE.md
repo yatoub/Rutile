@@ -266,7 +266,13 @@ pour l'instant — à ajouter plus tard si besoin) :
   `REPOSITORY_BETTERLEAKS`, du même auteur, qui relit les
   `.gitleaks.toml`/`.gitleaksignore` ; et Semgrep est ignoré hors des
   flavors `security`/`standalone` tant que `REPOSITORY_SEMGREP_RULESETS`
-  n'est pas défini (`p/rust`, `p/github-actions`, `p/secrets` ici). Après
+  n'est pas défini (`p/rust`, `p/github-actions`, `p/secrets` ici). Sa
+  règle `rust.lang.security.unsafe-usage` est exclue
+  (`REPOSITORY_SEMGREP_ARGUMENTS`, choix de l'utilisateur) : elle bloque
+  sur *tout* bloc `unsafe` sans regarder ce qu'il fait (13 résultats au
+  premier run, tous du FFI `libc::tcgetpgrp` ou l'API `set_data`/`data`
+  de glib) — l'audit de l'`unsafe` relève d'un outil dédié (cargo-geiger,
+  toujours différé, voir plus bas). Après
   une montée de version de MegaLinter, vérifier la ligne
   `--custom-flavor-linters` du log : c'est la liste réelle de ce qui tourne.
 - **Trivy et la limite de débit de ghcr.io** : sur les runners GitHub
