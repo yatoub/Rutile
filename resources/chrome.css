@@ -1,0 +1,78 @@
+/* Rutile's chrome (headerbar, sidebar, pane headers and dividers) — layout
+   only, colors come from the palette tokens defined by
+   catppuccin-mocha.css / catppuccin-latte.css (`@define-color`), which
+   `app::load_theme` puts in front of this file depending on the light/dark
+   variant. Terminal content colors (fg/bg/ANSI palette) are NOT themeable
+   through CSS — they come from each profile's color scheme
+   (`vte4::Terminal::set_colors()` in terminal/widget.rs). */
+
+window,
+headerbar,
+.background {
+  background-color: @rutile_bg_0;
+  color: @rutile_fg;
+}
+
+headerbar {
+  background-color: @rutile_bg_1;
+  border-bottom: 1px solid @rutile_bg_2;
+}
+
+tabbox,
+tabbar {
+  background-color: @rutile_bg_1;
+}
+
+tab {
+  color: @rutile_fg_dim;
+}
+
+tab:checked {
+  background-color: @rutile_bg_2;
+  color: @rutile_fg;
+}
+
+paned > separator {
+  background-color: @rutile_bg_2;
+  min-width: 2px;
+  min-height: 2px;
+}
+
+paned > separator:hover {
+  background-color: @rutile_accent;
+}
+
+.pane-header {
+  background-color: @rutile_bg_1;
+  border-bottom: 1px solid @rutile_bg_2;
+  padding: 2px 4px;
+  min-height: 22px;
+}
+
+.pane-header label {
+  color: @rutile_fg_dim;
+  font-size: 0.85em;
+}
+
+.pane-header button {
+  min-width: 20px;
+  min-height: 20px;
+  padding: 2px;
+}
+
+.pane-header button:hover {
+  background-color: @rutile_bg_2;
+}
+
+.pane-sync-excluded {
+  color: @rutile_danger;
+}
+
+.session-thumbnail {
+  border: 1px solid @rutile_bg_2;
+  border-radius: 4px;
+}
+
+row:selected .session-thumbnail {
+  border-color: @rutile_accent;
+}
