@@ -2,7 +2,10 @@ pub mod model;
 pub mod scheme;
 pub mod spawn;
 
-pub use model::{ExitAction, Profile, ProfileId, ProfileStore};
+pub use model::{
+    BellMode, CursorBlink, CursorShape, ExitAction, Profile, ProfileId, ProfileStore,
+    TerminalOptions, TextBlink,
+};
 pub use scheme::{ColorScheme, ColorSchemeStore};
 
 /// Everything a new terminal takes from its profile, resolved once when

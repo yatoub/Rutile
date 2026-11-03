@@ -111,13 +111,16 @@ impl PaneView {
 
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header.add_css_class("pane-header");
+        // Before `pane_header::attach` fills in the title and buttons, so
+        // the bell icon ends up first, left of the title.
+        header.append(widget.bell_icon());
 
         let content = gtk4::Box::new(gtk4::Orientation::Vertical, 0);
         content.set_vexpand(true);
         content.set_hexpand(true);
         content.append(&header);
         content.append(widget.banner());
-        content.append(widget.widget());
+        content.append(widget.root());
 
         let search = SearchBar::new(widget.widget());
         let margin = MarginGuide::new(widget.widget());

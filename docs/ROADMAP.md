@@ -146,15 +146,27 @@ rétro-compatible) :
   anti-boucle si la commande sort en moins d'1 s sous `restart`. Au passage,
   `SessionView` résout le profil par défaut à chaque nouvelle session (plus
   de snapshot figé au démarrage)
-- [ ] **Rendu** : taille (cols/rows + reset), cellule (cell spacing, cell
-  width/height scale), custom font (avec toggle « system font » + support
-  Powerline), `text_blink_mode` (never/focused/unfocused/always)
-- [ ] **Curseur & sélection** : forme du curseur (block/ibeam/underline),
-  mode de blink (system/on/off), `word_wise_chars` (charset de sélection par
+- [x] **Rendu** : cellule (cell width/height scale, bornée à 1.0–2.0 comme
+  vte), custom font (avec toggle « system font », lue dans GSettings
+  `org.gnome.desktop.interface monospace-font-name` ; les glyphes Powerline
+  viennent de la police elle-même, rien à faire côté vte), `text_blink_mode`
+  (never/focused/unfocused/always). Réglages regroupés dans
+  `TerminalOptions` (`#[serde(flatten)]` dans `Profile`), défauts = ceux de
+  Tilix (ex. 8192 lignes de scrollback au lieu des 512 de vte)
+- [ ] **Taille initiale** (cols/rows + reset) : seulement utile pour la
+  taille de la fenêtre à l'ouverture, interfère avec la taille restaurée
+  par la persistance de session — à traiter avec la CLI (`--geometry`,
+  Phase 3)
+- [x] **Curseur & sélection** : forme du curseur (block/ibeam/underline),
+  mode de blink (system/on/off), `word_chars` (charset de sélection par
   mot)
-- [ ] **Scrolling** : show/hide scrollbar (overlay), scroll on output, scroll
-  on keystroke, limite de scrollback (ou illimité)
-- [ ] **Cloche** : terminal bell (none/sound/icon/icon+sound)
+- [x] **Scrolling** : show/hide scrollbar (terminal dans un
+  `gtk4::ScrolledWindow`, `PolicyType::External` quand masquée pour garder
+  le défilement), scroll on output, scroll on keystroke, limite de
+  scrollback (ou illimité)
+- [x] **Cloche** : terminal bell (none/sound/icon/icon+sound) — icône
+  `alarm-symbolic` (pas de `bell` dans Adwaita) dans le header du pane
+  pendant 5 s, comme Tilix
 - [ ] **Couleurs étendues** : 16 couleurs + fg/bg déjà portées par schéma,
   ajouter curseur/highlight/bold/badge couleurs + `bold_is_bright`
 - [ ] **Badge** (feature VTE `background-draw`) : texte avec variables,

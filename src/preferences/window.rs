@@ -7,7 +7,10 @@ use libadwaita::prelude::*;
 
 use crate::keymap::{self, Keymap};
 use crate::preferences::config::Preferences;
-use crate::profile::{ColorSchemeStore, ExitAction, ProfileStore};
+use crate::profile::{
+    BellMode, ColorSchemeStore, CursorBlink, CursorShape, ExitAction, ProfileStore,
+    TerminalOptions, TextBlink,
+};
 
 /// Builds the Preferences window, mirroring Tilix's sidebar of categories
 /// (`AdwPreferencesWindow` gives us that navigation for free — one page per
@@ -369,6 +372,186 @@ impl ProfilesPage {
         self.groups.borrow_mut().push(add_group);
     }
 
+    /// Font, cell spacing, cursor and selection settings, folded into one
+    /// expander so the profile group stays readable.
+    fn text_and_cursor_rows(
+        self: &Rc<Self>,
+        profile_id: &str,
+        options: &TerminalOptions,
+    ) -> adw::ExpanderRow {
+        let expander = adw::ExpanderRow::builder().title("Text and cursor").build();
+
+        let font_dialog = gtk4::FontDialog::builder().title("Terminal font").build();
+        let font_button = gtk4::FontDialogButton::builder()
+            .dialog(&font_dialog)
+            .font_desc(&gtk4::pango::FontDescription::from_string(&options.font))
+            .valign(gtk4::Align::Center)
+            .build();
+        let font_row = adw::ActionRow::builder()
+            .title("Custom font")
+            .sensitive(!options.use_system_font)
+            .build();
+        font_row.add_suffix(&font_button);
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile_id.to_string();
+            font_button.connect_font_desc_notify(move |button| {
+                if let Some(desc) = button.font_desc() {
+                    let font = desc.to_string();
+                    profiles
+                        .borrow_mut()
+                        .update(&profile_id, |p| p.options.font = font);
+                }
+            });
+        }
+
+        let system_font_row = options_switch_row(
+            &self.profiles,
+            profile_id,
+            "Use the system monospace font",
+            options.use_system_font,
+            |o, v| o.use_system_font = v,
+        );
+        {
+            let font_row = font_row.clone();
+            system_font_row
+                .connect_active_notify(move |row| font_row.set_sensitive(!row.is_active()));
+        }
+        expander.add_row(&system_font_row);
+        expander.add_row(&font_row);
+
+        expander.add_row(&options_spin_row(
+            &self.profiles,
+            profile_id,
+            "Cell width spacing",
+            options.cell_width_scale,
+            |o, v| o.cell_width_scale = v,
+        ));
+        expander.add_row(&options_spin_row(
+            &self.profiles,
+            profile_id,
+            "Cell height spacing",
+            options.cell_height_scale,
+            |o, v| o.cell_height_scale = v,
+        ));
+        expander.add_row(&options_combo_row(
+            &self.profiles,
+            profile_id,
+            "Cursor shape",
+            &CursorShape::ALL,
+            CursorShape::label,
+            options.cursor_shape,
+            |o, v| o.cursor_shape = v,
+        ));
+        expander.add_row(&options_combo_row(
+            &self.profiles,
+            profile_id,
+            "Cursor blink",
+            &CursorBlink::ALL,
+            CursorBlink::label,
+            options.cursor_blink,
+            |o, v| o.cursor_blink = v,
+        ));
+        expander.add_row(&options_combo_row(
+            &self.profiles,
+            profile_id,
+            "Text blink",
+            &TextBlink::ALL,
+            TextBlink::label,
+            options.text_blink,
+            |o, v| o.text_blink = v,
+        ));
+
+        let word_chars_row = adw::EntryRow::builder()
+            .title("Word-wise select characters")
+            .text(options.word_chars.clone())
+            .show_apply_button(true)
+            .build();
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile_id.to_string();
+            word_chars_row.connect_apply(move |row| {
+                let chars = row.text().to_string();
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.options.word_chars = chars);
+            });
+        }
+        expander.add_row(&word_chars_row);
+
+        expander
+    }
+
+    fn scrolling_rows(
+        self: &Rc<Self>,
+        profile_id: &str,
+        options: &TerminalOptions,
+    ) -> adw::ExpanderRow {
+        let expander = adw::ExpanderRow::builder().title("Scrolling").build();
+
+        expander.add_row(&options_switch_row(
+            &self.profiles,
+            profile_id,
+            "Show scrollbar",
+            options.show_scrollbar,
+            |o, v| o.show_scrollbar = v,
+        ));
+        expander.add_row(&options_switch_row(
+            &self.profiles,
+            profile_id,
+            "Scroll on output",
+            options.scroll_on_output,
+            |o, v| o.scroll_on_output = v,
+        ));
+        expander.add_row(&options_switch_row(
+            &self.profiles,
+            profile_id,
+            "Scroll on keystroke",
+            options.scroll_on_keystroke,
+            |o, v| o.scroll_on_keystroke = v,
+        ));
+
+        let lines_adjustment = gtk4::Adjustment::new(
+            options.scrollback_lines as f64,
+            0.0,
+            1_000_000.0,
+            100.0,
+            1000.0,
+            0.0,
+        );
+        let lines_row = adw::SpinRow::builder()
+            .title("Scrollback lines")
+            .adjustment(&lines_adjustment)
+            .sensitive(!options.scrollback_unlimited)
+            .build();
+        {
+            let profiles = self.profiles.clone();
+            let profile_id = profile_id.to_string();
+            lines_row.connect_value_notify(move |row| {
+                let lines = row.value() as u32;
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.options.scrollback_lines = lines);
+            });
+        }
+        let unlimited_row = options_switch_row(
+            &self.profiles,
+            profile_id,
+            "Unlimited scrollback",
+            options.scrollback_unlimited,
+            |o, v| o.scrollback_unlimited = v,
+        );
+        {
+            let lines_row = lines_row.clone();
+            unlimited_row
+                .connect_active_notify(move |row| lines_row.set_sensitive(!row.is_active()));
+        }
+        expander.add_row(&unlimited_row);
+        expander.add_row(&lines_row);
+
+        expander
+    }
+
     fn build_profile_group(
         self: &Rc<Self>,
         profile_id: &str,
@@ -546,6 +729,18 @@ impl ProfilesPage {
         }
         group.add(&exit_action_row);
 
+        group.add(&self.text_and_cursor_rows(&profile.id, &profile.options));
+        group.add(&self.scrolling_rows(&profile.id, &profile.options));
+        group.add(&options_combo_row(
+            &self.profiles,
+            &profile.id,
+            "Terminal bell",
+            &BellMode::ALL,
+            BellMode::label,
+            profile.options.bell,
+            |o, v| o.bell = v,
+        ));
+
         let default_row = adw::SwitchRow::builder()
             .title("Default profile")
             .subtitle("New sessions are created with this profile")
@@ -615,4 +810,84 @@ impl ProfilesPage {
         group.add(&button_box);
         group
     }
+}
+
+/// A switch bound to one boolean of a profile's `TerminalOptions`, saved on
+/// every toggle like every other preference.
+fn options_switch_row(
+    profiles: &Rc<RefCell<ProfileStore>>,
+    profile_id: &str,
+    title: &str,
+    active: bool,
+    set: fn(&mut TerminalOptions, bool),
+) -> adw::SwitchRow {
+    let row = adw::SwitchRow::builder()
+        .title(title)
+        .active(active)
+        .build();
+    let profiles = profiles.clone();
+    let profile_id = profile_id.to_string();
+    row.connect_active_notify(move |row| {
+        let active = row.is_active();
+        profiles
+            .borrow_mut()
+            .update(&profile_id, |p| set(&mut p.options, active));
+    });
+    row
+}
+
+/// A drop-down bound to one enum of a profile's `TerminalOptions`; `all`
+/// gives the order of the entries (the enum's `ALL` constant).
+fn options_combo_row<T: Copy + PartialEq + 'static>(
+    profiles: &Rc<RefCell<ProfileStore>>,
+    profile_id: &str,
+    title: &str,
+    all: &'static [T],
+    label: fn(T) -> &'static str,
+    current: T,
+    set: fn(&mut TerminalOptions, T),
+) -> adw::ComboRow {
+    let labels: Vec<&str> = all.iter().map(|value| label(*value)).collect();
+    let row = adw::ComboRow::builder()
+        .title(title)
+        .model(&gtk4::StringList::new(&labels))
+        .build();
+    if let Some(index) = all.iter().position(|value| *value == current) {
+        row.set_selected(index as u32);
+    }
+    let profiles = profiles.clone();
+    let profile_id = profile_id.to_string();
+    row.connect_selected_notify(move |row| {
+        if let Some(&value) = all.get(row.selected() as usize) {
+            profiles
+                .borrow_mut()
+                .update(&profile_id, |p| set(&mut p.options, value));
+        }
+    });
+    row
+}
+
+/// A 1.0–2.0 spin button bound to one of a profile's cell scale factors.
+fn options_spin_row(
+    profiles: &Rc<RefCell<ProfileStore>>,
+    profile_id: &str,
+    title: &str,
+    value: f64,
+    set: fn(&mut TerminalOptions, f64),
+) -> adw::SpinRow {
+    let adjustment = gtk4::Adjustment::new(value, 1.0, 2.0, 0.05, 0.25, 0.0);
+    let row = adw::SpinRow::builder()
+        .title(title)
+        .adjustment(&adjustment)
+        .digits(2)
+        .build();
+    let profiles = profiles.clone();
+    let profile_id = profile_id.to_string();
+    row.connect_value_notify(move |row| {
+        let value = row.value();
+        profiles
+            .borrow_mut()
+            .update(&profile_id, |p| set(&mut p.options, value));
+    });
+    row
 }
