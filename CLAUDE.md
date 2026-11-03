@@ -269,6 +269,13 @@ pour l'instant — à ajouter plus tard si besoin) :
   n'est pas défini (`p/rust`, `p/github-actions`, `p/secrets` ici). Après
   une montée de version de MegaLinter, vérifier la ligne
   `--custom-flavor-linters` du log : c'est la liste réelle de ce qui tourne.
+- **Trivy et la limite de débit de ghcr.io** : sur les runners GitHub
+  partagés, le téléchargement anonyme de `trivy-db` depuis `ghcr.io`
+  échoue par intermittence (`TOOMANYREQUESTS` ×5 puis `FATAL
+  --skip-db-update cannot be specified on the first run`), et relancer le
+  job ne suffit pas toujours. `TRIVY_DB_REPOSITORY` (env de l'étape
+  MegaLinter dans `ci.yml`) pointe d'abord vers les miroirs officiels
+  d'Aqua (`mirror.gcr.io`, `public.ecr.aws`), `ghcr.io` en dernier recours.
 - Avant de pousser, toujours vérifier localement :
   `cargo fmt --all -- --check && cargo clippy --all-targets --all-features
   -- -D warnings && cargo test`. `cargo fmt` a dû reformater 8 fichiers
