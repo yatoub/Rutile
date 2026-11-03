@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.8.0] — 2026-11-03
+
+### Added
+
+- Add window style, sidebar position and per-profile encoding
+
+
 ## [0.7.0] — 2026-11-03
 
 ### Added
