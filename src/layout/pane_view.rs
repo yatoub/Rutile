@@ -5,7 +5,7 @@ use std::rc::Rc;
 use gtk4::prelude::*;
 
 use crate::layout::{Direction, Orientation, PaneId, SplitId, SplitTree};
-use crate::profile::ColorScheme;
+use crate::profile::TerminalConfig;
 use crate::terminal::{MarginGuide, SearchBar, TerminalWidget};
 
 /// Owns one session's split tree together with the live terminal widgets,
@@ -42,15 +42,16 @@ pub struct PaneView {
     /// When set, only this pane is rendered (Tilix's per-pane "maximize").
     maximized: Option<PaneId>,
     root: gtk4::Widget,
-    /// The scheme every new terminal in this session is created with.
-    /// Doesn't retroactively re-theme existing panes if the profile's
-    /// scheme changes later — matches Tilix, which also only applies a
+    /// The profile settings every new terminal in this session (its first
+    /// pane and every split) is created with, resolved when the session
+    /// was created. Doesn't retroactively re-apply to existing panes if the
+    /// profile changes later — matches Tilix, which also only applies a
     /// profile change to newly spawned terminals.
-    scheme: ColorScheme,
+    config: TerminalConfig,
 }
 
 impl PaneView {
-    pub fn new(id: PaneId, scheme: ColorScheme) -> Self {
+    pub fn new(id: PaneId, config: TerminalConfig) -> Self {
         let mut this = Self {
             tree: Rc::new(RefCell::new(SplitTree::new_leaf(id))),
             widgets: HashMap::new(),
@@ -61,7 +62,7 @@ impl PaneView {
             focused: id,
             maximized: None,
             root: gtk4::Box::new(gtk4::Orientation::Vertical, 0).upcast(),
-            scheme,
+            config,
         };
         this.create_pane(id);
         this.root = this.wrappers[&id].clone().upcast();
@@ -75,7 +76,7 @@ impl PaneView {
     /// working directory by its (already-remapped) id.
     pub fn from_tree(
         tree: SplitTree,
-        scheme: ColorScheme,
+        config: TerminalConfig,
         cwd_for: impl Fn(PaneId) -> Option<String>,
     ) -> Self {
         let leaves = tree.leaves();
@@ -92,7 +93,7 @@ impl PaneView {
             focused,
             maximized: None,
             root: gtk4::Box::new(gtk4::Orientation::Vertical, 0).upcast(),
-            scheme,
+            config,
         };
         for id in leaves {
             this.create_pane_with_cwd(id, cwd_for(id).as_deref());
@@ -106,7 +107,7 @@ impl PaneView {
     }
 
     fn create_pane_with_cwd(&mut self, id: PaneId, cwd: Option<&str>) {
-        let widget = TerminalWidget::new(&self.scheme, cwd);
+        let widget = TerminalWidget::new(&self.config, cwd);
 
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header.add_css_class("pane-header");
@@ -115,6 +116,7 @@ impl PaneView {
         content.set_vexpand(true);
         content.set_hexpand(true);
         content.append(&header);
+        content.append(widget.banner());
         content.append(widget.widget());
 
         let search = SearchBar::new(widget.widget());
@@ -196,6 +198,16 @@ impl PaneView {
     }
 
     /// The pane's shell pid, for `terminal::monitor`'s `/proc` polling.
+    /// Forwards a pane's `child-exited` to its terminal, which applies
+    /// the profile's exit action. `true` means the pane should be closed;
+    /// `false` covers both "restarted/held in place" and "no such pane"
+    /// (already closed by the time the deferred signal handler runs).
+    pub fn handle_child_exited(&self, id: PaneId, status: i32) -> bool {
+        self.widgets
+            .get(&id)
+            .is_some_and(|widget| widget.handle_child_exited(status))
+    }
+
     pub fn child_pid(&self, id: PaneId) -> Option<i32> {
         self.widgets.get(&id)?.child_pid()
     }

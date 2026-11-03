@@ -9,7 +9,7 @@ use vte4::TerminalExt;
 
 use crate::layout::pane_view::PaneView;
 use crate::layout::{Direction, Orientation, PaneId};
-use crate::profile::{ColorScheme, ProfileId};
+use crate::profile::{ProfileId, TerminalConfig};
 use crate::session::persist::{PaneMeta, SavedSession};
 use crate::terminal::broadcast::{BroadcastGroup, BroadcastManager, SessionId};
 
@@ -57,15 +57,17 @@ pub struct SessionView {
     session_listeners: Vec<Rc<dyn Fn()>>,
     next_session_id: SessionId,
     next_pane_id: PaneId,
-    /// The scheme every newly created session's first pane (and every pane
-    /// split off from it) is created with — see `PaneView::scheme`'s doc
-    /// comment for why this isn't live-updated for existing panes.
-    default_scheme: ColorScheme,
-    default_profile_id: ProfileId,
+    /// Resolves the current default profile (and its settings) each time a
+    /// session is created, rather than once at startup — so changing the
+    /// default profile, or editing it, in Preferences applies to the next
+    /// new session without restarting. See `PaneView::config`'s doc
+    /// comment for why existing panes aren't live-updated.
+    resolve_default: Rc<dyn Fn() -> (ProfileId, TerminalConfig)>,
     /// Which profile each session was created/restored with — tracked
-    /// separately from `default_scheme` because `session::persist` needs
-    /// to save the *profile*, not the resolved colors, so a later scheme
-    /// edit is picked up on the next restore.
+    /// separately from the resolved `TerminalConfig` because
+    /// `session::persist` needs to save the *profile*, not its resolved
+    /// settings, so a later profile edit is picked up on the next
+    /// restore.
     session_profiles: HashMap<SessionId, ProfileId>,
     /// User-set session names (Tilix-style rename via the sidebar's
     /// `GtkEditableLabel`). Absent = still the generic default — kept out
@@ -81,7 +83,7 @@ pub struct SessionView {
 }
 
 impl SessionView {
-    pub fn new(default_profile_id: ProfileId, default_scheme: ColorScheme) -> Self {
+    pub fn new(resolve_default: Rc<dyn Fn() -> (ProfileId, TerminalConfig)>) -> Self {
         let mut this = Self {
             tab_view: adw::TabView::new(),
             sessions: HashMap::new(),
@@ -94,8 +96,7 @@ impl SessionView {
             session_listeners: Vec::new(),
             next_session_id: 0,
             next_pane_id: 0,
-            default_scheme,
-            default_profile_id,
+            resolve_default,
             session_profiles: HashMap::new(),
             session_names: HashMap::new(),
             pane_title_labels: HashMap::new(),
@@ -185,8 +186,9 @@ impl SessionView {
         let pane_id = self.next_pane_id;
         self.next_pane_id += 1;
 
-        let pane_view = PaneView::new(pane_id, self.default_scheme.clone());
-        self.insert_session(self.default_profile_id.clone(), pane_view)
+        let (profile_id, config) = (self.resolve_default)();
+        let pane_view = PaneView::new(pane_id, config);
+        self.insert_session(profile_id, pane_view)
     }
 
     /// Rebuilds a session from a save file: remaps the saved tree's ids
@@ -194,7 +196,7 @@ impl SessionView {
     /// one's) via `SplitTree::remap_ids`, translates the saved per-pane
     /// metadata (keyed by the *old* ids) onto the fresh ones, and spawns
     /// each terminal in its saved working directory.
-    pub fn restore_session(&mut self, saved: &SavedSession, scheme: ColorScheme) -> SessionId {
+    pub fn restore_session(&mut self, saved: &SavedSession, config: TerminalConfig) -> SessionId {
         let (tree, id_map) = saved.tree.remap_ids(&mut || {
             let id = self.next_pane_id;
             self.next_pane_id += 1;
@@ -209,7 +211,7 @@ impl SessionView {
             })
             .collect();
 
-        let pane_view = PaneView::from_tree(tree, scheme, move |id| {
+        let pane_view = PaneView::from_tree(tree, config, move |id| {
             cwd_by_new_id.get(&id).cloned().flatten()
         });
         let session_id = self.insert_session(saved.profile_id.clone(), pane_view);
@@ -288,20 +290,20 @@ impl SessionView {
 
     /// Closes every session and rebuilds from `saved`, in order — used by
     /// "Open Session" to replace the whole window's layout in place.
-    /// `resolve_scheme` looks up each saved session's profile against the
+    /// `resolve_config` looks up each saved session's profile against the
     /// *current* profile/scheme stores (a profile referenced by the save
     /// file may since have been renamed/rescoped/deleted).
     pub fn replace_all_with(
         &mut self,
         sessions: &[SavedSession],
-        resolve_scheme: impl Fn(&ProfileId) -> ColorScheme,
+        resolve_config: impl Fn(&ProfileId) -> TerminalConfig,
     ) {
         for session_id in self.session_ids() {
             self.close_session(session_id);
         }
         for saved in sessions {
-            let scheme = resolve_scheme(&saved.profile_id);
-            self.restore_session(saved, scheme);
+            let config = resolve_config(&saved.profile_id);
+            self.restore_session(saved, config);
         }
     }
 
@@ -531,6 +533,25 @@ impl SessionView {
 
     /// Closes a specific pane (e.g. from its header's close button),
     /// regardless of whether it's currently focused.
+    /// A pane's command exited: applies its profile's exit action, closing
+    /// the pane (like `close_pane`) only for `ExitAction::Close`.
+    pub fn handle_child_exited(
+        &mut self,
+        session_id: SessionId,
+        pane_id: PaneId,
+        status: i32,
+    ) -> ClosePaneOutcome {
+        let should_close = self
+            .sessions
+            .get(&session_id)
+            .is_some_and(|pane_view| pane_view.handle_child_exited(pane_id, status));
+        if should_close {
+            self.close_pane(session_id, pane_id)
+        } else {
+            ClosePaneOutcome::Nothing
+        }
+    }
+
     pub fn close_pane(&mut self, session_id: SessionId, pane_id: PaneId) -> ClosePaneOutcome {
         let Some(pane_view) = self.sessions.get_mut(&session_id) else {
             return ClosePaneOutcome::Nothing;

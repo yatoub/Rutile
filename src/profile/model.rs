@@ -18,10 +18,75 @@ pub struct Profile {
     /// id/name/scheme_id.
     #[serde(default = "default_silence_seconds")]
     pub silence_seconds: u32,
+    /// Run `custom_command` instead of the user's shell. A separate flag
+    /// (rather than "non-empty `custom_command` means use it") so turning
+    /// it off in Preferences doesn't throw away what was typed — same
+    /// split as Tilix's `use-custom-command`/`custom-command` keys.
+    #[serde(default)]
+    pub use_custom_command: bool,
+    /// Parsed with shell quoting rules (`glib::shell_parse_argv`), looked
+    /// up in `$PATH` — see `profile::spawn::command_for`.
+    #[serde(default)]
+    pub custom_command: String,
+    /// Start the shell as a login shell (`argv[0]` prefixed with `-`).
+    /// Ignored when `use_custom_command` is set, like Tilix.
+    #[serde(default)]
+    pub login_shell: bool,
+    /// Where a brand new terminal starts when nothing more specific
+    /// applies (a restored session's saved cwd always wins). `None` keeps
+    /// vte's default — the directory Rutile itself was launched from.
+    #[serde(default)]
+    pub working_directory: Option<String>,
+    /// What happens to the pane once its command exits.
+    #[serde(default)]
+    pub exit_action: ExitAction,
+}
+
+impl Profile {
+    /// A profile with every optional setting at its default.
+    pub fn new(id: &str, name: &str, scheme_id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            name: name.to_string(),
+            scheme_id: scheme_id.to_string(),
+            silence_seconds: default_silence_seconds(),
+            use_custom_command: false,
+            custom_command: String::new(),
+            login_shell: false,
+            working_directory: None,
+            exit_action: ExitAction::default(),
+        }
+    }
 }
 
 fn default_silence_seconds() -> u32 {
     10
+}
+
+/// Tilix's "When command exits" setting, same three values (and same
+/// lowercase spelling in the TOML file as Tilix's GSettings enum).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExitAction {
+    /// Close the pane — Rutile's behavior before this setting existed.
+    #[default]
+    Close,
+    /// Spawn the command again in the same pane.
+    Restart,
+    /// Keep the pane and its output, with a banner offering to relaunch.
+    Hold,
+}
+
+impl ExitAction {
+    pub const ALL: [ExitAction; 3] = [ExitAction::Close, ExitAction::Restart, ExitAction::Hold];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ExitAction::Close => "Close the terminal",
+            ExitAction::Restart => "Restart the command",
+            ExitAction::Hold => "Hold the terminal open",
+        }
+    }
 }
 
 /// Every known profile, persisted as TOML in
@@ -54,12 +119,7 @@ impl ProfileStore {
 
     fn default_store() -> Self {
         Self {
-            profile: vec![Profile {
-                id: "default".to_string(),
-                name: "Default".to_string(),
-                scheme_id: "catppuccin-mocha".to_string(),
-                silence_seconds: default_silence_seconds(),
-            }],
+            profile: vec![Profile::new("default", "Default", "catppuccin-mocha")],
         }
     }
 
@@ -93,24 +153,32 @@ impl ProfileStore {
     /// suffix if that slug is already taken), returning the new id.
     pub fn create(&mut self, name: &str, scheme_id: &str) -> ProfileId {
         let id = self.unique_slug(name);
-        self.profile.push(Profile {
-            id: id.clone(),
-            name: name.to_string(),
-            scheme_id: scheme_id.to_string(),
-            silence_seconds: default_silence_seconds(),
-        });
+        self.profile.push(Profile::new(&id, name, scheme_id));
         self.save();
         id
     }
 
     /// Duplicates an existing profile under a new id/name ("Foo copy",
-    /// "Foo copy 2", ...). Returns `None` if `id` doesn't exist.
+    /// "Foo copy 2", ...), every other setting included. Returns `None` if
+    /// `id` doesn't exist.
     pub fn clone_profile(&mut self, id: &str) -> Option<ProfileId> {
-        let source = self.get(id)?.clone();
-        let new_name = format!("{} copy", source.name);
-        let new_id = self.create(&new_name, &source.scheme_id);
-        self.set_silence_seconds(&new_id, source.silence_seconds);
+        let mut copy = self.get(id)?.clone();
+        copy.name = format!("{} copy", copy.name);
+        copy.id = self.unique_slug(&copy.name);
+        let new_id = copy.id.clone();
+        self.profile.push(copy);
+        self.save();
         Some(new_id)
+    }
+
+    /// Applies `edit` to a profile and saves — the generic setter for
+    /// fields that don't need any validation of their own, so each new
+    /// profile setting doesn't need its own `set_*` method.
+    pub fn update(&mut self, id: &str, edit: impl FnOnce(&mut Profile)) {
+        if let Some(profile) = self.get_mut(id) {
+            edit(profile);
+            self.save();
+        }
     }
 
     pub fn rename(&mut self, id: &str, new_name: &str) {
