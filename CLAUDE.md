@@ -50,7 +50,8 @@ src/
 ├── terminal/
 │   ├── widget.rs         # wrapper vte4::Terminal (spawn, couleurs Mocha)
 │   └── broadcast.rs      # BroadcastManager, SANS GTK, testable
-└── resources/catppuccin-mocha.css
+└── resources/            # chrome.css (structure, tokens @rutile_*) +
+                          #   catppuccin-{mocha,latte}.css (@define-color)
 ```
 
 - `split_tree.rs` et `broadcast.rs` sont volontairement indépendants de GTK

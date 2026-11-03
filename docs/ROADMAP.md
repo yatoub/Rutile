@@ -203,8 +203,13 @@ rétro-compatible) :
 Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
 
 - [ ] **Appearance** (page Préférences réalisée) :
-  - Variant de thème Default/Light/Dark (`AdwStyleManager`) — Catppuccin
-    Latte pour le clair (existe déjà en `resources/catppuccin-latte.css`)
+  - [x] Variant de thème System/Light/Dark (`AdwStyleManager`) — Catppuccin
+    Latte pour le clair. `resources/catppuccin-latte.css` était en fait
+    **vide** : le CSS du chrome est maintenant séparé en structure
+    (`resources/chrome.css`, tokens `@rutile_*` uniquement) et palettes
+    (`catppuccin-{mocha,latte}.css`, des `@define-color`), rechargées en
+    direct par `app::load_theme`. **Sombre par défaut** (pas System comme
+    Tilix) : la DA de Rutile est Mocha, le clair est une option
   - Transparence de fond (+ transparence par profil de Phase 1)
   - Image de fond + mode (scale/tile/center/stretch)
   - Style de fenêtre (normal / disable-CSD / disable-CSD+hidétoolbar /

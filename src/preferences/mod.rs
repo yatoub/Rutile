@@ -2,4 +2,4 @@ pub mod config;
 pub mod profiles;
 pub mod window;
 
-pub use config::Preferences;
+pub use config::{Preferences, ThemeVariant};

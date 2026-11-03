@@ -6,7 +6,7 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 
 use crate::keymap::{self, Keymap};
-use crate::preferences::config::Preferences;
+use crate::preferences::config::{Preferences, ThemeVariant};
 use crate::preferences::profiles::ProfilesPage;
 use crate::profile::{ColorSchemeStore, ProfileStore};
 
@@ -28,6 +28,7 @@ pub fn build(
         .modal(true)
         .build();
 
+    let prefs_for_appearance = prefs.clone();
     window.add(&general_page(prefs.clone()));
     let profiles_page = ProfilesPage::new(&window, prefs, profiles, schemes.clone());
     window.add(profiles_page.page());
@@ -37,11 +38,7 @@ pub fn build(
     window.connect_destroy(move |_| {
         let _ = &profiles_page;
     });
-    window.add(&placeholder_page(
-        "Appearance",
-        "view-grid-symbolic",
-        "Planned (roadmap phase 2): light/dark theme variant, background transparency and image, window style, tab position.",
-    ));
+    window.add(&appearance_page(prefs_for_appearance));
     window.add(&placeholder_page(
         "Bookmarks",
         "user-bookmarks-symbolic",
@@ -160,6 +157,50 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     behavior_group.add(&prompt_on_close_row);
 
     page.add(&behavior_group);
+    page
+}
+
+/// The "Appearance" page. Only the theme variant for now — the rest of
+/// Tilix's Appearance settings land in their own changes (see the
+/// group's description).
+fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
+    let page = adw::PreferencesPage::builder()
+        .title("Appearance")
+        .icon_name("view-grid-symbolic")
+        .build();
+    let group = adw::PreferencesGroup::builder()
+        .title("Theme")
+        .description(
+            "Still to come (roadmap phase 2): background transparency and image, \
+             window style, sidebar position.",
+        )
+        .build();
+
+    let current = prefs.borrow().theme_variant;
+    let row = adw::ComboRow::builder()
+        .title("Theme variant")
+        .subtitle("Terminal colors come from each profile's color scheme")
+        .model(&gtk4::StringList::new(
+            &ThemeVariant::ALL.map(ThemeVariant::label),
+        ))
+        .build();
+    if let Some(index) = ThemeVariant::ALL.iter().position(|v| *v == current) {
+        row.set_selected(index as u32);
+    }
+    row.connect_selected_notify(move |row| {
+        let Some(&variant) = ThemeVariant::ALL.get(row.selected() as usize) else {
+            return;
+        };
+        {
+            let mut prefs = prefs.borrow_mut();
+            prefs.theme_variant = variant;
+            prefs.save();
+        }
+        crate::app::load_theme(variant);
+    });
+    group.add(&row);
+
+    page.add(&group);
     page
 }
 

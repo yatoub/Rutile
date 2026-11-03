@@ -39,6 +39,37 @@ pub struct Preferences {
     /// (e.g. `vim`, a long `ssh`). Mirrors Tilix's own
     /// `prompt-on-close-process` setting, including its default of `true`.
     pub prompt_on_close_with_process: bool,
+    /// Light or dark chrome (Catppuccin Latte or Mocha) — Tilix's "Theme
+    /// variant". Defaults to dark rather than following the system like
+    /// Tilix does: Rutile's look is Catppuccin Mocha, Latte is opt-in.
+    pub theme_variant: ThemeVariant,
+}
+
+/// Tilix's "Theme variant" setting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeVariant {
+    /// Follow the desktop's light/dark preference.
+    System,
+    Light,
+    #[default]
+    Dark,
+}
+
+impl ThemeVariant {
+    pub const ALL: [ThemeVariant; 3] = [
+        ThemeVariant::System,
+        ThemeVariant::Light,
+        ThemeVariant::Dark,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ThemeVariant::System => "Follow system",
+            ThemeVariant::Light => "Light (Catppuccin Latte)",
+            ThemeVariant::Dark => "Dark (Catppuccin Mocha)",
+        }
+    }
 }
 
 impl Default for Preferences {
@@ -51,6 +82,7 @@ impl Default for Preferences {
             enable_notifications: true,
             default_profile_id: "default".to_string(),
             prompt_on_close_with_process: true,
+            theme_variant: ThemeVariant::default(),
         }
     }
 }

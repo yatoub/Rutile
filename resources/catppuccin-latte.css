@@ -1,0 +1,9 @@
+/* Catppuccin Latte — palette tokens for resources/chrome.css. */
+
+@define-color rutile_bg_0 #eff1f5; /* base */
+@define-color rutile_bg_1 #e6e9ef; /* mantle */
+@define-color rutile_bg_2 #ccd0da; /* surface0 */
+@define-color rutile_fg #4c4f69; /* text */
+@define-color rutile_fg_dim #6c6f85; /* subtext0 */
+@define-color rutile_accent #1e66f5; /* blue */
+@define-color rutile_danger #d20f39; /* red */
