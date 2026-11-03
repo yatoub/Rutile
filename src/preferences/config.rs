@@ -48,6 +48,59 @@ pub struct Preferences {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub background_image: Option<PathBuf>,
     pub background_image_mode: BackgroundImageMode,
+    /// Tilix's "Window style", minus its server-side-decoration variants:
+    /// GTK4 can't switch a libadwaita window to server-side decorations.
+    pub window_style: WindowStyle,
+    /// Which side of the window the session sidebar sits on — Tilix's
+    /// "Place the sidebar on the right".
+    pub sidebar_position: SidebarPosition,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WindowStyle {
+    #[default]
+    Normal,
+    /// No header bar (its menu stays reachable from the terminal's
+    /// right-click menu and Ctrl+Comma), window frame kept.
+    HideToolbar,
+    /// No header bar and no window frame (shadow, resize borders).
+    Borderless,
+}
+
+impl WindowStyle {
+    pub const ALL: [WindowStyle; 3] = [
+        WindowStyle::Normal,
+        WindowStyle::HideToolbar,
+        WindowStyle::Borderless,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            WindowStyle::Normal => "Normal",
+            WindowStyle::HideToolbar => "Hide the toolbar",
+            WindowStyle::Borderless => "Borderless",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SidebarPosition {
+    #[default]
+    Left,
+    Right,
+}
+
+impl SidebarPosition {
+    pub const ALL: [SidebarPosition; 2] = [SidebarPosition::Left, SidebarPosition::Right];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            SidebarPosition::Left => "Left",
+            SidebarPosition::Right => "Right",
+        }
+    }
 }
 
 /// How the background image fills the window — Tilix's four modes.
@@ -142,6 +195,8 @@ impl Default for Preferences {
             theme_variant: ThemeVariant::default(),
             background_image: None,
             background_image_mode: BackgroundImageMode::default(),
+            window_style: WindowStyle::default(),
+            sidebar_position: SidebarPosition::default(),
         }
     }
 }
@@ -206,5 +261,19 @@ mod tests {
         assert_eq!(old.background_image, None);
         assert_eq!(old.background_image_mode, BackgroundImageMode::Scale);
         assert_eq!(old.theme_variant, ThemeVariant::Dark);
+        assert_eq!(old.window_style, WindowStyle::Normal);
+        assert_eq!(old.sidebar_position, SidebarPosition::Left);
+    }
+
+    #[test]
+    fn window_settings_use_tilix_like_names() {
+        let prefs = Preferences {
+            window_style: WindowStyle::HideToolbar,
+            sidebar_position: SidebarPosition::Right,
+            ..Preferences::default()
+        };
+        let toml = toml::to_string(&prefs).unwrap();
+        assert!(toml.contains(r#"window_style = "hide-toolbar""#), "{toml}");
+        assert!(toml.contains(r#"sidebar_position = "right""#), "{toml}");
     }
 }

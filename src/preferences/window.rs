@@ -6,7 +6,9 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 
 use crate::keymap::{self, Keymap};
-use crate::preferences::config::{BackgroundImageMode, Preferences, ThemeVariant};
+use crate::preferences::config::{
+    BackgroundImageMode, Preferences, SidebarPosition, ThemeVariant, WindowStyle,
+};
 use crate::preferences::profiles::ProfilesPage;
 use crate::profile::{ColorSchemeStore, ProfileStore};
 
@@ -48,7 +50,7 @@ pub fn build(
     window.add(&placeholder_page(
         "Encoding",
         "text-x-generic-symbolic",
-        "Rutile currently only supports UTF-8. Planned (roadmap phase 2): per-profile encoding and CJK ambiguous width.",
+        "Choosing which encodings the terminal menu offers is planned. The encoding itself is already set per profile: Profiles → edit a profile → Compatibility.",
     ));
     window.add(&placeholder_page(
         "Advanced",
@@ -168,10 +170,7 @@ fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
         .title("Appearance")
         .icon_name("view-grid-symbolic")
         .build();
-    let group = adw::PreferencesGroup::builder()
-        .title("Theme")
-        .description("Still to come (roadmap phase 2): window style, sidebar position.")
-        .build();
+    let group = adw::PreferencesGroup::builder().title("Theme").build();
 
     let current = prefs.borrow().theme_variant;
     let row = adw::ComboRow::builder()
@@ -196,8 +195,52 @@ fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     group.add(&row);
     page.add(&group);
 
-    page.add(&background_image_group(prefs));
+    page.add(&background_image_group(prefs.clone()));
+    page.add(&window_group(prefs));
     page
+}
+
+/// Window style and sidebar position.
+fn window_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder().title("Window").build();
+
+    let current = prefs.borrow().window_style;
+    let style_row = adw::ComboRow::builder()
+        .title("Window style")
+        .subtitle("Without the toolbar, Preferences stay reachable with Ctrl+Comma and the terminal's right-click menu")
+        .model(&gtk4::StringList::new(&WindowStyle::ALL.map(WindowStyle::label)))
+        .build();
+    if let Some(index) = WindowStyle::ALL.iter().position(|s| *s == current) {
+        style_row.set_selected(index as u32);
+    }
+    {
+        let prefs = prefs.clone();
+        style_row.connect_selected_notify(move |row| {
+            if let Some(&style) = WindowStyle::ALL.get(row.selected() as usize) {
+                update_appearance(&prefs, |p| p.window_style = style);
+            }
+        });
+    }
+    group.add(&style_row);
+
+    let current = prefs.borrow().sidebar_position;
+    let sidebar_row = adw::ComboRow::builder()
+        .title("Sidebar position")
+        .model(&gtk4::StringList::new(
+            &SidebarPosition::ALL.map(SidebarPosition::label),
+        ))
+        .build();
+    if let Some(index) = SidebarPosition::ALL.iter().position(|s| *s == current) {
+        sidebar_row.set_selected(index as u32);
+    }
+    sidebar_row.connect_selected_notify(move |row| {
+        if let Some(&position) = SidebarPosition::ALL.get(row.selected() as usize) {
+            update_appearance(&prefs, |p| p.sidebar_position = position);
+        }
+    });
+    group.add(&sidebar_row);
+
+    group
 }
 
 /// Saves an Appearance preference and applies it right away.
@@ -207,7 +250,9 @@ fn update_appearance(prefs: &Rc<RefCell<Preferences>>, edit: impl FnOnce(&mut Pr
         edit(&mut prefs);
         prefs.save();
     }
-    crate::app::load_theme(&prefs.borrow());
+    let prefs = prefs.borrow();
+    crate::app::load_theme(&prefs);
+    crate::window::apply_window_preferences_to_all(&prefs);
 }
 
 /// Tilix's background image: a file picker, a clear button and the fill

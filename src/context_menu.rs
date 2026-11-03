@@ -281,6 +281,17 @@ fn show_menu(
         });
     }
 
+    menu_box.append(&gtk4::Separator::new(gtk4::Orientation::Horizontal));
+
+    // Also here, not only in the header bar's menu, since the window style
+    // can hide the header bar (`WindowStyle::HideToolbar`/`Borderless`).
+    {
+        let terminal = terminal.clone();
+        add_action(&menu_box, &popover, "Préférences", move || {
+            let _ = WidgetExt::activate_action(&terminal, "win.preferences", None);
+        });
+    }
+
     popover.set_child(Some(&menu_box));
     popover.popup();
 }

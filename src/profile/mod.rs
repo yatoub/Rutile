@@ -9,8 +9,8 @@ use std::rc::Rc;
 
 pub use auto_switch::TerminalState;
 pub use model::{
-    Badge, BadgePosition, BellMode, ColorPair, CursorBlink, CursorShape, ExitAction, Profile,
-    ProfileColors, ProfileId, ProfileStore, TerminalOptions, TextBlink,
+    Badge, BadgePosition, BellMode, CjkWidth, ColorPair, CursorBlink, CursorShape, ExitAction,
+    Profile, ProfileColors, ProfileId, ProfileStore, TerminalOptions, TextBlink,
 };
 pub use scheme::{ColorScheme, ColorSchemeStore};
 

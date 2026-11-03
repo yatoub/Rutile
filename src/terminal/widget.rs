@@ -16,6 +16,7 @@ use crate::profile::{
     TerminalConfig, TerminalOptions, TerminalState, TextBlink,
 };
 use crate::terminal::badge::BadgeOverlay;
+use crate::terminal::encoding;
 use crate::terminal::title;
 
 /// A command that exits sooner than this after being (re)spawned is held
@@ -360,6 +361,14 @@ fn apply_options(terminal: &vte4::Terminal, options: &TerminalOptions) {
     });
 
     terminal.set_audible_bell(options.bell.plays_sound());
+
+    terminal.set_cjk_ambiguous_width(options.cjk_ambiguous_width.cells());
+    if let Err(err) = encoding::set_encoding(terminal, &options.encoding) {
+        eprintln!(
+            "[rutile] encoding {:?} not supported: {err}",
+            options.encoding
+        );
+    }
 }
 
 /// Applies a profile's color overrides on top of the scheme `set_colors`
