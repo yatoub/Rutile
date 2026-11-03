@@ -166,10 +166,15 @@ pub fn attach(
     // terminal's own teardown — tearing its pane down synchronously here
     // (unparenting/rebuilding the tree) would mutate the very widget still
     // emitting the signal.
-    terminal.connect_child_exited(move |_terminal, _status| {
+    //
+    // Whether the pane actually closes depends on the profile's exit action
+    // (close / restart / hold) — see `TerminalWidget::handle_child_exited`.
+    terminal.connect_child_exited(move |_terminal, status| {
         let session_view = session_view.clone();
         gtk4::glib::idle_add_local_once(move || {
-            session_view.borrow_mut().close_pane(session_id, pane_id);
+            session_view
+                .borrow_mut()
+                .handle_child_exited(session_id, pane_id, status);
         });
     });
 }

@@ -7,7 +7,7 @@ use libadwaita::prelude::*;
 
 use crate::keymap::{self, Keymap};
 use crate::preferences::config::Preferences;
-use crate::profile::{ColorSchemeStore, ProfileStore};
+use crate::profile::{ColorSchemeStore, ExitAction, ProfileStore};
 
 /// Builds the Preferences window, mirroring Tilix's sidebar of categories
 /// (`AdwPreferencesWindow` gives us that navigation for free — one page per
@@ -447,6 +447,104 @@ impl ProfilesPage {
             });
         }
         group.add(&silence_row);
+
+        let login_shell_row = adw::SwitchRow::builder()
+            .title("Run command as a login shell")
+            .active(profile.login_shell)
+            .build();
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            login_shell_row.connect_active_notify(move |row| {
+                let active = row.is_active();
+                this.profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.login_shell = active);
+            });
+        }
+        group.add(&login_shell_row);
+
+        let use_custom_command_row = adw::SwitchRow::builder()
+            .title("Run a custom command instead of my shell")
+            .active(profile.use_custom_command)
+            .build();
+        let custom_command_row = adw::EntryRow::builder()
+            .title("Custom command")
+            .text(profile.custom_command.clone())
+            .show_apply_button(true)
+            .sensitive(profile.use_custom_command)
+            .build();
+        // A login shell only applies to the shell itself, so the switch is
+        // meaningless while a custom command replaces it.
+        login_shell_row.set_sensitive(!profile.use_custom_command);
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            let custom_command_row = custom_command_row.clone();
+            let login_shell_row = login_shell_row.clone();
+            use_custom_command_row.connect_active_notify(move |row| {
+                let active = row.is_active();
+                custom_command_row.set_sensitive(active);
+                login_shell_row.set_sensitive(!active);
+                this.profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.use_custom_command = active);
+            });
+        }
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            custom_command_row.connect_apply(move |row| {
+                let command = row.text().trim().to_string();
+                this.profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.custom_command = command);
+            });
+        }
+        group.add(&use_custom_command_row);
+        group.add(&custom_command_row);
+
+        let working_directory_row = adw::EntryRow::builder()
+            .title("Working directory (empty: where Rutile was launched)")
+            .text(profile.working_directory.clone().unwrap_or_default())
+            .show_apply_button(true)
+            .build();
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            working_directory_row.connect_apply(move |row| {
+                let directory = row.text().trim().to_string();
+                let directory = (!directory.is_empty()).then_some(directory);
+                this.profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.working_directory = directory);
+            });
+        }
+        group.add(&working_directory_row);
+
+        let exit_labels: Vec<&str> = ExitAction::ALL.iter().map(|a| a.label()).collect();
+        let exit_action_row = adw::ComboRow::builder()
+            .title("When command exits")
+            .model(&gtk4::StringList::new(&exit_labels))
+            .build();
+        if let Some(index) = ExitAction::ALL
+            .iter()
+            .position(|a| *a == profile.exit_action)
+        {
+            exit_action_row.set_selected(index as u32);
+        }
+        {
+            let this = self.clone();
+            let profile_id = profile.id.clone();
+            exit_action_row.connect_selected_notify(move |row| {
+                if let Some(&action) = ExitAction::ALL.get(row.selected() as usize) {
+                    this.profiles
+                        .borrow_mut()
+                        .update(&profile_id, |p| p.exit_action = action);
+                }
+            });
+        }
+        group.add(&exit_action_row);
 
         let default_row = adw::SwitchRow::builder()
             .title("Default profile")

@@ -139,9 +139,13 @@ nouvelle feature.
 Étendre `src/profile/model.rs` (TOML, `#[serde(default)]` pour rester
 rétro-compatible) :
 
-- [ ] **Command / spawn** : `command` personnalisée (+ args), répertoire de
+- [x] **Command / spawn** : `command` personnalisée (+ args), répertoire de
   travail par défaut, checkbox « login shell », `exit_action`
-  (`exit`/`restart`/`hold`) — à la sortie du shell
+  (`close`/`restart`/`hold`) — à la sortie du shell. Logique pure dans
+  `profile/spawn.rs` (testée), relance via un `adw::Banner` par pane, garde
+  anti-boucle si la commande sort en moins d'1 s sous `restart`. Au passage,
+  `SessionView` résout le profil par défaut à chaque nouvelle session (plus
+  de snapshot figé au démarrage)
 - [ ] **Rendu** : taille (cols/rows + reset), cellule (cell spacing, cell
   width/height scale), custom font (avec toggle « system font » + support
   Powerline), `text_blink_mode` (never/focused/unfocused/always)

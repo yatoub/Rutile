@@ -12,26 +12,29 @@ use crate::dialogs::confirm_close;
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, Preferences};
-use crate::profile::{ColorScheme, ColorSchemeStore, ProfileId, ProfileStore};
+use crate::profile::{ColorSchemeStore, Profile, ProfileId, ProfileStore, TerminalConfig};
 use crate::session::persist::{self, SavedWindow};
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
 
-/// Resolves a profile id to its current color scheme — shared by
-/// `build_window`'s own `resolve_scheme` closure and `detach_session`, which
-/// needs the same lookup against a *different* window's freshly-loaded
-/// `profiles`/`schemes` stores.
-fn resolve_scheme_for(
+/// Resolves a profile id to its current settings and color scheme —
+/// shared by `build_window`'s own `resolve_config` closure and
+/// `detach_session`, which needs the same lookup against a *different*
+/// window's freshly-loaded `profiles`/`schemes` stores. A profile that no
+/// longer exists (deleted since a session was saved) falls back to default
+/// settings with the Catppuccin Mocha scheme.
+fn resolve_config_for(
     profiles: &Rc<RefCell<ProfileStore>>,
     schemes: &Rc<ColorSchemeStore>,
     profile_id: &ProfileId,
-) -> ColorScheme {
-    let scheme_id = profiles
+) -> TerminalConfig {
+    let profile = profiles
         .borrow()
         .get(profile_id)
-        .map(|p| p.scheme_id.clone())
-        .unwrap_or_else(|| "catppuccin-mocha".to_string());
-    schemes.get_or_default(&scheme_id).clone()
+        .cloned()
+        .unwrap_or_else(|| Profile::new(profile_id, "Default", "catppuccin-mocha"));
+    let scheme = schemes.get_or_default(&profile.scheme_id).clone();
+    TerminalConfig { profile, scheme }
 }
 
 pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
@@ -45,22 +48,26 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // there's nothing that needs to invalidate this snapshot.
     let schemes = Rc::new(ColorSchemeStore::load());
 
-    let resolve_scheme = {
+    let resolve_config = {
         let profiles = profiles.clone();
         let schemes = schemes.clone();
-        move |profile_id: &ProfileId| -> ColorScheme {
-            resolve_scheme_for(&profiles, &schemes, profile_id)
+        move |profile_id: &ProfileId| -> TerminalConfig {
+            resolve_config_for(&profiles, &schemes, profile_id)
         }
     };
 
     let keymap = Rc::new(RefCell::new(Keymap::load()));
 
-    let default_profile_id = prefs.borrow().default_profile_id.clone();
-    let initial_scheme = resolve_scheme(&default_profile_id);
-    let session_view = Rc::new(RefCell::new(SessionView::new(
-        default_profile_id,
-        initial_scheme,
-    )));
+    let resolve_default: Rc<dyn Fn() -> (ProfileId, TerminalConfig)> = {
+        let prefs = prefs.clone();
+        let resolve_config = resolve_config.clone();
+        Rc::new(move || {
+            let profile_id = prefs.borrow().default_profile_id.clone();
+            let config = resolve_config(&profile_id);
+            (profile_id, config)
+        })
+    };
+    let session_view = Rc::new(RefCell::new(SessionView::new(resolve_default)));
 
     // Auto-restore: a session saved on the last clean shutdown (see the
     // close-request handler below) takes over from the single blank
@@ -69,7 +76,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // parsing exists at all yet).
     if let Some(saved) = persist::SavedWindow::load_from_file(&persist::last_session_path()) {
         let mut session_view_mut = session_view.borrow_mut();
-        session_view_mut.replace_all_with(&saved.sessions, &resolve_scheme);
+        session_view_mut.replace_all_with(&saved.sessions, &resolve_config);
         session_view_mut.set_broadcast_group(saved.broadcast_group);
         // A clean shutdown after closing every session (Ctrl+D on the last
         // pane) saves an empty `sessions` list — `replace_all_with` above
@@ -206,7 +213,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         let profiles = profiles.clone();
         let app = app.clone();
         let window_weak = window.downgrade();
-        let resolve_scheme = resolve_scheme.clone();
+        let resolve_config = resolve_config.clone();
         session_open_action.connect_activate(move |_, _| {
             let Some(window) = window_weak.upgrade() else {
                 return;
@@ -217,7 +224,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
                 prefs.clone(),
                 profiles.clone(),
                 app.clone(),
-                resolve_scheme.clone(),
+                resolve_config.clone(),
             );
         });
     }
@@ -577,12 +584,12 @@ fn detach_session(window: &adw::ApplicationWindow, session_view: &Rc<RefCell<Ses
     if let (Some(new_session_view), Some(new_profiles), Some(new_schemes), Some(new_prefs)) =
         (new_session_view, new_profiles, new_schemes, new_prefs)
     {
-        let scheme = resolve_scheme_for(&new_profiles, &new_schemes, &saved.profile_id);
+        let config = resolve_config_for(&new_profiles, &new_schemes, &saved.profile_id);
         let stale_ids = new_session_view.borrow().session_ids();
 
         let restored_id = new_session_view
             .borrow_mut()
-            .restore_session(&saved, scheme);
+            .restore_session(&saved, config);
         for pane_id in new_session_view.borrow().pane_ids_for(restored_id) {
             wire_pane_context_menu_for(
                 &new_session_view,
@@ -693,7 +700,7 @@ fn open_session(
     prefs: Rc<RefCell<Preferences>>,
     profiles: Rc<RefCell<ProfileStore>>,
     app: adw::Application,
-    resolve_scheme: impl Fn(&crate::profile::ProfileId) -> ColorScheme + 'static,
+    resolve_config: impl Fn(&crate::profile::ProfileId) -> TerminalConfig + 'static,
 ) {
     let dialog = gtk4::FileDialog::builder()
         .title("Ouvrir une session")
@@ -709,7 +716,7 @@ fn open_session(
         };
 
         let mut view = session_view.borrow_mut();
-        view.replace_all_with(&saved.sessions, &resolve_scheme);
+        view.replace_all_with(&saved.sessions, &resolve_config);
         view.set_broadcast_group(saved.broadcast_group);
         let session_ids = view.session_ids();
         if let Some(&session_id) = session_ids.get(saved.active_session_index) {
