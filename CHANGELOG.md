@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.7.0] — 2026-11-03
+
+### Added
+
+- Switch profiles automatically based on host and directory
+
+- Add cursor, highlight, bold and badge colors, and a badge
+
+- Turn the Profiles page into a list with a tabbed editor
+
+
 ## [0.6.3] — 2026-08-19
 
 ### Fixed
