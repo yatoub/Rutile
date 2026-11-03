@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -12,9 +12,11 @@ use crate::layout::PaneId;
 use crate::profile::scheme::parse_or_fallback;
 use crate::profile::spawn::{self, SpawnCommand};
 use crate::profile::{
-    CursorBlink, CursorShape, ExitAction, ProfileColors, TerminalConfig, TerminalOptions, TextBlink,
+    BellMode, CursorBlink, CursorShape, ExitAction, ProfileColors, ProfileId, ProfileResolver,
+    TerminalConfig, TerminalOptions, TerminalState, TextBlink,
 };
 use crate::terminal::badge::BadgeOverlay;
+use crate::terminal::title;
 
 /// A command that exits sooner than this after being (re)spawned is held
 /// instead of restarted under `ExitAction::Restart` — otherwise a typo'd
@@ -35,7 +37,64 @@ pub struct TerminalWidget {
     /// its bell, if the profile's `BellMode` asks for an icon.
     bell_icon: gtk4::Image,
     spawner: Rc<Spawner>,
-    exit_action: ExitAction,
+    appearance: Rc<Appearance>,
+}
+
+/// Everything about the terminal that comes from its profile and can
+/// change while it runs — re-applied as a whole when automatic profile
+/// switching picks another profile. What the command *is* (`Spawner`)
+/// isn't part of it: like Tilix, switching profiles doesn't restart it.
+struct Appearance {
+    terminal: vte4::Terminal,
+    scrolled: gtk4::ScrolledWindow,
+    badge: BadgeOverlay,
+    /// Shared with the bell handler (see `connect_bell_icon`).
+    bell: Rc<Cell<BellMode>>,
+    exit_action: Cell<ExitAction>,
+    /// The profile currently applied: the session's own, or one picked by
+    /// automatic switching.
+    profile_id: RefCell<ProfileId>,
+}
+
+impl Appearance {
+    fn apply(&self, config: &TerminalConfig) {
+        let scheme = &config.scheme;
+        let foreground = scheme.foreground_rgba();
+        let background = scheme.background_rgba();
+        let palette = scheme.palette_rgba();
+        let palette_refs: Vec<&gtk4::gdk::RGBA> = palette.iter().collect();
+        self.terminal
+            .set_colors(Some(&foreground), Some(&background), &palette_refs);
+        apply_options(&self.terminal, &config.profile.options);
+        apply_colors(&self.terminal, &config.profile.colors);
+
+        // `External` rather than `Never` when hidden: the terminal still
+        // scrolls through its scrollback (mouse wheel, Shift+PageUp), only
+        // the scrollbar itself goes away. `Never` would make the window
+        // size itself to the whole scrollback.
+        self.scrolled
+            .set_vscrollbar_policy(if config.profile.options.show_scrollbar {
+                gtk4::PolicyType::Automatic
+            } else {
+                gtk4::PolicyType::External
+            });
+
+        // After `apply_options`: a "system font" badge is sized from the
+        // terminal's font.
+        let badge_color = config
+            .profile
+            .colors
+            .badge_color
+            .as_deref()
+            .map(parse_or_fallback)
+            .unwrap_or(foreground);
+        self.badge
+            .update(&self.terminal, &config.profile.badge, &badge_color);
+
+        self.bell.set(config.profile.options.bell);
+        self.exit_action.set(config.profile.exit_action);
+        self.profile_id.replace(config.profile.id.clone());
+    }
 }
 
 /// Everything needed to (re)start the terminal's command — shared with the
@@ -122,39 +181,13 @@ impl TerminalWidget {
         terminal.set_vexpand(true);
         terminal.set_hexpand(true);
 
-        let scheme = &config.scheme;
-        let foreground = scheme.foreground_rgba();
-        let background = scheme.background_rgba();
-        let palette = scheme.palette_rgba();
-        let palette_refs: Vec<&gtk4::gdk::RGBA> = palette.iter().collect();
-        terminal.set_colors(Some(&foreground), Some(&background), &palette_refs);
-        apply_options(&terminal, &config.profile.options);
-        apply_colors(&terminal, &config.profile.colors);
-
         let scrolled = gtk4::ScrolledWindow::builder()
             .hscrollbar_policy(gtk4::PolicyType::Never)
-            // `External` rather than `Never` when hidden: the terminal
-            // still scrolls through its scrollback (mouse wheel,
-            // Shift+PageUp), only the scrollbar itself goes away. `Never`
-            // would make the window size itself to the whole scrollback.
-            .vscrollbar_policy(if config.profile.options.show_scrollbar {
-                gtk4::PolicyType::Automatic
-            } else {
-                gtk4::PolicyType::External
-            })
             .hexpand(true)
             .vexpand(true)
             .child(&terminal)
             .build();
-
-        let badge_color = config
-            .profile
-            .colors
-            .badge_color
-            .as_deref()
-            .map(parse_or_fallback)
-            .unwrap_or(foreground);
-        let badge = BadgeOverlay::new(&terminal, &config.profile.badge, &badge_color, pane_id);
+        let badge = BadgeOverlay::new(&terminal, pane_id);
         let root = gtk4::Overlay::builder().child(&scrolled).build();
         root.add_overlay(badge.widget());
 
@@ -163,8 +196,20 @@ impl TerminalWidget {
             .tooltip_text("Bell")
             .visible(false)
             .build();
-        if config.profile.options.bell.shows_icon() {
-            connect_bell_icon(&terminal, &bell_icon);
+        let bell = Rc::new(Cell::new(config.profile.options.bell));
+        connect_bell_icon(&terminal, &bell_icon, bell.clone());
+
+        let appearance = Rc::new(Appearance {
+            terminal: terminal.clone(),
+            scrolled,
+            badge,
+            bell,
+            exit_action: Cell::new(config.profile.exit_action),
+            profile_id: RefCell::new(config.profile.id.clone()),
+        });
+        appearance.apply(config);
+        if let Some(resolver) = config.resolver.clone() {
+            connect_automatic_switch(&terminal, &appearance, resolver, config.profile.id.clone());
         }
 
         let banner = adw::Banner::builder().button_label("Relaunch").build();
@@ -192,7 +237,7 @@ impl TerminalWidget {
             root,
             bell_icon,
             spawner,
-            exit_action: config.profile.exit_action,
+            appearance,
         }
     }
 
@@ -227,7 +272,7 @@ impl TerminalWidget {
     /// pane should be closed — the caller owns the split tree, this
     /// widget doesn't.
     pub fn handle_child_exited(&self, status: i32) -> bool {
-        match self.exit_action {
+        match self.appearance.exit_action.get() {
             ExitAction::Close => true,
             ExitAction::Restart
                 if self.spawner.spawned_at.get().elapsed() >= MIN_UPTIME_FOR_RESTART =>
@@ -273,10 +318,9 @@ fn apply_options(terminal: &vte4::Terminal, options: &TerminalOptions) {
     } else {
         Some(options.font.clone())
     };
-    // `None` (no GNOME setting available) leaves vte's own default font.
-    if let Some(font) = font {
-        terminal.set_font(Some(&gtk4::pango::FontDescription::from_string(&font)));
-    }
+    // `None` (no GNOME setting available) is vte's own default font.
+    let font = font.map(|font| gtk4::pango::FontDescription::from_string(&font));
+    terminal.set_font(font.as_ref());
     // vte clamps these to 1.0..=2.0 itself, but a hand-edited TOML value
     // outside that range is clamped here too so what's applied matches
     // what Preferences shows.
@@ -345,15 +389,19 @@ fn system_monospace_font() -> Option<String> {
     (!font.is_empty()).then(|| font.to_string())
 }
 
-/// Shows `icon` on every bell and hides it once no bell has rung for
-/// `BELL_ICON_DURATION` — a new bell while it's shown restarts the timer.
-fn connect_bell_icon(terminal: &vte4::Terminal, icon: &gtk4::Image) {
+/// Shows `icon` on every bell — when the profile's current `BellMode`
+/// asks for it — and hides it once no bell has rung for
+/// `BELL_ICON_DURATION`; a new bell while it's shown restarts the timer.
+fn connect_bell_icon(terminal: &vte4::Terminal, icon: &gtk4::Image, bell: Rc<Cell<BellMode>>) {
     let pending: Rc<Cell<Option<glib::SourceId>>> = Rc::default();
     let icon = icon.downgrade();
     terminal.connect_bell(move |_| {
         let Some(icon) = icon.upgrade() else {
             return;
         };
+        if !bell.get().shows_icon() {
+            return;
+        }
         icon.set_visible(true);
         if let Some(previous) = pending.take() {
             previous.remove();
@@ -367,5 +415,43 @@ fn connect_bell_icon(terminal: &vte4::Terminal, icon: &gtk4::Image) {
             }
         });
         pending.set(Some(id));
+    });
+}
+
+/// Tilix's automatic profile switching: every time the shell reports a new
+/// directory (OSC 7), look for a profile whose rules match where the
+/// terminal now is, and fall back to the session's own profile
+/// (`base_profile_id`) once none does. Only re-applies when the matched
+/// profile actually changes.
+fn connect_automatic_switch(
+    terminal: &vte4::Terminal,
+    appearance: &Rc<Appearance>,
+    resolver: ProfileResolver,
+    base_profile_id: ProfileId,
+) {
+    let appearance = Rc::downgrade(appearance);
+    terminal.connect_current_directory_uri_changed(move |terminal| {
+        let Some(appearance) = appearance.upgrade() else {
+            return;
+        };
+        let Some(uri) = terminal.current_directory_uri() else {
+            return;
+        };
+        let Some(directory) = title::directory_from_uri(&uri) else {
+            return;
+        };
+        let state = TerminalState {
+            user: title::current_user(),
+            host: title::host_from_uri(&uri).or_else(title::local_hostname),
+            directory,
+        };
+        let target = resolver
+            .resolve_automatic(&state)
+            .or_else(|| resolver.try_resolve(&base_profile_id));
+        if let Some(target) = target
+            && target.profile.id != *appearance.profile_id.borrow()
+        {
+            appearance.apply(&target);
+        }
     });
 }

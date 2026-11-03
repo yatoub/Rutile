@@ -12,30 +12,10 @@ use crate::dialogs::confirm_close;
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, Preferences};
-use crate::profile::{ColorSchemeStore, Profile, ProfileId, ProfileStore, TerminalConfig};
+use crate::profile::{ColorSchemeStore, ProfileId, ProfileResolver, ProfileStore, TerminalConfig};
 use crate::session::persist::{self, SavedWindow};
 use crate::session::{SessionSidebar, SessionView};
 use crate::terminal::broadcast::SessionId;
-
-/// Resolves a profile id to its current settings and color scheme —
-/// shared by `build_window`'s own `resolve_config` closure and
-/// `detach_session`, which needs the same lookup against a *different*
-/// window's freshly-loaded `profiles`/`schemes` stores. A profile that no
-/// longer exists (deleted since a session was saved) falls back to default
-/// settings with the Catppuccin Mocha scheme.
-fn resolve_config_for(
-    profiles: &Rc<RefCell<ProfileStore>>,
-    schemes: &Rc<ColorSchemeStore>,
-    profile_id: &ProfileId,
-) -> TerminalConfig {
-    let profile = profiles
-        .borrow()
-        .get(profile_id)
-        .cloned()
-        .unwrap_or_else(|| Profile::new(profile_id, "Default", "catppuccin-mocha"));
-    let scheme = schemes.get_or_default(&profile.scheme_id).clone();
-    TerminalConfig { profile, scheme }
-}
 
 pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let header_bar = adw::HeaderBar::new();
@@ -49,11 +29,8 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let schemes = Rc::new(ColorSchemeStore::load());
 
     let resolve_config = {
-        let profiles = profiles.clone();
-        let schemes = schemes.clone();
-        move |profile_id: &ProfileId| -> TerminalConfig {
-            resolve_config_for(&profiles, &schemes, profile_id)
-        }
+        let resolver = ProfileResolver::new(profiles.clone(), schemes.clone());
+        move |profile_id: &ProfileId| -> TerminalConfig { resolver.resolve(profile_id) }
     };
 
     let keymap = Rc::new(RefCell::new(Keymap::load()));
@@ -584,7 +561,8 @@ fn detach_session(window: &adw::ApplicationWindow, session_view: &Rc<RefCell<Ses
     if let (Some(new_session_view), Some(new_profiles), Some(new_schemes), Some(new_prefs)) =
         (new_session_view, new_profiles, new_schemes, new_prefs)
     {
-        let config = resolve_config_for(&new_profiles, &new_schemes, &saved.profile_id);
+        let config = ProfileResolver::new(new_profiles.clone(), new_schemes.clone())
+            .resolve(&saved.profile_id);
         let stale_ids = new_session_view.borrow().session_ids();
 
         let restored_id = new_session_view
