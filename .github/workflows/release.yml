@@ -472,3 +472,42 @@ jobs:
           TAG: ${{ github.event.inputs.tag }}
         run: |
           gh workflow run aur-publish.yml --repo "${{ github.repository }}" --ref main -f "tag=${TAG}"
+
+  # ── Cleanup stale release-plz branches ───────────────────────────────────
+  # Ported from susshi: release-plz opens a new `release-plz-<timestamp>`
+  # branch per release PR, and nothing deleted them (16 had piled up by
+  # v0.8.0). Deletes every one without an open PR, once a tagged release
+  # went through. `--repo` matters: without a checkout, `gh pr list` has no
+  # repository to infer and fails — susshi's version swallows that, ends up
+  # with an empty `open` count and silently never deletes anything — so a
+  # lookup failure fails this job instead.
+  cleanup-branches:
+    name: Cleanup stale release-plz branches
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [update-pkgbuild]
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Delete release-plz branches without an open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/${REPO}/branches" --paginate \
+            --jq '.[].name | select(startswith("release-plz-"))' \
+          | while IFS= read -r branch; do
+              open=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq 'length')
+              if [ "$open" = "0" ]; then
+                # A branch already gone (e.g. auto-deleted on merge) is fine.
+                if gh api -X DELETE "repos/${REPO}/git/refs/heads/${branch}" > /dev/null; then
+                  echo "Deleted: $branch"
+                else
+                  echo "::warning::Could not delete ${branch}"
+                fi
+              else
+                echo "Kept (open PR): $branch"
+              fi
+            done

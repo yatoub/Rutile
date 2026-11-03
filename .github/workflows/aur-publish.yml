@@ -36,16 +36,16 @@ jobs:
     permissions:
       contents: read
       issues: write
-    # Also run when the completed Release workflow was itself a manual
-    # workflow_dispatch re-publish: a re-publish can rebuild the binary
-    # (overwrite: true on the upload step) with different bytes, which
-    # otherwise leaves the AUR package's checksum stale until the next
-    # tagged release.
+    # `workflow_run` only covers a tag-push Release. A manual re-publish of
+    # Release (workflow_dispatch, run from `main`) is handed over by its
+    # `trigger-aur-publish` job, which dispatches this workflow with the
+    # tag explicitly: the `workflow_run` it also fires carries `main`'s
+    # head_sha, which no tag points at, so resolve-release-tag would only
+    # fail (v0.8.0's re-publish: "Invalid tag format:").
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
-       (github.event.workflow_run.event == 'push' ||
-        github.event.workflow_run.event == 'workflow_dispatch'))
+       github.event.workflow_run.event == 'push')
 
     steps:
       - name: Checkout
@@ -108,8 +108,7 @@ jobs:
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
-       (github.event.workflow_run.event == 'push' ||
-        github.event.workflow_run.event == 'workflow_dispatch'))
+       github.event.workflow_run.event == 'push')
 
     steps:
       - name: Checkout
