@@ -32,23 +32,23 @@ pub fn build(
     window.add(&placeholder_page(
         "Appearance",
         "view-grid-symbolic",
-        "Theme variants (Catppuccin Latte, custom palettes) are planned for a future version.",
+        "Planned (roadmap phase 2): light/dark theme variant, background transparency and image, window style, tab position.",
     ));
     window.add(&placeholder_page(
         "Bookmarks",
         "user-bookmarks-symbolic",
-        "Rutile has no bookmarks concept yet.",
+        "Planned (roadmap phase 4): command bookmarks organized in folders, inserted into the focused terminal.",
     ));
     window.add(ShortcutsPage::new(keymap).page());
     window.add(&placeholder_page(
         "Encoding",
         "text-x-generic-symbolic",
-        "Rutile currently only supports UTF-8.",
+        "Rutile currently only supports UTF-8. Planned (roadmap phase 2): per-profile encoding and CJK ambiguous width.",
     ));
     window.add(&placeholder_page(
         "Advanced",
         "applications-system-symbolic",
-        "No advanced settings yet.",
+        "Planned (roadmap phase 5): regex triggers and unsafe-paste warnings.",
     ));
 
     window
