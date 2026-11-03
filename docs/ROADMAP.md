@@ -214,7 +214,10 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
     (`ProfileColors::background_transparency`, onglet Color) : la fenêtre
     est transparente (`rutile-window` dans chrome.css), chaque élément du
     chrome peint son propre fond, le terminal applique l'alpha à son fond
-  - Image de fond + mode (scale/tile/center/stretch)
+  - [x] Image de fond + mode (scale/tile/center/stretch), réglage global
+    comme Tilix : règle CSS `background-image` sur `rutile-window`, ajoutée
+    à la feuille du chrome par `app::load_theme` — visible à travers les
+    terminaux transparents uniquement. Fichier introuvable → ignoré
   - Style de fenêtre (normal / disable-CSD / disable-CSD+hidétoolbar /
     borderless) — `GtkHeaderBar`/CSD conditionnel
   - Position des onglets (left/right/top/bottom), poignées larges, overlay

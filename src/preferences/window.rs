@@ -6,7 +6,7 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 
 use crate::keymap::{self, Keymap};
-use crate::preferences::config::{Preferences, ThemeVariant};
+use crate::preferences::config::{BackgroundImageMode, Preferences, ThemeVariant};
 use crate::preferences::profiles::ProfilesPage;
 use crate::profile::{ColorSchemeStore, ProfileStore};
 
@@ -160,8 +160,8 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     page
 }
 
-/// The "Appearance" page. Only the theme variant for now — the rest of
-/// Tilix's Appearance settings land in their own changes (see the
+/// The "Appearance" page: theme variant and background image. The rest of
+/// Tilix's Appearance settings land in their own changes (see the theme
 /// group's description).
 fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     let page = adw::PreferencesPage::builder()
@@ -170,10 +170,7 @@ fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
         .build();
     let group = adw::PreferencesGroup::builder()
         .title("Theme")
-        .description(
-            "Still to come (roadmap phase 2): background transparency and image, \
-             window style, sidebar position.",
-        )
+        .description("Still to come (roadmap phase 2): window style, sidebar position.")
         .build();
 
     let current = prefs.borrow().theme_variant;
@@ -187,21 +184,131 @@ fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     if let Some(index) = ThemeVariant::ALL.iter().position(|v| *v == current) {
         row.set_selected(index as u32);
     }
-    row.connect_selected_notify(move |row| {
-        let Some(&variant) = ThemeVariant::ALL.get(row.selected() as usize) else {
-            return;
-        };
-        {
-            let mut prefs = prefs.borrow_mut();
-            prefs.theme_variant = variant;
-            prefs.save();
-        }
-        crate::app::load_theme(variant);
-    });
+    {
+        let prefs = prefs.clone();
+        row.connect_selected_notify(move |row| {
+            let Some(&variant) = ThemeVariant::ALL.get(row.selected() as usize) else {
+                return;
+            };
+            update_appearance(&prefs, |p| p.theme_variant = variant);
+        });
+    }
     group.add(&row);
-
     page.add(&group);
+
+    page.add(&background_image_group(prefs));
     page
+}
+
+/// Saves an Appearance preference and applies it right away.
+fn update_appearance(prefs: &Rc<RefCell<Preferences>>, edit: impl FnOnce(&mut Preferences)) {
+    {
+        let mut prefs = prefs.borrow_mut();
+        edit(&mut prefs);
+        prefs.save();
+    }
+    crate::app::load_theme(&prefs.borrow());
+}
+
+/// Tilix's background image: a file picker, a clear button and the fill
+/// mode. Global, not per profile — like Tilix — and only visible through
+/// terminals whose profile has some background transparency.
+fn background_image_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder()
+        .title("Background image")
+        .description("Shown through terminals whose profile has some background transparency.")
+        .build();
+
+    let image_row = adw::ActionRow::builder().title("Image").build();
+    let describe = |path: Option<&std::path::Path>| match path {
+        Some(path) => path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.display().to_string()),
+        None => "None".to_string(),
+    };
+    image_row.set_subtitle(&describe(prefs.borrow().background_image.as_deref()));
+
+    let choose = gtk4::Button::builder()
+        .label("Choose…")
+        .valign(gtk4::Align::Center)
+        .build();
+    let clear = gtk4::Button::builder()
+        .icon_name("edit-clear-symbolic")
+        .tooltip_text("Remove the background image")
+        .valign(gtk4::Align::Center)
+        .sensitive(prefs.borrow().background_image.is_some())
+        .build();
+    clear.add_css_class("flat");
+    image_row.add_suffix(&choose);
+    image_row.add_suffix(&clear);
+    {
+        let prefs = prefs.clone();
+        let image_row = image_row.downgrade();
+        let clear = clear.downgrade();
+        choose.connect_clicked(move |button| {
+            let filter = gtk4::FileFilter::new();
+            filter.set_name(Some("Images"));
+            filter.add_pixbuf_formats();
+            let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
+            filters.append(&filter);
+            let dialog = gtk4::FileDialog::builder()
+                .title("Background image")
+                .filters(&filters)
+                .default_filter(&filter)
+                .build();
+            let parent = button.root().and_downcast::<gtk4::Window>();
+            let prefs = prefs.clone();
+            let (image_row, clear) = (image_row.clone(), clear.clone());
+            dialog.open(
+                parent.as_ref(),
+                gtk4::gio::Cancellable::NONE,
+                move |result| {
+                    let Some(path) = result.ok().and_then(|file| file.path()) else {
+                        return;
+                    };
+                    if let Some(row) = image_row.upgrade() {
+                        row.set_subtitle(&describe(Some(&path)));
+                    }
+                    if let Some(clear) = clear.upgrade() {
+                        clear.set_sensitive(true);
+                    }
+                    update_appearance(&prefs, |p| p.background_image = Some(path));
+                },
+            );
+        });
+    }
+    {
+        let prefs = prefs.clone();
+        let image_row = image_row.downgrade();
+        clear.connect_clicked(move |button| {
+            button.set_sensitive(false);
+            if let Some(row) = image_row.upgrade() {
+                row.set_subtitle(&describe(None));
+            }
+            update_appearance(&prefs, |p| p.background_image = None);
+        });
+    }
+    group.add(&image_row);
+
+    let current = prefs.borrow().background_image_mode;
+    let mode_row = adw::ComboRow::builder()
+        .title("Mode")
+        .model(&gtk4::StringList::new(
+            &BackgroundImageMode::ALL.map(BackgroundImageMode::label),
+        ))
+        .build();
+    if let Some(index) = BackgroundImageMode::ALL.iter().position(|m| *m == current) {
+        mode_row.set_selected(index as u32);
+    }
+    mode_row.connect_selected_notify(move |row| {
+        if let Some(&mode) = BackgroundImageMode::ALL.get(row.selected() as usize) {
+            update_appearance(&prefs, |p| p.background_image_mode = mode);
+        }
+    });
+    group.add(&mode_row);
+
+    group
 }
 
 fn placeholder_page(title: &str, icon_name: &str, message: &str) -> adw::PreferencesPage {
