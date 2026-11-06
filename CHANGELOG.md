@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.9.0] — 2026-11-06
+
+### Added
+
+- Reorder sessions by drag and drop, drag out to detach
+
+- Add command bookmarks with nested folders
+
+- Add Tilix's command line options and new instance modes
+
+
 ## [0.8.0] — 2026-11-03
 
 ### Added
