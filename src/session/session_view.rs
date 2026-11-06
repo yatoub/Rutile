@@ -83,8 +83,11 @@ pub struct SessionView {
 }
 
 impl SessionView {
+    /// Starts with no session: `window::build_window` decides what the
+    /// first one is (the restored last session, a session file, or one
+    /// shaped by the command line).
     pub fn new(resolve_default: Rc<dyn Fn() -> (ProfileId, TerminalConfig)>) -> Self {
-        let mut this = Self {
+        Self {
             tab_view: adw::TabView::new(),
             sessions: HashMap::new(),
             containers: HashMap::new(),
@@ -100,9 +103,7 @@ impl SessionView {
             session_profiles: HashMap::new(),
             session_names: HashMap::new(),
             pane_title_labels: HashMap::new(),
-        };
-        this.new_session();
-        this
+        }
     }
 
     pub fn tab_view(&self) -> &adw::TabView {
@@ -183,11 +184,22 @@ impl SessionView {
     }
 
     pub fn new_session(&mut self) -> SessionId {
+        let (profile_id, config) = (self.resolve_default)();
+        self.new_session_with(profile_id, config, None)
+    }
+
+    /// A new session with an explicit profile/config and starting
+    /// directory — what the command line asks for (`-p`, `-e`, `-w`).
+    pub fn new_session_with(
+        &mut self,
+        profile_id: ProfileId,
+        config: TerminalConfig,
+        cwd: Option<&str>,
+    ) -> SessionId {
         let pane_id = self.next_pane_id;
         self.next_pane_id += 1;
 
-        let (profile_id, config) = (self.resolve_default)();
-        let pane_view = PaneView::new(pane_id, config);
+        let pane_view = PaneView::new(pane_id, config, cwd);
         self.insert_session(profile_id, pane_view)
     }
 
@@ -337,8 +349,20 @@ impl SessionView {
     /// Returns the new pane's `(SessionId, PaneId)`, e.g. so the caller can
     /// wire up its right-click context menu.
     pub fn split_focused(&mut self, orientation: Orientation) -> Option<(SessionId, PaneId)> {
+        self.split_focused_with(orientation, None, None)
+    }
+
+    /// `split_focused`, with the new terminal's config (`None`: the
+    /// session's) and starting directory — a split asked for on the
+    /// command line.
+    pub fn split_focused_with(
+        &mut self,
+        orientation: Orientation,
+        config: Option<&TerminalConfig>,
+        cwd: Option<&str>,
+    ) -> Option<(SessionId, PaneId)> {
         let session_id = self.current_session_id()?;
-        let new_id = self.split_in_session(session_id, orientation)?;
+        let new_id = self.split_in_session_with(session_id, orientation, config, cwd)?;
         Some((session_id, new_id))
     }
 
@@ -362,6 +386,16 @@ impl SessionView {
         session_id: SessionId,
         orientation: Orientation,
     ) -> Option<PaneId> {
+        self.split_in_session_with(session_id, orientation, None, None)
+    }
+
+    fn split_in_session_with(
+        &mut self,
+        session_id: SessionId,
+        orientation: Orientation,
+        config: Option<&TerminalConfig>,
+        cwd: Option<&str>,
+    ) -> Option<PaneId> {
         let pane_id = self.next_pane_id;
         self.next_pane_id += 1;
         // Reuses the same counter as pane ids: they live in disjoint
@@ -371,7 +405,7 @@ impl SessionView {
         self.next_pane_id += 1;
 
         let pane_view = self.sessions.get_mut(&session_id)?;
-        pane_view.split(orientation, pane_id, split_id);
+        pane_view.split_with(orientation, pane_id, split_id, config, cwd);
         self.broadcast.register_pane(session_id, pane_id);
         self.resync_page_child(session_id);
         Some(pane_id)

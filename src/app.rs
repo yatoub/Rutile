@@ -1,22 +1,117 @@
 use std::cell::{OnceCell, RefCell};
 
+use gio::prelude::*;
+use gtk4::glib;
 use gtk4::prelude::*;
 use libadwaita as adw;
 
-use crate::preferences::{Preferences, ThemeVariant};
+use crate::cli::LaunchRequest;
+use crate::preferences::{NewInstanceMode, Preferences, ThemeVariant};
+use crate::profile::ProfileStore;
 use crate::window;
 
+/// `activate` without a command line (e.g. `gapplication launch`): a plain
+/// launch.
 pub fn build(app: &adw::Application) {
-    load_theme(&Preferences::load());
+    launch(app, &LaunchRequest::default());
+}
 
-    let win = window::build_window(app);
-    win.present();
+/// Every `rutile …` invocation, the first one and those handed over by
+/// later ones while this instance runs (`HANDLES_COMMAND_LINE`). Messages
+/// go to the *invoking* terminal through `cmdline`, not this process's
+/// stderr.
+pub fn command_line(
+    app: &adw::Application,
+    cmdline: &gio::ApplicationCommandLine,
+) -> glib::ExitCode {
+    let cwd = cmdline.cwd();
+    let launch_request = match LaunchRequest::parse(&cmdline.arguments(), cwd.as_deref()) {
+        Ok(request) => request,
+        Err(err) => {
+            // Also `--help`/`--version`, which exit successfully.
+            let text = err.render().to_string();
+            if err.exit_code() == 0 {
+                cmdline.print_literal(&text);
+            } else {
+                cmdline.printerr_literal(&text);
+            }
+            return glib::ExitCode::from(err.exit_code().clamp(0, 255) as u8);
+        }
+    };
+    if let Err(message) = validate(&launch_request) {
+        cmdline.printerr_literal(&format!("rutile: {message}\n"));
+        return glib::ExitCode::FAILURE;
+    }
+    for warning in &launch_request.warnings {
+        cmdline.printerr_literal(&format!("{warning}\n"));
+    }
+    launch(app, &launch_request);
+    glib::ExitCode::SUCCESS
+}
+
+/// Rejects what can't work before anything opens, so the mistake is
+/// reported where the command was typed instead of silently falling back.
+fn validate(request: &LaunchRequest) -> Result<(), String> {
+    if let Some(dir) = &request.working_directory
+        && !dir.is_dir()
+    {
+        return Err(format!("{}: not a directory", dir.display()));
+    }
+    if let Some(file) = &request.session_file
+        && !file.is_file()
+    {
+        return Err(format!("{}: no such session file", file.display()));
+    }
+    if let Some(wanted) = &request.profile {
+        let store = ProfileStore::load();
+        let known = store.get(wanted).is_some()
+            || store.iter().any(|p| p.name.eq_ignore_ascii_case(wanted));
+        if !known {
+            let names: Vec<&str> = store.iter().map(|p| p.name.as_str()).collect();
+            return Err(format!(
+                "unknown profile {wanted:?} (profiles: {})",
+                names.join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Opens what `request` asks for: a new window if none is open yet,
+/// otherwise whatever `--action` (or the "On new instance" preference)
+/// says, in the most recently focused window.
+fn launch(app: &adw::Application, request: &LaunchRequest) {
+    let prefs = Preferences::load();
+    load_theme(&prefs);
+
+    let existing = app
+        .active_window()
+        .and_downcast::<adw::ApplicationWindow>()
+        .filter(|window| window.has_css_class("rutile-window"));
+    let target = match existing {
+        Some(existing) => {
+            let mode = request.action.unwrap_or(prefs.new_instance_mode);
+            if mode == NewInstanceMode::NewWindow {
+                None
+            } else {
+                window::launch_into(&existing, request, mode);
+                Some(existing)
+            }
+        }
+        None => None,
+    };
+    let target = target.unwrap_or_else(|| window::build_window(app, request));
+    target.present();
+    window::apply_launch_window_state(&target, request);
+    if request.preferences {
+        let _ = WidgetExt::activate_action(&target, "win.preferences", None);
+    }
 }
 
 thread_local! {
     /// The chrome stylesheet, installed on the display once and reloaded
     /// in place when the light/dark variant or the background image
-    /// changes (`build` runs on every activation, so it mustn't stack a
+    /// changes (`launch` runs for every invocation, so it mustn't stack a
     /// new provider each time).
     static CHROME: OnceCell<gtk4::CssProvider> = const { OnceCell::new() };
     /// The background image rule last built from Preferences, kept so a
@@ -67,7 +162,7 @@ fn background_css(prefs: &Preferences) -> String {
     let Some(path) = prefs.background_image.as_ref().filter(|p| p.is_file()) else {
         return String::new();
     };
-    let uri = gtk4::gio::File::for_path(path).uri();
+    let uri = gio::File::for_path(path).uri();
     format!(
         "window.rutile-window.background {{ background-image: url(\"{uri}\"); {} }}\n",
         prefs.background_image_mode.css()

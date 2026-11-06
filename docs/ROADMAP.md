@@ -153,10 +153,10 @@ rétro-compatible) :
   (never/focused/unfocused/always). Réglages regroupés dans
   `TerminalOptions` (`#[serde(flatten)]` dans `Profile`), défauts = ceux de
   Tilix (ex. 8192 lignes de scrollback au lieu des 512 de vte)
-- [ ] **Taille initiale** (cols/rows + reset) : seulement utile pour la
-  taille de la fenêtre à l'ouverture, interfère avec la taille restaurée
-  par la persistance de session — à traiter avec la CLI (`--geometry`,
-  Phase 3)
+- [x] **Taille initiale** (cols/rows) : couverte par `--geometry
+  COLONNESxLIGNES` (Phase 3) plutôt que par un réglage de profil — elle ne
+  sert qu'à la taille de la fenêtre à l'ouverture et interférerait avec la
+  taille restaurée par la persistance de session
 - [x] **Curseur & sélection** : forme du curseur (block/ibeam/underline),
   mode de blink (system/on/off), `word_chars` (charset de sélection par
   mot)
@@ -248,12 +248,21 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
 > `clap` (derive) dans un `src/cli.rs`. Vérifier comment
 > `gio::Application::run()` consomme déjà `argv` avant d'ajouter clap.
 
-- [ ] Options : `-w/--working-directory`, `-p/--profile`, `-t/--title`,
-  `-s/--session <path>` (réutilise `persist::load_from_file`),
-  `-e/--command`, `--maximize`/`--minimize`, `--geometry` (best-effort
-  Wayland), `--new-window`/`--new-tab`, `--preferences`, `--full-screen`
-- [ ] Mode d'activation : New Window / New Session / Split Right / Split Down
-  / Focus Window (parité Tilix `new-instance`)
+- [x] Options (`src/cli.rs`, clap derive, testé sans GTK) :
+  `-w/--working-directory`, `-p/--profile` (id ou nom), `-t/--title`,
+  `-s/--session <path>`, `-e/--command`, `-x/--execute` (reste de la
+  ligne), `--maximize`/`--minimize`/`--full-screen`, `--geometry
+  COLSxROWS` (position `+X+Y` acceptée mais ignorée, Wayland ne laisse pas
+  placer une fenêtre), `--new-window`/`--new-tab`, `--preferences`,
+  `--new-process`. L'application passe en `HANDLES_COMMAND_LINE` : un
+  second `rutile …` remet ses arguments **et son répertoire courant** à
+  l'instance en cours, les erreurs (profil inconnu, dossier ou fichier de
+  session introuvable) s'affichent dans le terminal de l'appelant
+- [x] Mode d'activation : New Window / New Session / Split Right / Split Down
+  / Focus Window (parité Tilix `new-instance`) — réglage « On new
+  instance » (General), surchargé par `-a/--action`. Au passage : seule la
+  *première* fenêtre restaure la dernière session (une seconde fenêtre en
+  ouvrait une copie)
 
 ### Phase 4 — Signets & DnD sidebar (M4, M3)
 

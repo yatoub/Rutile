@@ -7,11 +7,12 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use vte4::TerminalExt;
 
+use crate::cli::{LaunchRequest, WindowState};
 use crate::context_menu;
 use crate::dialogs::confirm_close;
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
-use crate::preferences::{self, Preferences, SidebarPosition, WindowStyle};
+use crate::preferences::{self, NewInstanceMode, Preferences, SidebarPosition, WindowStyle};
 use crate::profile::{ColorSchemeStore, ProfileId, ProfileResolver, ProfileStore, TerminalConfig};
 use crate::session::persist::{self, SavedWindow};
 use crate::session::{SessionSidebar, SessionView};
@@ -84,7 +85,237 @@ pub fn apply_window_preferences_to_all(prefs: &Preferences) {
     }
 }
 
-pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
+/// A window's first session(s): the session file given with `-s`, else —
+/// for the first window of a plain launch only — the session saved on the
+/// last clean shutdown, else a single session shaped by the command line
+/// (`-p`, `-e`, `-w`, `-t`; just the default profile for a plain launch).
+fn open_initial_sessions(
+    session_view: &Rc<RefCell<SessionView>>,
+    resolver: &ProfileResolver,
+    prefs: &Rc<RefCell<Preferences>>,
+    launch: &LaunchRequest,
+    first_window: bool,
+) {
+    let saved = match &launch.session_file {
+        Some(path) => SavedWindow::load_from_file(path),
+        None if first_window && !launch.shapes_session() => {
+            SavedWindow::load_from_file(&persist::last_session_path())
+        }
+        None => None,
+    };
+    if let Some(saved) = saved {
+        let mut view = session_view.borrow_mut();
+        view.replace_all_with(&saved.sessions, |id| resolver.resolve(id));
+        view.set_broadcast_group(saved.broadcast_group);
+        let session_ids = view.session_ids();
+        if let Some(&session_id) = session_ids.get(saved.active_session_index) {
+            view.select_session(session_id);
+        }
+    }
+    // Also when the saved window had no session at all — a clean shutdown
+    // after closing every session saves an empty list — rather than
+    // opening onto an empty window.
+    if session_view.borrow().session_ids().is_empty() {
+        let default_profile = prefs.borrow().default_profile_id.clone();
+        let (profile_id, config) = launch_config(resolver, launch, &default_profile);
+        let cwd = launch_cwd(launch, &config);
+        let session_id =
+            session_view
+                .borrow_mut()
+                .new_session_with(profile_id, config, cwd.as_deref());
+        if let Some(title) = &launch.title {
+            session_view
+                .borrow_mut()
+                .rename_session(session_id, Some(title.clone()));
+        }
+    }
+}
+
+/// The profile (`-p`, by id or name — else `base_profile`) and config a
+/// launch asks for, with `-e`/`-x` replacing the profile's command.
+fn launch_config(
+    resolver: &ProfileResolver,
+    launch: &LaunchRequest,
+    base_profile: &ProfileId,
+) -> (ProfileId, TerminalConfig) {
+    let profile_id = launch
+        .profile
+        .as_deref()
+        .and_then(|wanted| resolver.find_profile_id(wanted))
+        .unwrap_or_else(|| base_profile.clone());
+    let mut config = resolver.resolve(&profile_id);
+    if let Some(command) = &launch.command {
+        config.profile.use_custom_command = true;
+        config.profile.custom_command = command.clone();
+    }
+    (profile_id, config)
+}
+
+/// Where a launched terminal starts: `-w`, else the profile's own working
+/// directory (`None` here, `TerminalWidget` applies it), else wherever
+/// `rutile` was launched from.
+fn launch_cwd(launch: &LaunchRequest, config: &TerminalConfig) -> Option<String> {
+    let dir = match &launch.working_directory {
+        Some(dir) => Some(dir),
+        None if config.profile.working_directory.is_some() => None,
+        None => launch.invocation_dir.as_ref(),
+    };
+    dir.map(|dir| dir.to_string_lossy().into_owned())
+}
+
+/// The per-window state `build_window` attaches to its window, so code
+/// that only has the window (a launch handed to the running instance, a
+/// detached session) can reach it.
+struct WindowHandles {
+    session_view: Rc<RefCell<SessionView>>,
+    prefs: Rc<RefCell<Preferences>>,
+    profiles: Rc<RefCell<ProfileStore>>,
+    schemes: Rc<ColorSchemeStore>,
+}
+
+impl WindowHandles {
+    fn of(window: &adw::ApplicationWindow) -> Option<Self> {
+        // SAFETY: these keys are only ever set by `build_window`, with
+        // exactly these types, and live as long as the window.
+        unsafe {
+            Some(Self {
+                session_view: window
+                    .data::<Rc<RefCell<SessionView>>>("session-view")?
+                    .as_ref()
+                    .clone(),
+                prefs: window
+                    .data::<Rc<RefCell<Preferences>>>("preferences")?
+                    .as_ref()
+                    .clone(),
+                profiles: window
+                    .data::<Rc<RefCell<ProfileStore>>>("profiles")?
+                    .as_ref()
+                    .clone(),
+                schemes: window
+                    .data::<Rc<ColorSchemeStore>>("schemes")?
+                    .as_ref()
+                    .clone(),
+            })
+        }
+    }
+
+    fn resolver(&self) -> ProfileResolver {
+        ProfileResolver::new(self.profiles.clone(), self.schemes.clone())
+    }
+}
+
+/// A launch handed over to an already open window (`--action
+/// new-session`/`split-right`/`split-down`, or the "On new instance"
+/// preference): opens the session or split it asks for there.
+pub fn launch_into(window: &adw::ApplicationWindow, launch: &LaunchRequest, mode: NewInstanceMode) {
+    let Some(handles) = WindowHandles::of(window) else {
+        return;
+    };
+    let Some(app) = window.application().and_downcast::<adw::Application>() else {
+        return;
+    };
+    let resolver = handles.resolver();
+    match mode {
+        NewInstanceMode::NewSession => {
+            let default_profile = handles.prefs.borrow().default_profile_id.clone();
+            let (profile_id, config) = launch_config(&resolver, launch, &default_profile);
+            let cwd = launch_cwd(launch, &config);
+            let session_id = handles.session_view.borrow_mut().new_session_with(
+                profile_id,
+                config,
+                cwd.as_deref(),
+            );
+            if let Some(title) = &launch.title {
+                handles
+                    .session_view
+                    .borrow_mut()
+                    .rename_session(session_id, Some(title.clone()));
+            }
+            wire_pane_context_menu(
+                &handles.session_view,
+                &handles.prefs,
+                &handles.profiles,
+                &app,
+                session_id,
+            );
+        }
+        NewInstanceMode::SplitRight | NewInstanceMode::SplitDown => {
+            let orientation = if mode == NewInstanceMode::SplitRight {
+                Orientation::Horizontal
+            } else {
+                Orientation::Vertical
+            };
+            let current = handles.session_view.borrow().current_session_id();
+            let session_profile = current
+                .and_then(|id| handles.session_view.borrow().profile_id_for(id))
+                .unwrap_or_else(|| handles.prefs.borrow().default_profile_id.clone());
+            let (_, config) = launch_config(&resolver, launch, &session_profile);
+            let cwd = launch_cwd(launch, &config);
+            let split = handles.session_view.borrow_mut().split_focused_with(
+                orientation,
+                Some(&config),
+                cwd.as_deref(),
+            );
+            if let Some((session_id, new_id)) = split {
+                wire_pane_context_menu_for(
+                    &handles.session_view,
+                    &handles.prefs,
+                    &handles.profiles,
+                    &app,
+                    session_id,
+                    new_id,
+                );
+            }
+        }
+        NewInstanceMode::NewWindow | NewInstanceMode::FocusWindow => {}
+    }
+}
+
+/// `--maximize`/`--minimize`/`--full-screen` and `--geometry`, once the
+/// window is shown.
+pub fn apply_launch_window_state(window: &adw::ApplicationWindow, launch: &LaunchRequest) {
+    match launch.window_state {
+        Some(WindowState::Maximized) => window.maximize(),
+        Some(WindowState::Minimized) => window.minimize(),
+        Some(WindowState::FullScreen) => window.fullscreen(),
+        None => {}
+    }
+    let Some(geometry) = launch.geometry else {
+        return;
+    };
+    // Cell size and the chrome around the terminal are only known once
+    // the window is laid out.
+    let window = window.downgrade();
+    glib::idle_add_local_once(move || {
+        let Some(window) = window.upgrade() else {
+            return;
+        };
+        let Some(handles) = WindowHandles::of(&window) else {
+            return;
+        };
+        let Some(terminal) = handles.session_view.borrow().focused_terminal() else {
+            return;
+        };
+        let chrome_width = window.width() - terminal.width();
+        let chrome_height = window.height() - terminal.height();
+        let width = chrome_width + terminal.char_width() as i32 * geometry.columns as i32;
+        let height = chrome_height + terminal.char_height() as i32 * geometry.rows as i32;
+        window.set_default_size(width, height);
+    });
+}
+
+/// `launch`: what the command line asked for (`LaunchRequest::default()`
+/// for a plain launch) — it decides this window's first session, see
+/// `open_initial_sessions`.
+pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::ApplicationWindow {
+    // Before this window exists: only the very first window restores the
+    // last session, a second one (another launch, a detached session)
+    // shouldn't open a copy of it.
+    let first_window = !app
+        .windows()
+        .iter()
+        .any(|window| window.has_css_class("rutile-window"));
+
     let header_bar = adw::HeaderBar::new();
 
     let prefs = Rc::new(RefCell::new(Preferences::load()));
@@ -95,8 +326,9 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     // there's nothing that needs to invalidate this snapshot.
     let schemes = Rc::new(ColorSchemeStore::load());
 
+    let resolver = ProfileResolver::new(profiles.clone(), schemes.clone());
     let resolve_config = {
-        let resolver = ProfileResolver::new(profiles.clone(), schemes.clone());
+        let resolver = resolver.clone();
         move |profile_id: &ProfileId| -> TerminalConfig { resolver.resolve(profile_id) }
     };
 
@@ -113,29 +345,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     };
     let session_view = Rc::new(RefCell::new(SessionView::new(resolve_default)));
 
-    // Auto-restore: a session saved on the last clean shutdown (see the
-    // close-request handler below) takes over from the single blank
-    // session `SessionView::new` just created above. Doesn't yet honor a
-    // `-s`/`--session <path>` CLI override — that's Phase 5 (no CLI
-    // parsing exists at all yet).
-    if let Some(saved) = persist::SavedWindow::load_from_file(&persist::last_session_path()) {
-        let mut session_view_mut = session_view.borrow_mut();
-        session_view_mut.replace_all_with(&saved.sessions, &resolve_config);
-        session_view_mut.set_broadcast_group(saved.broadcast_group);
-        // A clean shutdown after closing every session (Ctrl+D on the last
-        // pane) saves an empty `sessions` list — `replace_all_with` above
-        // then closes the blank session `SessionView::new` created without
-        // replaying anything to take its place, leaving zero sessions.
-        // Fall back to a fresh blank session rather than reopening onto an
-        // empty window.
-        if session_view_mut.session_ids().is_empty() {
-            session_view_mut.new_session();
-        }
-        let session_ids = session_view_mut.session_ids();
-        if let Some(&session_id) = session_ids.get(saved.active_session_index) {
-            session_view_mut.select_session(session_id);
-        }
-    }
+    open_initial_sessions(&session_view, &resolver, &prefs, launch, first_window);
 
     // Tilix-style session switcher: a left sidebar of session rows instead
     // of a top tab strip. Hidden by default — revealed via the toolbar's
@@ -617,52 +827,29 @@ fn detach_session(window: &adw::ApplicationWindow, session_view: &Rc<RefCell<Ses
         return;
     };
 
-    let new_window = build_window(&app);
+    let new_window = build_window(&app, &LaunchRequest::default());
     new_window.present();
 
-    let new_session_view = unsafe {
-        new_window
-            .data::<Rc<RefCell<SessionView>>>("session-view")
-            .map(|p| p.as_ref().clone())
-    };
-    let new_profiles = unsafe {
-        new_window
-            .data::<Rc<RefCell<ProfileStore>>>("profiles")
-            .map(|p| p.as_ref().clone())
-    };
-    let new_schemes = unsafe {
-        new_window
-            .data::<Rc<ColorSchemeStore>>("schemes")
-            .map(|p| p.as_ref().clone())
-    };
-    let new_prefs = unsafe {
-        new_window
-            .data::<Rc<RefCell<Preferences>>>("preferences")
-            .map(|p| p.as_ref().clone())
-    };
+    if let Some(handles) = WindowHandles::of(&new_window) {
+        let config = handles.resolver().resolve(&saved.profile_id);
+        let stale_ids = handles.session_view.borrow().session_ids();
 
-    if let (Some(new_session_view), Some(new_profiles), Some(new_schemes), Some(new_prefs)) =
-        (new_session_view, new_profiles, new_schemes, new_prefs)
-    {
-        let config = ProfileResolver::new(new_profiles.clone(), new_schemes.clone())
-            .resolve(&saved.profile_id);
-        let stale_ids = new_session_view.borrow().session_ids();
-
-        let restored_id = new_session_view
+        let restored_id = handles
+            .session_view
             .borrow_mut()
             .restore_session(&saved, config);
-        for pane_id in new_session_view.borrow().pane_ids_for(restored_id) {
+        for pane_id in handles.session_view.borrow().pane_ids_for(restored_id) {
             wire_pane_context_menu_for(
-                &new_session_view,
-                &new_prefs,
-                &new_profiles,
+                &handles.session_view,
+                &handles.prefs,
+                &handles.profiles,
                 &app,
                 restored_id,
                 pane_id,
             );
         }
         for stale_id in stale_ids {
-            new_session_view.borrow_mut().close_session(stale_id);
+            handles.session_view.borrow_mut().close_session(stale_id);
         }
     }
 

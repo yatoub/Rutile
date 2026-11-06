@@ -2,4 +2,6 @@ pub mod config;
 pub mod profiles;
 pub mod window;
 
-pub use config::{BackgroundImageMode, Preferences, SidebarPosition, ThemeVariant, WindowStyle};
+pub use config::{
+    BackgroundImageMode, NewInstanceMode, Preferences, SidebarPosition, ThemeVariant, WindowStyle,
+};

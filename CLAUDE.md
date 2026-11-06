@@ -32,6 +32,7 @@ Voir `GUIDELINE.md` pour la vision complète et la roadmap priorisée
 ```
 src/
 ├── main.rs / lib.rs      # binaire mince ; toute la logique vit dans la lib
+├── cli.rs                # options clap → LaunchRequest (SANS GTK, testé)
 ├── app.rs                # activation GTK, chargement du thème CSS
 ├── window.rs             # fenêtre, barre d'outils globale, raccourcis clavier
 ├── keymap.rs             # table de raccourcis (parité Tilix), Action enum
@@ -219,6 +220,31 @@ navigation par sidebar de catégories gratuitement (une `AdwPreferencesPage`
   utilise `window.downgrade()`/`WeakRef` pour construire la fenêtre de
   préférences à la demande, pas une fenêtre pré-construite gardée en vie.
 
+## Ligne de commande (instance unique)
+
+- `main.rs` lance l'application en `HANDLES_COMMAND_LINE` (+ `NON_UNIQUE`
+  si `--new-process`, repéré dans `argv` *avant* `run()`). Chaque
+  invocation — la première comme celles remises par un second `rutile` à
+  l'instance en cours via D-Bus — passe par `app::command_line` : clap
+  parse `cmdline.arguments()`, les chemins relatifs sont résolus contre
+  `cmdline.cwd()` (le répertoire de **l'appelant**, pas de l'instance), et
+  les messages vont au terminal de l'appelant (`print_literal`/
+  `printerr_literal`, d'où la feature `gio` `v2_80` — GLib 2.80 =
+  Ubuntu 24.04, plancher respecté).
+- `app::launch` : aucune fenêtre → `window::build_window(app, &request)`,
+  qui choisit la première session (fichier `-s`, sinon restauration de la
+  dernière session **seulement pour la première fenêtre d'un lancement
+  sans argument de session**, sinon une session `-p`/`-e`/`-w`/`-t`) ;
+  sinon `--action` ou le réglage « On new instance » →
+  `window::launch_into` (nouvelle session / split dans la fenêtre active)
+  ou focus. `SessionView::new` ne crée plus de session lui-même.
+- **Tester un lancement réel sans toucher une instance ouverte** : même id
+  d'application, donc un `rutile` lancé depuis un test serait remis à
+  l'instance de l'utilisateur. Toujours lancer sous `dbus-run-session --
+  …` (bus privé) avec `XDG_CONFIG_HOME`/`XDG_STATE_HOME` temporaires, et
+  observer l'effet par les processus fils (`/proc/<pid>/cwd`, cmdline des
+  shells/commandes lancés).
+
 ## Fermeture de pane
 
 - Ctrl+D n'est PAS intercepté directement (casserait `cat`, un REPL, etc.).
@@ -285,7 +311,17 @@ pour l'instant — à ajouter plus tard si besoin) :
   d'Aqua (`mirror.gcr.io`, `public.ecr.aws`), `ghcr.io` en dernier recours.
 - Avant de pousser, toujours vérifier localement :
   `cargo fmt --all -- --check && cargo clippy --all-targets --all-features
-  -- -D warnings && cargo test`. `cargo fmt` a dû reformater 8 fichiers
+  -- -D warnings && cargo test`. **Lancer aussi `cargo +stable clippy …`** :
+  la toolchain par défaut de la machine de dev est épinglée (1.94.0) alors
+  que le job `lint` de la CI prend la dernière stable, dont clippy a plus
+  de lints — vécu sur la #87 (`needless_borrows_for_generic_args` sur
+  `.map(&closure)`, absent en 1.94, bloquant en 1.99). Ne pas changer le
+  `rustup default` de l'utilisateur, juste `+stable` (`rustup update
+  stable` au besoin). Semgrep se rejoue à l'identique de MegaLinter avec
+  `docker run --rm -v "$PWD:/src:ro" -w /src semgrep/semgrep semgrep
+  --error --metrics=off --exclude-rule
+  rust.lang.security.unsafe-usage.unsafe-usage --config p/rust --config
+  p/github-actions --config p/secrets --exclude .git --exclude target .`. `cargo fmt` a dû reformater 8 fichiers
   lors de la mise en place de la CI (jamais lancé jusque-là) ; clippy a
   relevé 4 lints réels (`let_and_return`, `collapsible_if` → let-chains
   Rust 2024, `new_without_default` sur `TerminalWidget`, closure

@@ -61,6 +61,18 @@ impl ProfileResolver {
         Some(self.config_for(profile, profile_id))
     }
 
+    /// The id of the profile `wanted` names — its id, or else its name,
+    /// ignoring case (`rutile -p Work`).
+    pub fn find_profile_id(&self, wanted: &str) -> Option<ProfileId> {
+        let profiles = self.profiles.borrow();
+        let found = profiles.get(wanted).or_else(|| {
+            profiles
+                .iter()
+                .find(|p| p.name.eq_ignore_ascii_case(wanted))
+        });
+        found.map(|p| p.id.clone())
+    }
+
     /// The profile whose automatic switch rules match `state`, if any.
     /// Same `try_borrow` caveat as `try_resolve`.
     pub fn resolve_automatic(&self, state: &TerminalState) -> Option<TerminalConfig> {
