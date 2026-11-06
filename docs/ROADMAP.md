@@ -280,9 +280,13 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
   les panes synchronisés la reçoivent aussi, sans code dédié. Les types
   PATH/REMOTE (ssh/telnet/ftp/sftp) et le DnD de réorganisation des signets
   restent en Phase 6
-- [ ] **Sidebar DnD** : `gtk4::DragSource`/`DropTarget` par ligne (garder
-  `ListBox` et `tab_view.reorder_page()` synchronisés), drag hors fenêtre →
-  détacher une session (réutilise le snapshot/détach de la persistance)
+- [x] **Sidebar DnD** : `gtk4::DragSource`/`DropTarget` par ligne,
+  `SessionView::move_session` → `tab_view.reorder_page()`, la liste se
+  reconstruit depuis l'ordre des pages (donc aussi l'ordre sauvegardé).
+  Lâché hors fenêtre (`DragCancelReason::NoTarget`) → détacher la session
+  (réutilise `detach_session`). Un `DropTarget` « fourre-tout » sur le
+  contenu de la fenêtre accepte les lâchers sur ses terminaux/sa barre,
+  sinon eux aussi compteraient comme « hors fenêtre »
 
 ### Phase 5 — Collage avancé complet + triggers + insert number (M7, M8, M9)
 
