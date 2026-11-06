@@ -9,7 +9,7 @@ use vte4::TerminalExt;
 
 use crate::cli::{LaunchRequest, WindowState};
 use crate::context_menu;
-use crate::dialogs::confirm_close;
+use crate::dialogs::{bookmark_editor, bookmark_picker, confirm_close};
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, NewInstanceMode, Preferences, SidebarPosition, WindowStyle};
@@ -304,6 +304,17 @@ pub fn apply_launch_window_state(window: &adw::ApplicationWindow, launch: &Launc
     });
 }
 
+/// Takes any session row dropped on the window's own area (the
+/// terminals, the header bar…) and does nothing with it. Without it such a
+/// drop would find no target and count as "dropped outside the window",
+/// which detaches the session (`session::sidebar`'s drag and drop) — only
+/// a drop really outside the window should.
+fn accept_session_drops(content: &gtk4::Box) {
+    let target = gtk4::DropTarget::new(SessionId::static_type(), gtk4::gdk::DragAction::MOVE);
+    target.connect_drop(|_, _, _, _| true);
+    content.add_controller(target);
+}
+
 /// `launch`: what the command line asked for (`LaunchRequest::default()`
 /// for a plain launch) — it decides this window's first session, see
 /// `open_initial_sessions`.
@@ -386,6 +397,19 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
     // widget paints its own opaque background instead.
     window.add_css_class("rutile-window");
     apply_window_preferences(&window, &prefs.borrow());
+    accept_session_drops(&content);
+    {
+        let window = window.downgrade();
+        let session_view = session_view.clone();
+        sidebar.set_detach_handler(move |session_id| {
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            // `detach_session` takes the current session.
+            session_view.borrow_mut().select_session(session_id);
+            detach_session(&window, &session_view);
+        });
+    }
 
     // Wire the context menu (right-click: split + broadcast group) for
     // every pane of every session that exists so far — just the one blank
@@ -636,6 +660,17 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
                     }
                 }
                 Action::ToggleMargin => session_view.borrow().toggle_margin_focused(),
+                Action::SelectBookmark => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        let include_return = prefs.borrow().bookmark_include_return;
+                        bookmark_picker::pick_and_insert(&terminal, include_return);
+                    }
+                }
+                Action::AddBookmark => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        bookmark_editor::add_from_terminal(&terminal);
+                    }
+                }
                 Action::OpenPreferences => {
                     if let Some(window) = window_weak.upgrade() {
                         let _ = WidgetExt::activate_action(&window, "win.preferences", None);

@@ -33,6 +33,7 @@ Voir `GUIDELINE.md` pour la vision complète et la roadmap priorisée
 src/
 ├── main.rs / lib.rs      # binaire mince ; toute la logique vit dans la lib
 ├── cli.rs                # options clap → LaunchRequest (SANS GTK, testé)
+├── bookmarks/mod.rs      # signets (commandes, dossiers imbriqués), SANS GTK, testé
 ├── app.rs                # activation GTK, chargement du thème CSS
 ├── window.rs             # fenêtre, barre d'outils globale, raccourcis clavier
 ├── keymap.rs             # table de raccourcis (parité Tilix), Action enum

@@ -6,6 +6,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use vte4::TerminalExt;
 
+use crate::dialogs::{bookmark_editor, bookmark_picker};
 use crate::layout::{Orientation, PaneId};
 use crate::pane_header;
 use crate::preferences::Preferences;
@@ -278,6 +279,25 @@ fn show_menu(
         let session_view = session_view.clone();
         add_action(&menu_box, &popover, &label, move || {
             session_view.borrow_mut().set_broadcast_group(group);
+        });
+    }
+
+    menu_box.append(&gtk4::Separator::new(gtk4::Orientation::Horizontal));
+
+    {
+        let terminal = terminal.clone();
+        let prefs = prefs.clone();
+        add_action(&menu_box, &popover, "Signets…", move || {
+            let include_return = prefs.borrow().bookmark_include_return;
+            bookmark_picker::pick_and_insert(&terminal, include_return);
+        });
+    }
+    {
+        // The selection survives the right-click, so the new bookmark can
+        // start from the command line just selected.
+        let terminal = terminal.clone();
+        add_action(&menu_box, &popover, "Ajouter un signet…", move || {
+            bookmark_editor::add_from_terminal(&terminal);
         });
     }
 

@@ -154,6 +154,19 @@ impl SessionView {
     }
 
     /// Selects a session by id (e.g. from a sidebar row click).
+    /// Moves a session to `position` in the session order (the sidebar's
+    /// drag and drop). The order is `AdwTabView`'s, which the sidebar
+    /// rebuilds from and `session::persist` saves.
+    pub fn move_session(&mut self, session_id: SessionId, position: u32) {
+        let Some(page) = self.pages.get(&session_id) else {
+            return;
+        };
+        let last = self.tab_view.n_pages().saturating_sub(1);
+        self.tab_view
+            .reorder_page(page, position.min(last as u32) as i32);
+        self.notify_session_listeners();
+    }
+
     pub fn select_session(&mut self, session_id: SessionId) {
         if let Some(page) = self.pages.get(&session_id) {
             self.tab_view.set_selected_page(page);

@@ -1,3 +1,4 @@
+pub mod bookmarks;
 pub mod config;
 pub mod profiles;
 pub mod window;

@@ -13,6 +13,10 @@ use crate::terminal::broadcast::SessionId;
 /// Selecting a row switches `AdwTabView`'s selected page; selecting a page
 /// another way (keyboard, closing a session) is reflected back onto the
 /// row list via `AdwTabView`'s own `selected-page` notification.
+/// What dropping a row outside the window does with its session, shared
+/// with every row's drag source — empty until `set_detach_handler`.
+type DetachHandler = Rc<RefCell<Option<Rc<dyn Fn(SessionId)>>>>;
+
 pub struct SessionSidebar {
     root: gtk4::ScrolledWindow,
     list_box: gtk4::ListBox,
@@ -25,6 +29,10 @@ pub struct SessionSidebar {
     /// `prompt_on_close_with_process` before closing a session with a
     /// running process (`dialogs::confirm_close`).
     prefs: Rc<RefCell<Preferences>>,
+    /// What dropping a dragged row outside the window does — set by
+    /// `window::build_window` (detach the session into a new window), since
+    /// that needs the window this sidebar is built before.
+    on_detach: DetachHandler,
 }
 
 impl SessionSidebar {
@@ -67,6 +75,7 @@ impl SessionSidebar {
             list_box,
             syncing,
             prefs,
+            on_detach: Rc::default(),
         });
 
         // Follow AdwTabView's own selection changes (keyboard session
@@ -115,6 +124,7 @@ impl SessionSidebar {
 
         for session_id in ids {
             let (row, label) = build_row(session_view, &self.prefs, session_id);
+            connect_drag_and_drop(&row, session_view, session_id, &self.on_detach);
             unsafe {
                 row.set_data("session-id", session_id);
                 row.set_data("title-label", label);
@@ -127,6 +137,11 @@ impl SessionSidebar {
                 self.syncing.set(false);
             }
         }
+    }
+
+    /// Sets what dropping a row outside the window does with its session.
+    pub fn set_detach_handler(&self, handler: impl Fn(SessionId) + 'static) {
+        self.on_detach.replace(Some(Rc::new(handler)));
     }
 
     /// Enters edit mode on the current session's row label
@@ -176,6 +191,66 @@ impl SessionSidebar {
             index += 1;
         }
     }
+}
+
+/// Rows can be dragged: dropped on another row, the session moves to that
+/// row's place (`SessionView::move_session`, which `AdwTabView` and so the
+/// rebuilt list follow); dropped outside the window — no drop target took
+/// it, see `window::accept_session_drops` for the window's own area — the
+/// session is detached into a new window, like Tilix.
+fn connect_drag_and_drop(
+    row: &gtk4::ListBoxRow,
+    session_view: &Rc<RefCell<SessionView>>,
+    session_id: SessionId,
+    on_detach: &DetachHandler,
+) {
+    let source = gtk4::DragSource::builder()
+        .actions(gtk4::gdk::DragAction::MOVE)
+        .content(&gtk4::gdk::ContentProvider::for_value(
+            &session_id.to_value(),
+        ))
+        .build();
+    {
+        let row = row.downgrade();
+        source.connect_drag_begin(move |source, _| {
+            if let Some(row) = row.upgrade() {
+                source.set_icon(Some(&gtk4::WidgetPaintable::new(Some(&row))), 0, 0);
+            }
+        });
+    }
+    {
+        let on_detach = on_detach.clone();
+        source.connect_drag_cancel(move |_, _, reason| {
+            if reason == gtk4::gdk::DragCancelReason::NoTarget {
+                let handler = on_detach.borrow().clone();
+                if let Some(handler) = handler {
+                    // After the drag has fully ended: detaching rebuilds
+                    // this very list.
+                    gtk4::glib::idle_add_local_once(move || handler(session_id));
+                }
+            }
+            false
+        });
+    }
+    row.add_controller(source);
+
+    let target = gtk4::DropTarget::new(SessionId::static_type(), gtk4::gdk::DragAction::MOVE);
+    {
+        let session_view = session_view.clone();
+        let row = row.downgrade();
+        target.connect_drop(move |_, value, _, _| {
+            let (Ok(dragged), Some(row)) = (value.get::<SessionId>(), row.upgrade()) else {
+                return false;
+            };
+            if dragged != session_id {
+                session_view
+                    .borrow_mut()
+                    .move_session(dragged, row.index().max(0) as u32);
+            }
+            true
+        });
+    }
+    row.add_controller(target);
 }
 
 /// Thumbnail height in pixels; width follows the sidebar's own width.

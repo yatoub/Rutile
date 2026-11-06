@@ -266,16 +266,27 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
 
 ### Phase 4 — Signets & DnD sidebar (M4, M3)
 
-- [ ] **Signets** (commandes uniquement, pas de mots de passe) :
-  `bookmarks/model.rs` (`Bookmark{name, command, folder: Vec<String>}`,
-  TOML dans `$XDG_CONFIG_HOME/rutile/bookmarks.toml`), page Préférences
-  "Signets" réelle, `dialogs/bookmark_picker.rs` (popover, insère via
-  `feed_child()` comme le broadcast). Les types PATH/REMOTE (ssh/telnet/ftp/
-  sftp) et le DnD de réorganisation des signets sont secondaires (voir
-  Phase 6)
-- [ ] **Sidebar DnD** : `gtk4::DragSource`/`DropTarget` par ligne (garder
-  `ListBox` et `tab_view.reorder_page()` synchronisés), drag hors fenêtre →
-  détacher une session (réutilise le snapshot/détach de la persistance)
+- [x] **Signets** (commandes uniquement, pas de mots de passe) :
+  `src/bookmarks/` (`Bookmark{name, command, folder: Vec<String>}`, dossiers
+  imbriqués, TOML dans `$XDG_CONFIG_HOME/rutile/bookmarks.toml`, logique
+  testée sans GTK), page Préférences « Bookmarks » réelle (groupes par
+  dossier, ajout/édition/suppression, « Press Enter after inserting »
+  activé par défaut comme Tilix), `dialogs/bookmark_picker.rs` (dialogue
+  avec recherche multi-mots) et `dialogs/bookmark_editor.rs`. Ctrl+Shift+B
+  (Tilix) pour insérer, Ctrl+Alt+Shift+B pour ajouter (non lié chez Tilix,
+  mais une action sans raccourci n'apparaît pas dans la page Raccourcis) ;
+  les deux aussi dans le menu contextuel, « Ajouter » pré-rempli avec la
+  sélection. L'insertion passe par `feed_child()` → le signal `commit` →
+  les panes synchronisés la reçoivent aussi, sans code dédié. Les types
+  PATH/REMOTE (ssh/telnet/ftp/sftp) et le DnD de réorganisation des signets
+  restent en Phase 6
+- [x] **Sidebar DnD** : `gtk4::DragSource`/`DropTarget` par ligne,
+  `SessionView::move_session` → `tab_view.reorder_page()`, la liste se
+  reconstruit depuis l'ordre des pages (donc aussi l'ordre sauvegardé).
+  Lâché hors fenêtre (`DragCancelReason::NoTarget`) → détacher la session
+  (réutilise `detach_session`). Un `DropTarget` « fourre-tout » sur le
+  contenu de la fenêtre accepte les lâchers sur ses terminaux/sa barre,
+  sinon eux aussi compteraient comme « hors fenêtre »
 
 ### Phase 5 — Collage avancé complet + triggers + insert number (M7, M8, M9)
 
