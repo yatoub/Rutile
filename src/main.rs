@@ -9,6 +9,10 @@ fn main() -> gtk4::glib::ExitCode {
     // the running one and exits — unless `--new-process` asks for a
     // separate process.
     let mut flags = gtk4::gio::ApplicationFlags::HANDLES_COMMAND_LINE;
+    // Semgrep's args-os rule warns against trusting argv[0], which the
+    // caller controls: `wants_new_process` skips it and only looks for a
+    // literal `--new-process` flag, so there's nothing to trust here.
+    // nosemgrep: rust.lang.security.args-os.args-os
     if cli::wants_new_process(std::env::args_os()) {
         flags |= gtk4::gio::ApplicationFlags::NON_UNIQUE;
     }

@@ -227,10 +227,10 @@ impl Cli {
         }
         LaunchRequest {
             invocation_dir: cwd.map(Path::to_path_buf),
-            working_directory: self.working_directory.map(&absolute),
+            working_directory: self.working_directory.map(absolute),
             profile: self.profile,
             title: self.title,
-            session_file: self.session.map(&absolute),
+            session_file: self.session.map(absolute),
             command,
             action,
             window_state,

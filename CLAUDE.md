@@ -311,7 +311,17 @@ pour l'instant — à ajouter plus tard si besoin) :
   d'Aqua (`mirror.gcr.io`, `public.ecr.aws`), `ghcr.io` en dernier recours.
 - Avant de pousser, toujours vérifier localement :
   `cargo fmt --all -- --check && cargo clippy --all-targets --all-features
-  -- -D warnings && cargo test`. `cargo fmt` a dû reformater 8 fichiers
+  -- -D warnings && cargo test`. **Lancer aussi `cargo +stable clippy …`** :
+  la toolchain par défaut de la machine de dev est épinglée (1.94.0) alors
+  que le job `lint` de la CI prend la dernière stable, dont clippy a plus
+  de lints — vécu sur la #87 (`needless_borrows_for_generic_args` sur
+  `.map(&closure)`, absent en 1.94, bloquant en 1.99). Ne pas changer le
+  `rustup default` de l'utilisateur, juste `+stable` (`rustup update
+  stable` au besoin). Semgrep se rejoue à l'identique de MegaLinter avec
+  `docker run --rm -v "$PWD:/src:ro" -w /src semgrep/semgrep semgrep
+  --error --metrics=off --exclude-rule
+  rust.lang.security.unsafe-usage.unsafe-usage --config p/rust --config
+  p/github-actions --config p/secrets --exclude .git --exclude target .`. `cargo fmt` a dû reformater 8 fichiers
   lors de la mise en place de la CI (jamais lancé jusque-là) ; clippy a
   relevé 4 lints réels (`let_and_return`, `collapsible_if` → let-chains
   Rust 2024, `new_without_default` sur `TerminalWidget`, closure
