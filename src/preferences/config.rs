@@ -58,6 +58,10 @@ pub struct Preferences {
     /// Tilix's "On new instance". Overridden per launch by `--action`,
     /// `--new-window` and `--new-tab` (see `cli`).
     pub new_instance_mode: NewInstanceMode,
+    /// Press Enter after inserting a bookmark's command, so it runs right
+    /// away — Tilix's "Include return character with bookmark", on by
+    /// default like there.
+    pub bookmark_include_return: bool,
 }
 
 /// Tilix's "On new instance" choices, shared with the `--action` command
@@ -236,6 +240,7 @@ impl Default for Preferences {
             window_style: WindowStyle::default(),
             sidebar_position: SidebarPosition::default(),
             new_instance_mode: NewInstanceMode::default(),
+            bookmark_include_return: true,
         }
     }
 }

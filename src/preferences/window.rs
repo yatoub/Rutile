@@ -6,6 +6,7 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 
 use crate::keymap::{self, Keymap};
+use crate::preferences::bookmarks::BookmarksPage;
 use crate::preferences::config::{
     BackgroundImageMode, NewInstanceMode, Preferences, SidebarPosition, ThemeVariant, WindowStyle,
 };
@@ -31,21 +32,20 @@ pub fn build(
         .build();
 
     let prefs_for_appearance = prefs.clone();
+    let prefs_for_bookmarks = prefs.clone();
     window.add(&general_page(prefs.clone()));
     let profiles_page = ProfilesPage::new(&window, prefs, profiles, schemes.clone());
     window.add(profiles_page.page());
-    // `ProfilesPage`'s own callbacks only hold weak refs to it (it holds
-    // the widgets they're connected to, strong refs would be a cycle), so
-    // something else has to own it for as long as the window lives.
-    window.connect_destroy(move |_| {
-        let _ = &profiles_page;
-    });
     window.add(&appearance_page(prefs_for_appearance));
-    window.add(&placeholder_page(
-        "Bookmarks",
-        "user-bookmarks-symbolic",
-        "Planned (roadmap phase 4): command bookmarks organized in folders, inserted into the focused terminal.",
-    ));
+    let bookmarks_page = BookmarksPage::new(prefs_for_bookmarks);
+    window.add(bookmarks_page.page());
+    // `ProfilesPage`'s and `BookmarksPage`'s own callbacks only hold weak
+    // refs to them (they hold the widgets those are connected to, strong
+    // refs would be a cycle), so something else has to own them for as
+    // long as the window lives.
+    window.connect_destroy(move |_| {
+        let _ = (&profiles_page, &bookmarks_page);
+    });
     window.add(ShortcutsPage::new(keymap).page());
     window.add(&placeholder_page(
         "Encoding",

@@ -35,6 +35,10 @@ pub enum Action {
     /// Opens the Preferences window — also reachable without the header
     /// bar's menu, which `WindowStyle::HideToolbar`/`Borderless` hide.
     OpenPreferences,
+    /// Pick a bookmark and type its command into the focused terminal.
+    SelectBookmark,
+    /// Add a bookmark, starting from the focused terminal's selection.
+    AddBookmark,
 }
 
 const CTRL_SHIFT: gdk::ModifierType =
@@ -114,6 +118,10 @@ const DEFAULT_KEYBINDINGS: &[(gdk::Key, gdk::ModifierType, Action)] = &[
         gdk::ModifierType::CONTROL_MASK,
         Action::OpenPreferences,
     ),
+    (gdk::Key::B, CTRL_SHIFT, Action::SelectBookmark),
+    // Unbound by default in Tilix, but an action needs a chord to show up
+    // (and be rebindable) in the Shortcuts page.
+    (gdk::Key::B, CTRL_SHIFT_ALT, Action::AddBookmark),
 ];
 
 const RELEVANT_MODIFIERS: gdk::ModifierType = gdk::ModifierType::CONTROL_MASK
@@ -313,6 +321,8 @@ pub fn action_label(action: Action) -> String {
         Action::PasteAdvanced => "Paste (advanced)".to_string(),
         Action::ToggleMargin => "Toggle margin guide".to_string(),
         Action::OpenPreferences => "Open preferences".to_string(),
+        Action::SelectBookmark => "Insert a bookmark".to_string(),
+        Action::AddBookmark => "Add a bookmark".to_string(),
     }
 }
 

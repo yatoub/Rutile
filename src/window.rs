@@ -9,7 +9,7 @@ use vte4::TerminalExt;
 
 use crate::cli::{LaunchRequest, WindowState};
 use crate::context_menu;
-use crate::dialogs::confirm_close;
+use crate::dialogs::{bookmark_editor, bookmark_picker, confirm_close};
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, NewInstanceMode, Preferences, SidebarPosition, WindowStyle};
@@ -636,6 +636,17 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
                     }
                 }
                 Action::ToggleMargin => session_view.borrow().toggle_margin_focused(),
+                Action::SelectBookmark => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        let include_return = prefs.borrow().bookmark_include_return;
+                        bookmark_picker::pick_and_insert(&terminal, include_return);
+                    }
+                }
+                Action::AddBookmark => {
+                    if let Some(terminal) = session_view.borrow().focused_terminal() {
+                        bookmark_editor::add_from_terminal(&terminal);
+                    }
+                }
                 Action::OpenPreferences => {
                     if let Some(window) = window_weak.upgrade() {
                         let _ = WidgetExt::activate_action(&window, "win.preferences", None);

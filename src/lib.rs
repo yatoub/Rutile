@@ -1,4 +1,5 @@
 pub mod app;
+pub mod bookmarks;
 pub mod cli;
 pub mod context_menu;
 pub mod dialogs;
