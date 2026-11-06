@@ -7,7 +7,7 @@ use libadwaita::prelude::*;
 
 use crate::keymap::{self, Keymap};
 use crate::preferences::config::{
-    BackgroundImageMode, Preferences, SidebarPosition, ThemeVariant, WindowStyle,
+    BackgroundImageMode, NewInstanceMode, Preferences, SidebarPosition, ThemeVariant, WindowStyle,
 };
 use crate::preferences::profiles::ProfilesPage;
 use crate::profile::{ColorSchemeStore, ProfileStore};
@@ -157,6 +157,29 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
         });
     }
     behavior_group.add(&prompt_on_close_row);
+
+    let current = prefs.borrow().new_instance_mode;
+    let new_instance_row = adw::ComboRow::builder()
+        .title("On new instance")
+        .subtitle("When rutile is launched again while running (overridden by --action)")
+        .model(&gtk4::StringList::new(
+            &NewInstanceMode::ALL.map(NewInstanceMode::label),
+        ))
+        .build();
+    if let Some(index) = NewInstanceMode::ALL.iter().position(|m| *m == current) {
+        new_instance_row.set_selected(index as u32);
+    }
+    {
+        let prefs = prefs.clone();
+        new_instance_row.connect_selected_notify(move |row| {
+            if let Some(&mode) = NewInstanceMode::ALL.get(row.selected() as usize) {
+                let mut prefs = prefs.borrow_mut();
+                prefs.new_instance_mode = mode;
+                prefs.save();
+            }
+        });
+    }
+    behavior_group.add(&new_instance_row);
 
     page.add(&behavior_group);
     page

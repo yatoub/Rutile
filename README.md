@@ -47,6 +47,18 @@ The four pillars above are stable and usable daily; everything else (session sav
 
 Deep profiles (custom command, font, cursor, scrollback, badge, triggers), appearance options (theme variant/transparency/background image), non-UTF-8 encodings, a CLI, bookmarks, sidebar drag-and-drop, advanced paste warnings, and (deferred, on request) quake mode, Nautilus integration, libsecret passwords, and i18n.
 
+## Command line
+
+```sh
+rutile -w ~/projets -p dev -e nvim       # a session in ~/projets, "dev" profile, running nvim
+rutile -s work.rutile-session.toml       # open a saved session
+rutile --new-tab                         # while running: new session in the open window
+rutile -a split-down -x htop -d 10       # while running: split the focused pane, run the rest of the line
+rutile --geometry 120x40 --maximize      # window size in cells / state
+```
+
+A second `rutile` hands its arguments (and its working directory) over to the running instance, which opens a new window, a new session, a split or just focuses itself — `--action`, or the "On new instance" preference. `--new-process` starts a separate instance instead. See `rutile --help`.
+
 ## Keybindings
 
 Tilix-parity, all `Ctrl+Shift+<key>` (shortcuts are fully configurable via the Preferences → Shortcuts page, persisted as TOML — the defaults below):

@@ -54,6 +54,44 @@ pub struct Preferences {
     /// Which side of the window the session sidebar sits on — Tilix's
     /// "Place the sidebar on the right".
     pub sidebar_position: SidebarPosition,
+    /// What launching `rutile` again does while it's already running —
+    /// Tilix's "On new instance". Overridden per launch by `--action`,
+    /// `--new-window` and `--new-tab` (see `cli`).
+    pub new_instance_mode: NewInstanceMode,
+}
+
+/// Tilix's "On new instance" choices, shared with the `--action` command
+/// line option (hence the `clap::ValueEnum`, whose kebab-case value names
+/// match the TOML ones).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum NewInstanceMode {
+    #[default]
+    NewWindow,
+    NewSession,
+    SplitRight,
+    SplitDown,
+    FocusWindow,
+}
+
+impl NewInstanceMode {
+    pub const ALL: [NewInstanceMode; 5] = [
+        NewInstanceMode::NewWindow,
+        NewInstanceMode::NewSession,
+        NewInstanceMode::SplitRight,
+        NewInstanceMode::SplitDown,
+        NewInstanceMode::FocusWindow,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            NewInstanceMode::NewWindow => "Open a new window",
+            NewInstanceMode::NewSession => "Open a new session",
+            NewInstanceMode::SplitRight => "Split right",
+            NewInstanceMode::SplitDown => "Split down",
+            NewInstanceMode::FocusWindow => "Focus the window",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -197,6 +235,7 @@ impl Default for Preferences {
             background_image_mode: BackgroundImageMode::default(),
             window_style: WindowStyle::default(),
             sidebar_position: SidebarPosition::default(),
+            new_instance_mode: NewInstanceMode::default(),
         }
     }
 }

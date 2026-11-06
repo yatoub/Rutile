@@ -25,6 +25,8 @@ name = "rutile"
 path = "src/main.rs"
 
 [dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
+gio = { version = "0.22", features = ["v2_80"] }
 gtk4 = { version = "0.11.4", features = ["v4_14"] }
 # v1_5 (not v1_4): `adw::AlertDialog` (used by dialogs::confirm_close) was
 # added in libadwaita 1.5. Ubuntu 24.04's apt libadwaita-1-dev is 1.5.x

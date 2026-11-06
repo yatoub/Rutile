@@ -51,7 +51,9 @@ pub struct PaneView {
 }
 
 impl PaneView {
-    pub fn new(id: PaneId, config: TerminalConfig) -> Self {
+    /// `cwd`: the first terminal's starting directory, `None` for the
+    /// profile's or vte's default (see `TerminalWidget::new`).
+    pub fn new(id: PaneId, config: TerminalConfig, cwd: Option<&str>) -> Self {
         let mut this = Self {
             tree: Rc::new(RefCell::new(SplitTree::new_leaf(id))),
             widgets: HashMap::new(),
@@ -64,7 +66,7 @@ impl PaneView {
             root: gtk4::Box::new(gtk4::Orientation::Vertical, 0).upcast(),
             config,
         };
-        this.create_pane(id);
+        this.create_pane_with_cwd(id, cwd);
         this.root = this.wrappers[&id].clone().upcast();
         this
     }
@@ -102,12 +104,15 @@ impl PaneView {
         this
     }
 
-    fn create_pane(&mut self, id: PaneId) {
-        self.create_pane_with_cwd(id, None);
+    fn create_pane_with_cwd(&mut self, id: PaneId, cwd: Option<&str>) {
+        let config = self.config.clone();
+        self.create_pane_from(id, &config, cwd);
     }
 
-    fn create_pane_with_cwd(&mut self, id: PaneId, cwd: Option<&str>) {
-        let widget = TerminalWidget::new(&self.config, id, cwd);
+    /// Like `create_pane_with_cwd`, with a config other than the session's
+    /// own — a split asked for on the command line (`-p`/`-e`).
+    fn create_pane_from(&mut self, id: PaneId, config: &TerminalConfig, cwd: Option<&str>) {
+        let widget = TerminalWidget::new(config, id, cwd);
 
         let header = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         header.add_css_class("pane-header");
@@ -235,7 +240,23 @@ impl PaneView {
     }
 
     pub fn split(&mut self, orientation: Orientation, new_id: PaneId, split_id: SplitId) {
-        self.create_pane(new_id);
+        self.split_with(orientation, new_id, split_id, None, None);
+    }
+
+    /// `split`, with the new terminal's config (`None`: the session's) and
+    /// starting directory given explicitly.
+    pub fn split_with(
+        &mut self,
+        orientation: Orientation,
+        new_id: PaneId,
+        split_id: SplitId,
+        config: Option<&TerminalConfig>,
+        cwd: Option<&str>,
+    ) {
+        match config {
+            Some(config) => self.create_pane_from(new_id, config, cwd),
+            None => self.create_pane_with_cwd(new_id, cwd),
+        }
         self.tree
             .borrow_mut()
             .split(self.focused, orientation, new_id, split_id);
