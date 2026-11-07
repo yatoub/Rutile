@@ -605,7 +605,7 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
         let window_weak = window.downgrade();
         about_action.connect_activate(move |_, _| {
             if let Some(window) = window_weak.upgrade() {
-                about_dialog().present(Some(&window));
+                adw::prelude::AdwDialogExt::present(&about_dialog(), Some(&window));
             }
         });
     }
