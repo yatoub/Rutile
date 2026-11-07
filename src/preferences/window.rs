@@ -185,9 +185,8 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     page
 }
 
-/// The "Appearance" page: theme variant and background image. The rest of
-/// Tilix's Appearance settings land in their own changes (see the theme
-/// group's description).
+/// The "Appearance" page: theme variant, background image, window style
+/// and pane layout.
 fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     let page = adw::PreferencesPage::builder()
         .title("Appearance")
@@ -219,8 +218,39 @@ fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     page.add(&group);
 
     page.add(&background_image_group(prefs.clone()));
-    page.add(&window_group(prefs));
+    page.add(&window_group(prefs.clone()));
+    page.add(&panes_group(prefs));
     page
+}
+
+/// Splitter handles and lone-pane headers.
+fn panes_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder().title("Panes").build();
+
+    let wide_row = adw::SwitchRow::builder()
+        .title("Wide splitter handles")
+        .subtitle("Easier to grab with the mouse")
+        .active(prefs.borrow().wide_handles)
+        .build();
+    {
+        let prefs = prefs.clone();
+        wide_row.connect_active_notify(move |row| {
+            update_appearance(&prefs, |p| p.wide_handles = row.is_active());
+        });
+    }
+    group.add(&wide_row);
+
+    let title_row = adw::SwitchRow::builder()
+        .title("Show the title of a lone pane")
+        .subtitle("Otherwise a session with a single pane hides its title bar")
+        .active(prefs.borrow().show_title_when_single)
+        .build();
+    title_row.connect_active_notify(move |row| {
+        update_appearance(&prefs, |p| p.show_title_when_single = row.is_active());
+    });
+    group.add(&title_row);
+
+    group
 }
 
 /// Window style and sidebar position.

@@ -1,7 +1,7 @@
 # Roadmap
 
-> **État réel au 2026-11-03 : série v0.6** (version exacte : badge Release
-> du README / `CHANGELOG.md`, jamais en dur ici). Ce document a été réaligné sur le
+> **État réel au 2026-11-07 : série v0.9** (version exacte : badge Release
+> du README / `CHANGELOG.md` / fenêtre « À propos », jamais en dur ici). Ce document a été réaligné sur le
 > code livré — l'ancien décrivait encore un « MVP v0.1 » alors que le socle
 > et une grosse partie de la parité étaient déjà codés, livrés et utilisés
 > au quotidien. La numérotation a été **renumérotée** : ce qui est déjà
@@ -14,7 +14,7 @@
 > stables et utilisés au quotidien, et couvre tout ce qui manque pour la
 > **parité fonctionnelle** avec Tilix.
 
-## ✅ Déjà livré (v0.1 → v0.6)
+## ✅ Déjà livré (v0.1 → v0.9)
 
 Ci-dessous ce qui est codé et fonctionnel aujourd'hui — le socle sur
 lequel la suite se construit.
@@ -128,7 +128,10 @@ nouvelle feature.
 - [x] Reclasser les pages Préférences placeholder comme telles et lister
   leur contenu réel restant (Appearance/Encoding → Phase 2, Bookmarks →
   Phase 4, Advanced → Phase 5)
-- [ ] S'assurer que `CHANGELOG.md` et la page `About`/version suivent
+- [x] S'assurer que `CHANGELOG.md` et la page `About`/version suivent —
+  dialogue « À propos de Rutile » (menu hamburger, `adw::AboutDialog`) ; la
+  version vient de `CARGO_PKG_VERSION`, donc suit le bump de release-plz
+  sans rien toucher
 
 ### Phase 1 — Profondeur des profils (M1) — le plus gros levier de parité
 
@@ -195,8 +198,12 @@ rétro-compatible) :
   General / Command / Color / Scrolling (`src/preferences/profiles.rs`).
   Les onglets Compatibilité (encodage, Phase 2), Badge et Advanced
   (triggers, Phase 5) seront ajoutés avec leur contenu
-- [ ] Vérifier que `TerminalWidget::new(profile)` applique tous ces champs
-  au spawn et au rendu
+- [x] Vérifier que `TerminalWidget::new(profile)` applique tous ces champs
+  au spawn et au rendu — relu champ par champ (`Appearance::apply`,
+  `apply_options`, `apply_colors`, `Spawner`). Seul écart trouvé : le délai
+  de silence des notifications lisait le profil *de la session*, pas celui
+  du terminal (split `-p`, switch automatique) — corrigé via
+  `TerminalWidget::profile_id`
 
 ### Phase 2 — Appearance & encodage (M6, M5)
 
@@ -231,7 +238,10 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
     (`Preferences::sidebar_position`) — Rutile n'a pas de barre d'onglets,
     l'équivalent de la « position des onglets » de Tilix est le panneau
     latéral, d'où seulement gauche/droite
-  - [ ] Poignées larges, « show title even when single »
+  - [x] Poignées larges, « show title even when single » (groupe
+    « Panes ») — défauts de Tilix (poignées fines, titre affiché).
+    `LayoutStyle` copié dans `SessionView`/`PaneView`, appliqué à chaque
+    rebuild et en direct sans rebuild (`PaneView::set_layout`)
 - [x] **Encodage** par profil (onglet Compatibility de l'éditeur) + largeur
   CJK narrow/wide. Le crate `vte4` sûr n'enveloppe plus `set_encoding`
   (déprécié par vte), appelé via `vte4::ffi` (`terminal/encoding.rs`) ; la

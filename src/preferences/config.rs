@@ -62,6 +62,13 @@ pub struct Preferences {
     /// away — Tilix's "Include return character with bookmark", on by
     /// default like there.
     pub bookmark_include_return: bool,
+    /// Tilix's "Use a wide handle for splitters" — off by default like
+    /// there (GTK's thin separator).
+    pub wide_handles: bool,
+    /// Tilix's "Show the terminal title even if it's the only terminal" —
+    /// when off, a session with a single pane hides its pane header. On by
+    /// default like there.
+    pub show_title_when_single: bool,
 }
 
 /// Tilix's "On new instance" choices, shared with the `--action` command
@@ -241,6 +248,8 @@ impl Default for Preferences {
             sidebar_position: SidebarPosition::default(),
             new_instance_mode: NewInstanceMode::default(),
             bookmark_include_return: true,
+            wide_handles: false,
+            show_title_when_single: true,
         }
     }
 }
@@ -307,6 +316,8 @@ mod tests {
         assert_eq!(old.theme_variant, ThemeVariant::Dark);
         assert_eq!(old.window_style, WindowStyle::Normal);
         assert_eq!(old.sidebar_position, SidebarPosition::Left);
+        assert!(!old.wide_handles);
+        assert!(old.show_title_when_single);
     }
 
     #[test]
