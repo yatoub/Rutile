@@ -8,7 +8,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
-use crate::terminal::triggers::{self, Trigger, TriggerAction};
+use crate::terminal::triggers::{self, ParameterIssue, Trigger, TriggerAction};
 
 /// A group listing `initial` with add/edit/remove. `on_change` gets the
 /// whole list after every edit (saved and applied by the caller). An
@@ -123,6 +123,14 @@ impl Editor {
             .text(trigger.parameter.as_str())
             .sensitive(trigger.action != TriggerAction::PlayBell)
             .build();
+        // What an active action means, and what's wrong with its command.
+        let notice = adw::ActionRow::builder().activatable(false).build();
+        notice.add_prefix(&gtk4::Image::from_icon_name("dialog-warning-symbolic"));
+        // Error messages are plain text, not Pango markup.
+        notice.set_use_markup(false);
+        notice.set_title_lines(0);
+        notice.set_subtitle_lines(0);
+        update_notice(&notice, &parameter, trigger.action, &trigger.parameter);
 
         let remove = adw::ActionRow::builder()
             .title("Remove this trigger")
@@ -139,6 +147,7 @@ impl Editor {
         row.add_row(&pattern);
         row.add_row(&action);
         row.add_row(&parameter);
+        row.add_row(&notice);
         row.add_row(&remove);
 
         let weak = Rc::downgrade(self);
@@ -173,19 +182,26 @@ impl Editor {
         {
             let edit = edit.clone();
             let parameter = parameter.clone();
+            let notice = notice.clone();
             action.connect_selected_notify(move |combo| {
                 let Some(&chosen) = TriggerAction::ALL.get(combo.selected() as usize) else {
                     return;
                 };
                 parameter.set_title(&parameter_title(chosen));
                 parameter.set_sensitive(chosen != TriggerAction::PlayBell);
+                update_notice(&notice, &parameter, chosen, &parameter.text());
                 edit(&|t| t.action = chosen);
             });
         }
         {
             let edit = edit.clone();
+            let action = action.clone();
+            let notice = notice.clone();
             parameter.connect_changed(move |entry| {
                 let text = entry.text().to_string();
+                if let Some(&chosen) = TriggerAction::ALL.get(action.selected() as usize) {
+                    update_notice(&notice, entry, chosen, &text);
+                }
                 edit(&|t| t.parameter = text.clone());
             });
         }
@@ -244,6 +260,49 @@ fn flag_pattern(entry: &adw::EntryRow, pattern: &str) {
             entry.set_tooltip_text(None);
         }
     }
+}
+
+/// Shows, under the parameter of an active action, what it implies and
+/// anything wrong with its command; hidden for the display-only actions.
+fn update_notice(
+    notice: &adw::ActionRow,
+    parameter: &adw::EntryRow,
+    action: TriggerAction,
+    text: &str,
+) {
+    parameter.remove_css_class("error");
+    parameter.remove_css_class("warning");
+    notice.set_visible(action.is_active());
+    if !action.is_active() {
+        return;
+    }
+    notice.set_title(
+        "Acts on your system, on any program's output — remote ones and files \
+         being displayed included",
+    );
+    let safeguards = match action {
+        TriggerAction::SendText => {
+            "Captured text is typed without its control characters: only the \
+             parameter itself can contain \\n."
+        }
+        _ => {
+            "The command runs without a shell; each $n is one argument, without \
+             its control characters. $$ is a literal $."
+        }
+    };
+    let issue = triggers::parameter_issue(action, text);
+    let subtitle = match &issue {
+        Some(ParameterIssue::Error(error)) => {
+            parameter.add_css_class("error");
+            format!("Not usable: {error}")
+        }
+        Some(ParameterIssue::Warning(warning)) => {
+            parameter.add_css_class("warning");
+            warning.clone()
+        }
+        None => format!("{safeguards} Disabled if it fires more than 5 times a second."),
+    };
+    notice.set_subtitle(&subtitle);
 }
 
 /// The parameter field's title, with what it expects — `EntryRow` has no

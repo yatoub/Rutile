@@ -152,7 +152,12 @@ pub fn attach(
     terminal.add_controller(focus_controller);
 
     let session_view_for_commit = session_view.clone();
-    terminal.connect_commit(move |_terminal, text, _size| {
+    terminal.connect_commit(move |terminal, text, _size| {
+        // Typed by one of this terminal's triggers: every synchronized
+        // pane runs its own triggers, relaying would apply them twice.
+        if crate::terminal::trigger_runner::is_trigger_input(terminal) {
+            return;
+        }
         session_view_for_commit
             .borrow()
             .broadcast_from(session_id, pane_id, text.as_bytes());

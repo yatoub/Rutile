@@ -315,6 +315,12 @@ impl TerminalWidget {
         &self.bell_icon
     }
 
+    /// The banner reporting disabled or failing triggers — placed above
+    /// the terminal by `PaneView`.
+    pub fn trigger_banner(&self) -> &adw::Banner {
+        self.appearance.triggers.banner()
+    }
+
     /// The relaunch banner — placed above the terminal by `PaneView`.
     pub fn banner(&self) -> &adw::Banner {
         &self.spawner.banner

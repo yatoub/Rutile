@@ -51,9 +51,11 @@ pub struct Trigger {
     pub parameter: String,
 }
 
-/// The actions available so far: the ones that only change what Rutile
-/// shows. Tilix's actions that act on the system (send text, run a
-/// command) come separately, with their own safeguards.
+/// What a trigger does. The first five only change what Rutile shows; the
+/// last three act on the system (`is_active`) — any program's output can
+/// fire them, a `cat` of a file or a remote server included, hence their
+/// safeguards: captured text never reaches a shell and loses its control
+/// characters, and a trigger firing too often is disabled (`FiringGuard`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum TriggerAction {
@@ -71,16 +73,36 @@ pub enum TriggerAction {
     UpdateBadge,
     /// Ring the bell.
     PlayBell,
+    /// Type text into the terminal's program. Parameter: the text, with
+    /// `\n`, `\r`, `\t` and `\\` escapes (in the template only).
+    SendText,
+    /// Start a program in the background. Parameter: a command line,
+    /// split into arguments *before* `$n` are replaced.
+    ExecuteCommand,
+    /// Run a program and type its output into the terminal. Parameter:
+    /// like `ExecuteCommand`.
+    RunProcess,
 }
 
 impl TriggerAction {
-    pub const ALL: [TriggerAction; 5] = [
+    pub const ALL: [TriggerAction; 8] = [
         TriggerAction::UpdateState,
         TriggerAction::SendNotification,
         TriggerAction::UpdateTitle,
         TriggerAction::UpdateBadge,
         TriggerAction::PlayBell,
+        TriggerAction::SendText,
+        TriggerAction::ExecuteCommand,
+        TriggerAction::RunProcess,
     ];
+
+    /// Whether this action acts on the system rather than on the display.
+    pub fn is_active(self) -> bool {
+        matches!(
+            self,
+            TriggerAction::SendText | TriggerAction::ExecuteCommand | TriggerAction::RunProcess
+        )
+    }
 
     pub fn label(self) -> &'static str {
         match self {
@@ -89,6 +111,9 @@ impl TriggerAction {
             TriggerAction::UpdateTitle => "Update title",
             TriggerAction::UpdateBadge => "Update badge",
             TriggerAction::PlayBell => "Play bell",
+            TriggerAction::SendText => "Send text",
+            TriggerAction::ExecuteCommand => "Execute command",
+            TriggerAction::RunProcess => "Run process and send its output",
         }
     }
 
@@ -100,8 +125,153 @@ impl TriggerAction {
             TriggerAction::UpdateTitle => "${title} — $1",
             TriggerAction::UpdateBadge => "$1",
             TriggerAction::PlayBell => "(no parameter)",
+            TriggerAction::SendText => r"cd $1\n",
+            TriggerAction::ExecuteCommand => r#"notify-send "Build done" $1"#,
+            TriggerAction::RunProcess => "pass show $1",
         }
     }
+}
+
+/// What's wrong with a trigger's parameter, for the editor: an error makes
+/// the trigger unusable, a warning flags a risk.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParameterIssue {
+    Error(String),
+    Warning(String),
+}
+
+pub fn parameter_issue(action: TriggerAction, parameter: &str) -> Option<ParameterIssue> {
+    if action == TriggerAction::SendText && has_placeholder(parameter) {
+        // Control characters are stripped, but `$(…)`, backquotes or `;`
+        // are printable: typed into a shell, captured text runs.
+        return Some(ParameterIssue::Warning(
+            "Captured text is typed as is: a shell reading it would run \
+             $(…), `…` or ; in it — only use $n on output you trust"
+                .to_string(),
+        ));
+    }
+    if !matches!(
+        action,
+        TriggerAction::ExecuteCommand | TriggerAction::RunProcess
+    ) {
+        return None;
+    }
+    let argv = match parse_command(parameter) {
+        Ok(argv) => argv,
+        Err(error) => return Some(ParameterIssue::Error(error)),
+    };
+    code_argument(&argv)
+        .filter(|code| has_placeholder(code))
+        .map(|_| {
+            ParameterIssue::Warning(
+                "Captured text would be run as code there: pass it as a separate \
+                 argument instead (sh -c '… \"$$1\"' sh $1)"
+                    .to_string(),
+            )
+        })
+}
+
+fn parse_command(template: &str) -> Result<Vec<String>, String> {
+    if template.trim().is_empty() {
+        return Err("Empty command".to_string());
+    }
+    // GLib's shell-style splitting only handles quotes and backslashes:
+    // nothing is expanded, nothing runs.
+    gtk4::glib::shell_parse_argv(template)
+        .map(|argv| {
+            argv.into_iter()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect()
+        })
+        .map_err(|err| err.message().to_string())
+}
+
+/// The command's argument that a shell or an interpreter runs as code
+/// (`sh -c CODE`, `python -c CODE`, `perl -e CODE`…), if any — `env` and
+/// its `VAR=value` arguments skipped.
+fn code_argument(argv: &[String]) -> Option<&str> {
+    let mut args = argv.iter().map(String::as_str).peekable();
+    let mut program = args.next()?;
+    while basename(program) == "env" || program.contains('=') {
+        program = args.next()?;
+    }
+    let flag = match basename(program) {
+        "sh" | "bash" | "zsh" | "dash" | "ksh" | "mksh" | "ash" | "fish" | "busybox" => 'c',
+        name if name.starts_with("python") => 'c',
+        "perl" | "ruby" | "node" | "nodejs" => 'e',
+        _ => return None,
+    };
+    while let Some(arg) = args.next() {
+        // `-c`, or bundled short options like `-lc`.
+        if arg.len() > 1 && arg.starts_with('-') && !arg.starts_with("--") && arg.contains(flag) {
+            return args.next();
+        }
+    }
+    None
+}
+
+fn basename(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
+}
+
+/// Whether `text` contains a `$n` that `substitute` would replace.
+fn has_placeholder(text: &str) -> bool {
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '$' {
+            match chars.peek() {
+                Some('$') => {
+                    chars.next();
+                }
+                Some(d) if d.is_ascii_digit() => return true,
+                _ => {}
+            }
+        }
+    }
+    false
+}
+
+/// Drops control characters (line breaks, escape sequences, DEL, C1) from
+/// captured text before it's typed or passed to a program: output could
+/// otherwise end a command line and start another, or drive the shell's
+/// line editor.
+pub fn sanitize(text: &str) -> String {
+    text.chars().filter(|c| !c.is_control()).collect()
+}
+
+/// The program and arguments an `ExecuteCommand`/`RunProcess` trigger
+/// runs: the template split into arguments first, then `$n` replaced in
+/// each with the sanitized groups — a group is always one argument's
+/// content, whatever its quotes or spaces.
+pub fn command_argv(template: &str, groups: &[String]) -> Result<Vec<String>, String> {
+    let groups: Vec<String> = groups.iter().map(|g| sanitize(g)).collect();
+    Ok(parse_command(template)?
+        .iter()
+        .map(|arg| substitute(arg, &groups))
+        .collect())
+}
+
+/// The text a `SendText` trigger types: the template's escapes (`\n`,
+/// `\r`, `\t`, `\\`) decoded, its `$n` replaced with the sanitized groups —
+/// only the template can contain a line break.
+pub fn send_text(template: &str, groups: &[String]) -> String {
+    let groups: Vec<String> = groups.iter().map(|g| sanitize(g)).collect();
+    expand(template, &groups, true)
+}
+
+/// A `RunProcess` program's output, before it's typed: at most `max_bytes`
+/// (cut on a character boundary), control characters dropped except line
+/// breaks and tabs — what the program prints is meant to be typed, escape
+/// sequences aren't.
+pub fn sanitize_process_output(output: &str, max_bytes: usize) -> String {
+    let mut end = output.len().min(max_bytes);
+    while !output.is_char_boundary(end) {
+        end -= 1;
+    }
+    output[..end]
+        .chars()
+        .filter(|c| *c == '\n' || *c == '\t' || !c.is_control())
+        .collect()
 }
 
 /// Why a pattern can't be used, for the editor — `None` when it's valid.
@@ -128,6 +298,7 @@ fn compile_pattern(pattern: &str) -> Result<regex::Regex, String> {
 
 pub struct CompiledTrigger {
     regex: regex::Regex,
+    pub pattern: String,
     pub action: TriggerAction,
     pub parameter: String,
 }
@@ -140,6 +311,7 @@ pub fn compile(triggers: &[Trigger]) -> Vec<CompiledTrigger> {
         .filter_map(|trigger| {
             Some(CompiledTrigger {
                 regex: compile_pattern(&trigger.pattern).ok()?,
+                pattern: trigger.pattern.clone(),
                 action: trigger.action,
                 parameter: trigger.parameter.clone(),
             })
@@ -157,20 +329,55 @@ pub struct TriggerMatch {
 
 /// Replaces `$0`..`$9` in `template` with `groups`, in a single pass:
 /// matched text is never itself searched for `$n` (Tilix substitutes
-/// repeatedly, so output containing `$2` would be expanded again). A `$`
-/// not followed by a digit, or a group that doesn't exist, is kept as is.
+/// repeatedly, so output containing `$2` would be expanded again). `$$` is
+/// a literal `$` — to write a shell's own `$1`. Any other `$`, or a group
+/// that doesn't exist, is kept as is.
 pub fn substitute(template: &str, groups: &[String]) -> String {
+    expand(template, groups, false)
+}
+
+/// `substitute`, plus backslash escapes when `escapes` is set — decoded in
+/// the same single pass, so neither a group nor a decoded character is
+/// ever read again.
+fn expand(template: &str, groups: &[String], escapes: bool) -> String {
     let mut out = String::with_capacity(template.len());
     let mut chars = template.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '$'
-            && let Some(digit) = chars.peek().and_then(|d| d.to_digit(10))
-            && let Some(group) = groups.get(digit as usize)
-        {
-            chars.next();
-            out.push_str(group);
-        } else {
-            out.push(c);
+        match c {
+            '\\' if escapes => {
+                let decoded = match chars.peek() {
+                    Some('n') => Some('\n'),
+                    Some('r') => Some('\r'),
+                    Some('t') => Some('\t'),
+                    Some('\\') => Some('\\'),
+                    _ => None,
+                };
+                match decoded {
+                    Some(d) => {
+                        chars.next();
+                        out.push(d);
+                    }
+                    None => out.push('\\'),
+                }
+            }
+            '$' => match chars.peek() {
+                Some('$') => {
+                    chars.next();
+                    out.push('$');
+                }
+                Some(d) if d.is_ascii_digit() => {
+                    let index = d.to_digit(10).unwrap_or(0) as usize;
+                    match groups.get(index) {
+                        Some(group) => {
+                            chars.next();
+                            out.push_str(group);
+                        }
+                        None => out.push('$'),
+                    }
+                }
+                _ => out.push('$'),
+            },
+            c => out.push(c),
         }
     }
     out
@@ -397,6 +604,59 @@ impl RateLimiter {
         }
         *count += 1;
         true
+    }
+}
+
+/// What to do with a trigger that just matched.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    Run,
+    /// Over its rate: skipped this time.
+    Drop,
+    /// An active trigger over its rate: probably matching its own effect
+    /// (text it sends, echoed back) — disabled until `reset`.
+    Disable,
+}
+
+/// `RateLimiter`, plus disabling the active triggers that exceed it: a
+/// trigger typing text that matches itself would otherwise loop for as
+/// long as the terminal is open, 5 times a second.
+pub struct FiringGuard {
+    limiter: RateLimiter,
+    max_per_window: u32,
+    window: Duration,
+    disabled: HashSet<usize>,
+}
+
+impl FiringGuard {
+    pub fn new(max_per_window: u32, window: Duration) -> Self {
+        Self {
+            limiter: RateLimiter::new(max_per_window, window),
+            max_per_window,
+            window,
+            disabled: HashSet::new(),
+        }
+    }
+
+    pub fn check(&mut self, trigger: usize, active: bool, now: Instant) -> Verdict {
+        if self.disabled.contains(&trigger) {
+            return Verdict::Drop;
+        }
+        if self.limiter.allow(trigger, now) {
+            Verdict::Run
+        } else if active {
+            self.disabled.insert(trigger);
+            Verdict::Disable
+        } else {
+            Verdict::Drop
+        }
+    }
+
+    /// Re-enables every trigger, with fresh rate counts — the triggers
+    /// changed, or the user asked.
+    pub fn reset(&mut self) {
+        self.limiter = RateLimiter::new(self.max_per_window, self.window);
+        self.disabled.clear();
     }
 }
 
@@ -702,6 +962,108 @@ mod tests {
         assert!(!limiter.allow(0, t0 + Duration::from_millis(500)));
         assert!(limiter.allow(1, t0), "triggers are counted separately");
         assert!(limiter.allow(0, t0 + Duration::from_secs(1)));
+    }
+
+    #[test]
+    fn dollar_dollar_is_a_literal_dollar() {
+        let groups = vec!["all".to_string(), "one".to_string()];
+        assert_eq!(substitute("$$1 is $1, $$$1", &groups), "$1 is one, $one");
+    }
+
+    fn groups(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_group_is_always_a_single_argument_and_never_reaches_a_shell() {
+        let hostile = groups(&["x", "a; rm -rf ~ \"$(id)\"\nreboot"]);
+        let argv = command_argv(r#"notify-send "Build: $1" $1"#, &hostile).unwrap();
+        assert_eq!(
+            argv,
+            [
+                "notify-send",
+                r#"Build: a; rm -rf ~ "$(id)"reboot"#,
+                r#"a; rm -rf ~ "$(id)"reboot"#,
+            ],
+            "quotes and spaces in the group don't split it, the line break is gone"
+        );
+        assert!(command_argv("", &hostile).is_err());
+        assert!(command_argv("echo 'unclosed", &hostile).is_err());
+    }
+
+    #[test]
+    fn sent_text_decodes_template_escapes_but_strips_controls_from_groups() {
+        let hostile = groups(&["x", "ls\n\u{1b}[31mrm -rf ~\r"]);
+        assert_eq!(send_text(r"echo $1\n", &hostile), "echo ls[31mrm -rf ~\n");
+        assert_eq!(send_text(r"a\tb\\n\q", &[]), "a\tb\\n\\q");
+        // A backslash from a group is data, not an escape.
+        assert_eq!(send_text("$1", &groups(&["", r"\n"])), r"\n");
+    }
+
+    #[test]
+    fn process_output_is_capped_and_stripped_of_escape_sequences() {
+        assert_eq!(
+            sanitize_process_output("secret\u{1b}[2J\r\n\tok", 100),
+            "secret[2J\n\tok"
+        );
+        assert_eq!(
+            sanitize_process_output("ééé", 3),
+            "é",
+            "cut on a char boundary"
+        );
+    }
+
+    #[test]
+    fn code_run_by_an_interpreter_is_flagged() {
+        let warn = |p: &str| {
+            matches!(
+                parameter_issue(TriggerAction::ExecuteCommand, p),
+                Some(ParameterIssue::Warning(_))
+            )
+        };
+        assert!(warn(r#"sh -c "notify-send $1""#));
+        assert!(warn(r#"/usr/bin/bash -lc 'echo $1'"#));
+        assert!(warn(r#"env FOO=1 python3 -c "print('$1')""#));
+        assert!(warn(r#"perl -e 'print "$0"'"#));
+        // The safe forms.
+        assert!(!warn(r#"sh -c 'notify-send "$$1"' sh $1"#));
+        assert!(!warn(r#"notify-send "Build" $1"#));
+        assert!(!warn(r#"sh -c 'date'"#));
+        assert!(matches!(
+            parameter_issue(TriggerAction::RunProcess, "pass 'show"),
+            Some(ParameterIssue::Error(_))
+        ));
+        assert!(matches!(
+            parameter_issue(TriggerAction::SendText, r"cd $1\n"),
+            Some(ParameterIssue::Warning(_))
+        ));
+        assert!(parameter_issue(TriggerAction::SendText, r"yes\n").is_none());
+        assert!(parameter_issue(TriggerAction::SendText, r"cost: $$5").is_none());
+    }
+
+    #[test]
+    fn an_active_trigger_over_its_rate_is_disabled_a_passive_one_throttled() {
+        let mut guard = FiringGuard::new(2, Duration::from_secs(1));
+        let t0 = Instant::now();
+        for trigger in [0, 1] {
+            assert_eq!(guard.check(trigger, trigger == 1, t0), Verdict::Run);
+            assert_eq!(guard.check(trigger, trigger == 1, t0), Verdict::Run);
+        }
+        assert_eq!(guard.check(0, false, t0), Verdict::Drop);
+        assert_eq!(guard.check(1, true, t0), Verdict::Disable);
+        let later = t0 + Duration::from_secs(5);
+        assert_eq!(
+            guard.check(0, false, later),
+            Verdict::Run,
+            "throttled, then back"
+        );
+        assert_eq!(
+            guard.check(1, true, later),
+            Verdict::Drop,
+            "disabled stays off"
+        );
+        guard.reset();
+        assert_eq!(guard.check(1, true, later), Verdict::Run);
     }
 
     #[test]

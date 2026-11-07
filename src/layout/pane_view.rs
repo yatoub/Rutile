@@ -153,6 +153,7 @@ impl PaneView {
         content.set_hexpand(true);
         content.append(&header);
         content.append(widget.banner());
+        content.append(widget.trigger_banner());
         content.append(widget.root());
 
         let search = SearchBar::new(widget.widget());

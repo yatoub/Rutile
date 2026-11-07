@@ -283,8 +283,23 @@ Phase 5) — à ne pas « simplifier » :
 - Valeurs posées par triggers (`Overrides` : titre, badge, user/host/dir)
   prioritaires sur celles du shell (OSC 0/2/7), lues par l'en-tête de
   pane, le badge et le changement automatique de profil.
+- **Actions actives** (envoyer du texte, exécuter, lancer un processus) :
+  n'importe quelle sortie peut les déclencher (`cat`, serveur ssh). Règles
+  à garder : argv découpé **avant** substitution, jamais de `sh -c` ;
+  groupes passés par `triggers::sanitize` ; texte injecté marqué
+  (`trigger_runner::is_trigger_input`, posé autour de `feed_child` dont le
+  `commit` est synchrone) pour que `context_menu` ne le diffuse pas ;
+  `FiringGuard` désactive un trigger actif emballé (boucle sur son propre
+  effet). « Envoyer du texte » + `$n` reste dangereux par nature (un shell
+  exécute `$(…)`) : l'éditeur avertit, on ne peut pas filtrer.
+- `glib::SourceId::remove()` **panique** si la source a déjà fini
+  (`.unwrap()` dans glib-rs) : un timeout qui peut avoir expiré se garde
+  dans un `Cell<Option<SourceId>>` pris par le premier qui passe.
 - Tester sans shell : `vte::Terminal::feed()` écrit à l'écran comme une
-  sortie de programme et déclenche `contents-changed`.
+  sortie de programme et déclenche `contents-changed`. Pour une action qui
+  tape dans le shell, lancer l'exemple avec `SHELL=/bin/sh` : le zsh de
+  l'utilisateur ouvre l'assistant powerlevel10k avec une config XDG vide
+  et avale tout ce qu'on lui envoie.
 
 ## Fermeture de pane
 

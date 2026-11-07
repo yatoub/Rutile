@@ -319,7 +319,7 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
   synchronisée, chaque pane atteint tape **son propre** numéro (garde
   `broadcasting` tenue pendant l'insertion, sinon le `commit` d'origine
   rediffuserait le sien)
-- [ ] **Triggers** (regex → action) — spike fait, livré en deux PR
+- [x] **Triggers** (regex → action) — spike fait, livré en deux PR
   (décision utilisateur) :
   - [x] **PR 1 — moteur + actions passives + éditeur** : `terminal/triggers.rs`
     (sans GTK, testé sur un faux écran : tous les cas du spike),
@@ -332,11 +332,19 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
     (onglet Advanced), appliqués **en direct** à tous les terminaux.
     Limite de lignes par changement (256 par défaut, comme Tilix) ;
     5 déclenchements/s max par trigger
-  - [ ] **PR 2 — actions actives** (envoyer du texte, exécuter une commande,
-    lancer un processus) avec garde-fous dédiés : argv uniquement (jamais
-    `sh -c`), groupes capturés débarrassés des caractères de contrôle,
-    limiteur qui désactive un trigger emballé, pas de diffusion du texte
-    injecté aux panes synchronisés (chacun a ses propres triggers).
+  - [x] **PR 2 — actions actives** : envoyer du texte, exécuter une
+    commande, lancer un processus et taper sa sortie. Garde-fous :
+    commande découpée en argv **avant** substitution et lancée sans shell
+    (`gio::SubprocessLauncher`, dossier courant du terminal) — chaque `$n`
+    reste un seul argument ; groupes débarrassés des caractères de
+    contrôle ; échappements `\n`/`\t` seulement dans le modèle ; `$$` pour
+    un `$` littéral ; l'éditeur avertit quand un `$n` arrive dans du code
+    interprété (`sh -c`, `python -c`, `perl -e`…) et pour **tout** `$n`
+    d'un « envoyer du texte » (un shell exécuterait `$(…)`, imprimable
+    donc non filtrable) ; processus arrêté après 10 s, sortie limitée à
+    64 Kio et nettoyée ; trigger actif dépassant 5 déclenchements/s
+    **désactivé** (bannière « Réactiver ») ; texte injecté **jamais
+    diffusé** aux panes synchronisés (chacun a ses propres triggers).
     « Insert password » attend un stockage de mots de passe (6.3)
 
   **Résultats du spike** (vte 0.84, mesures sur une vraie fenêtre) :
