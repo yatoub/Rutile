@@ -14,6 +14,8 @@ pub use model::{
 };
 pub use scheme::{ColorScheme, ColorSchemeStore};
 
+use crate::preferences::Preferences;
+
 /// Everything a new terminal takes from its profile, resolved once when
 /// the pane is created: the profile itself (command, exit action, ...) and
 /// its color scheme, already looked up in the `ColorSchemeStore`.
@@ -25,14 +27,20 @@ pub struct TerminalConfig {
     /// another profile later (automatic profile switching) against the
     /// same — live — stores. `None` disables automatic switching.
     pub resolver: Option<ProfileResolver>,
+    /// The global triggers followed by the profile's, and how many rows
+    /// they may read per change (see `terminal::triggers`).
+    pub triggers: Vec<crate::terminal::triggers::Trigger>,
+    pub trigger_max_lines: Option<usize>,
 }
 
 /// Turns profile ids into `TerminalConfig`s against one window's profile
-/// and color scheme stores. Cheap to clone (two `Rc`s).
+/// and color scheme stores, plus the preferences for the global trigger
+/// settings. Cheap to clone (three `Rc`s).
 #[derive(Clone)]
 pub struct ProfileResolver {
     profiles: Rc<RefCell<ProfileStore>>,
     schemes: Rc<ColorSchemeStore>,
+    prefs: Rc<RefCell<Preferences>>,
 }
 
 impl fmt::Debug for ProfileResolver {
@@ -42,8 +50,16 @@ impl fmt::Debug for ProfileResolver {
 }
 
 impl ProfileResolver {
-    pub fn new(profiles: Rc<RefCell<ProfileStore>>, schemes: Rc<ColorSchemeStore>) -> Self {
-        Self { profiles, schemes }
+    pub fn new(
+        profiles: Rc<RefCell<ProfileStore>>,
+        schemes: Rc<ColorSchemeStore>,
+        prefs: Rc<RefCell<Preferences>>,
+    ) -> Self {
+        Self {
+            profiles,
+            schemes,
+            prefs,
+        }
     }
 
     /// A profile that no longer exists (deleted since a session was saved)
@@ -88,10 +104,20 @@ impl ProfileResolver {
         let profile =
             profile.unwrap_or_else(|| Profile::new(profile_id, "Default", "catppuccin-mocha"));
         let scheme = self.schemes.get_or_default(&profile.scheme_id).clone();
+        // `try_borrow`: called from terminal signals too (see
+        // `try_resolve`); preferences being edited right then only means
+        // no global triggers until the next resolve.
+        let (mut triggers, trigger_max_lines) = match self.prefs.try_borrow() {
+            Ok(prefs) => (prefs.triggers.clone(), prefs.trigger_max_lines()),
+            Err(_) => (Vec::new(), Some(256)),
+        };
+        triggers.extend(profile.triggers.iter().cloned());
         TerminalConfig {
             profile,
             scheme,
             resolver: Some(self.clone()),
+            triggers,
+            trigger_max_lines,
         }
     }
 }

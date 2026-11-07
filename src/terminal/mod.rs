@@ -7,6 +7,8 @@ pub mod monitor;
 pub mod paste;
 pub mod search;
 pub mod title;
+pub mod trigger_runner;
+pub mod triggers;
 pub mod widget;
 
 pub use margin::MarginGuide;

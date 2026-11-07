@@ -8,6 +8,7 @@ use vte4::TerminalExt;
 use crate::layout::PaneId;
 use crate::profile::{Badge, BadgePosition};
 use crate::terminal::title;
+use crate::terminal::trigger_runner::Overrides;
 
 /// Distance from the terminal's edges, in pixels.
 const MARGIN: i32 = 12;
@@ -32,18 +33,36 @@ struct BadgeState {
     pane_id: PaneId,
     title: Option<String>,
     directory: Option<String>,
+    /// What triggers set: a badge template replacing the profile's, and
+    /// user/host/directory replacing the shell's (`trigger_runner`).
+    overrides: Rc<RefCell<Overrides>>,
 }
 
 impl BadgeState {
+    /// The template in effect: a trigger's, else the profile's.
+    fn template(&self) -> String {
+        self.overrides
+            .borrow()
+            .badge_template
+            .clone()
+            .unwrap_or_else(|| self.template.clone())
+    }
+
     fn render(&self) -> String {
-        let host = title::local_hostname();
-        let user = title::current_user();
+        let overrides = self.overrides.borrow();
+        let host = overrides.host.clone().or_else(title::local_hostname);
+        let user = overrides.user.clone().or_else(title::current_user);
+        let directory = overrides
+            .directory
+            .clone()
+            .or_else(|| self.directory.clone());
+        drop(overrides);
         title::render_template(
-            &self.template,
+            &self.template(),
             &title::TitleContext {
                 id: self.pane_id,
                 title: self.title.as_deref(),
-                directory: self.directory.as_deref(),
+                directory: directory.as_deref(),
                 host: host.as_deref(),
                 user: user.as_deref(),
             },
@@ -55,7 +74,11 @@ impl BadgeOverlay {
     /// An empty, hidden badge — `update` gives it the profile's settings.
     /// It tracks the terminal's title and directory from the start, so a
     /// later `update` (automatic profile switching) renders right away.
-    pub fn new(terminal: &vte4::Terminal, pane_id: PaneId) -> Self {
+    pub fn new(
+        terminal: &vte4::Terminal,
+        pane_id: PaneId,
+        overrides: Rc<RefCell<Overrides>>,
+    ) -> Self {
         let label = gtk4::Label::builder()
             .margin_top(MARGIN)
             .margin_bottom(MARGIN)
@@ -73,6 +96,7 @@ impl BadgeOverlay {
             pane_id,
             title: None,
             directory: None,
+            overrides,
         }));
         {
             let state = state.clone();
@@ -127,13 +151,18 @@ impl BadgeOverlay {
         refresh(&self.label, &state);
     }
 
+    /// Renders again — after triggers changed what it's rendered from.
+    pub fn refresh(&self) {
+        refresh(&self.label, &self.state.borrow());
+    }
+
     pub fn widget(&self) -> &gtk4::Label {
         &self.label
     }
 }
 
 fn refresh(label: &gtk4::Label, state: &BadgeState) {
-    if state.template.trim().is_empty() {
+    if state.template().trim().is_empty() {
         label.set_visible(false);
         return;
     }

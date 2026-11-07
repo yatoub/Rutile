@@ -57,6 +57,10 @@ pub struct Profile {
     /// current host/directory matches one switches to this profile.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub automatic_switch: Vec<String>,
+    /// This profile's triggers, checked after the global ones
+    /// (`Preferences::triggers`), like Tilix.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub triggers: Vec<crate::terminal::triggers::Trigger>,
 }
 
 impl Profile {
@@ -76,6 +80,7 @@ impl Profile {
             colors: ProfileColors::default(),
             badge: Badge::default(),
             automatic_switch: Vec::new(),
+            triggers: Vec::new(),
         }
     }
 }

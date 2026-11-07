@@ -9,9 +9,10 @@ use vte4::TerminalExt;
 
 use crate::layout::pane_view::{LayoutStyle, PaneView};
 use crate::layout::{Direction, Orientation, PaneId};
-use crate::profile::{ProfileId, TerminalConfig};
+use crate::profile::{ProfileId, ProfileResolver, TerminalConfig};
 use crate::session::persist::{PaneMeta, SavedSession};
 use crate::terminal::broadcast::{BroadcastGroup, BroadcastManager, SessionId};
+use crate::terminal::trigger_runner::Overrides;
 
 /// Result of attempting to close the focused pane of the current session.
 pub enum ClosePaneOutcome {
@@ -457,6 +458,33 @@ impl SessionView {
             .get(&session_id)
             .map(|pane_view| pane_view.pane_ids())
             .unwrap_or_default()
+    }
+
+    /// What triggers set on a pane's terminal (see `trigger_runner`).
+    pub fn trigger_overrides(
+        &self,
+        session_id: SessionId,
+        pane_id: PaneId,
+    ) -> Option<Rc<std::cell::RefCell<Overrides>>> {
+        self.sessions.get(&session_id)?.trigger_overrides(pane_id)
+    }
+
+    pub fn connect_trigger_overrides_changed(
+        &self,
+        session_id: SessionId,
+        pane_id: PaneId,
+        listener: impl Fn() + 'static,
+    ) {
+        if let Some(pane_view) = self.sessions.get(&session_id) {
+            pane_view.connect_trigger_overrides_changed(pane_id, listener);
+        }
+    }
+
+    /// Every terminal re-reads its triggers — after they were edited.
+    pub fn reload_triggers(&self, resolver: &ProfileResolver) {
+        for pane_view in self.sessions.values() {
+            pane_view.reload_triggers(resolver);
+        }
     }
 
     /// The profile a pane's terminal currently uses — not necessarily

@@ -248,6 +248,44 @@ navigation par sidebar de catégories gratuitement (une `AdwPreferencesPage`
   observer l'effet par les processus fils (`/proc/<pid>/cwd`, cmdline des
   shells/commandes lancés).
 
+## Triggers (regex → action)
+
+Moteur dans `terminal/triggers.rs` (sans GTK, testé via le trait `Screen`
+sur un faux écran), branchement vte dans `terminal/trigger_runner.rs`.
+Points non évidents, établis par un spike (détails dans `docs/ROADMAP.md`,
+Phase 5) — à ne pas « simplifier » :
+
+- **Lecture par ligne logique, pas par repère (ligne, colonne) façon
+  Tilix** : une ligne n'est finie que quand le curseur est passé dessous ;
+  la ligne du curseur est relue à chaque changement, avec déduplication
+  par (ligne de départ, trigger, offset, texte). Sinon : lignes reçues en
+  morceaux ou réécrites par `\r` ratées, et relecture de vieilles lignes
+  en sortant de l'écran alternatif.
+- `text_range_format (r,0)→(r+1,0)` : `\n` final = vraie fin de ligne, pas
+  de `\n` = ligne repliée (à recoller)… **sauf la ligne du curseur, qui en
+  a toujours un** — ce piège a fait échouer le premier prototype.
+- Les entrées de déduplication **survivent à un retour en arrière du
+  curseur** (sortie d'écran alternatif → relecture de lignes déjà vues).
+  Rater un déclenchement vaut mieux qu'en faire deux (les futures actions
+  actives exécutent des choses).
+- Ligne coupée par la limite `max_lines` : ignorée jusqu'à sa fin (état
+  persistant `skipping_cut_line`), sinon sa ligne de départ bouge à chaque
+  scan et la déduplication ne joue plus → déclenchements en boucle.
+- L'écran alternatif n'est pas détectable avec le vte standard : son
+  contenu est scanné. Ne pas promettre le contraire.
+- Crate `regex` (temps linéaire) et non `glib::Regex` : la sortie n'est
+  pas de confiance, un motif pathologique ne doit pas geler la fenêtre.
+- Substitution `$0`..`$9` en **une seule passe** (Tilix fait des `replace`
+  successifs : un texte capturé contenant `$2` serait réinterprété).
+- Les actions sont copiées (action + paramètre) avant d'être exécutées :
+  une mise à jour d'état peut déclencher un changement automatique de
+  profil, qui recompile les triggers en plein milieu.
+- Valeurs posées par triggers (`Overrides` : titre, badge, user/host/dir)
+  prioritaires sur celles du shell (OSC 0/2/7), lues par l'en-tête de
+  pane, le badge et le changement automatique de profil.
+- Tester sans shell : `vte::Terminal::feed()` écrit à l'écran comme une
+  sortie de programme et déclenche `contents-changed`.
+
 ## Fermeture de pane
 
 - Ctrl+D n'est PAS intercepté directement (casserait `cat`, un REPL, etc.).

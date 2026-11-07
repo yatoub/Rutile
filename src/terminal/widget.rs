@@ -18,6 +18,7 @@ use crate::profile::{
 use crate::terminal::badge::BadgeOverlay;
 use crate::terminal::encoding;
 use crate::terminal::title;
+use crate::terminal::trigger_runner::{Overrides, TriggerRunner};
 
 /// A command that exits sooner than this after being (re)spawned is held
 /// instead of restarted under `ExitAction::Restart` — otherwise a typo'd
@@ -49,6 +50,7 @@ struct Appearance {
     terminal: vte4::Terminal,
     scrolled: gtk4::ScrolledWindow,
     badge: BadgeOverlay,
+    triggers: Rc<TriggerRunner>,
     /// Shared with the bell handler (see `connect_bell_icon`).
     bell: Rc<Cell<BellMode>>,
     exit_action: Cell<ExitAction>,
@@ -97,6 +99,8 @@ impl Appearance {
         self.badge
             .update(&self.terminal, &config.profile.badge, &badge_color);
 
+        self.triggers
+            .set_triggers(&config.triggers, config.trigger_max_lines);
         self.bell.set(config.profile.options.bell);
         self.exit_action.set(config.profile.exit_action);
         self.profile_id.replace(config.profile.id.clone());
@@ -193,7 +197,8 @@ impl TerminalWidget {
             .vexpand(true)
             .child(&terminal)
             .build();
-        let badge = BadgeOverlay::new(&terminal, pane_id);
+        let triggers = TriggerRunner::new(&terminal, pane_id);
+        let badge = BadgeOverlay::new(&terminal, pane_id, triggers.overrides());
         let root = gtk4::Overlay::builder().child(&scrolled).build();
         root.add_overlay(badge.widget());
 
@@ -209,13 +214,28 @@ impl TerminalWidget {
             terminal: terminal.clone(),
             scrolled,
             badge,
+            triggers: triggers.clone(),
             bell,
             exit_action: Cell::new(config.profile.exit_action),
             profile_id: RefCell::new(config.profile.id.clone()),
         });
         appearance.apply(config);
+        {
+            let appearance = Rc::downgrade(&appearance);
+            triggers.connect_overrides_changed(move || {
+                if let Some(appearance) = appearance.upgrade() {
+                    appearance.badge.refresh();
+                }
+            });
+        }
         if let Some(resolver) = config.resolver.clone() {
-            connect_automatic_switch(&terminal, &appearance, resolver, config.profile.id.clone());
+            connect_automatic_switch(
+                &terminal,
+                &appearance,
+                &triggers,
+                resolver,
+                config.profile.id.clone(),
+            );
         }
 
         let banner = adw::Banner::builder().button_label("Relaunch").build();
@@ -251,6 +271,27 @@ impl TerminalWidget {
     /// still running. See `Spawner::pid`'s doc comment.
     pub fn child_pid(&self) -> Option<i32> {
         self.spawner.pid.get()
+    }
+
+    /// What triggers have set on this terminal (title, badge, state).
+    pub fn trigger_overrides(&self) -> Rc<RefCell<Overrides>> {
+        self.appearance.triggers.overrides()
+    }
+
+    /// Called whenever triggers change `trigger_overrides`.
+    pub fn connect_trigger_overrides_changed(&self, listener: impl Fn() + 'static) {
+        self.appearance.triggers.connect_overrides_changed(listener);
+    }
+
+    /// Re-reads the triggers of the profile currently applied, and the
+    /// global ones — after they were edited in Preferences.
+    pub fn reload_triggers(&self, resolver: &ProfileResolver) {
+        let profile_id = self.profile_id();
+        if let Some(config) = resolver.try_resolve(&profile_id) {
+            self.appearance
+                .triggers
+                .set_triggers(&config.triggers, config.trigger_max_lines);
+        }
     }
 
     /// The profile currently applied to this terminal: the one it was
@@ -449,40 +490,66 @@ fn connect_bell_icon(terminal: &vte4::Terminal, icon: &gtk4::Image, bell: Rc<Cel
     });
 }
 
+/// Where the terminal is, for automatic profile switching: what triggers
+/// set first (`Overrides`), else what the shell reported (OSC 7), else the
+/// local user and host. `None` until some directory is known.
+fn terminal_state(terminal: &vte4::Terminal, overrides: &Overrides) -> Option<TerminalState> {
+    let uri = terminal.current_directory_uri();
+    let directory = overrides
+        .directory
+        .clone()
+        .or_else(|| uri.as_deref().and_then(title::directory_from_uri))?;
+    Some(TerminalState {
+        user: overrides.user.clone().or_else(title::current_user),
+        host: overrides
+            .host
+            .clone()
+            .or_else(|| uri.as_deref().and_then(title::host_from_uri))
+            .or_else(title::local_hostname),
+        directory,
+    })
+}
+
 /// Tilix's automatic profile switching: every time the shell reports a new
-/// directory (OSC 7), look for a profile whose rules match where the
-/// terminal now is, and fall back to the session's own profile
-/// (`base_profile_id`) once none does. Only re-applies when the matched
-/// profile actually changes.
+/// directory (OSC 7), or a trigger updates the terminal's state, look for a
+/// profile whose rules match where the terminal now is, and fall back to
+/// the session's own profile (`base_profile_id`) once none does. Only
+/// re-applies when the matched profile actually changes.
 fn connect_automatic_switch(
     terminal: &vte4::Terminal,
     appearance: &Rc<Appearance>,
+    triggers: &Rc<TriggerRunner>,
     resolver: ProfileResolver,
     base_profile_id: ProfileId,
 ) {
-    let appearance = Rc::downgrade(appearance);
-    terminal.connect_current_directory_uri_changed(move |terminal| {
-        let Some(appearance) = appearance.upgrade() else {
-            return;
-        };
-        let Some(uri) = terminal.current_directory_uri() else {
-            return;
-        };
-        let Some(directory) = title::directory_from_uri(&uri) else {
-            return;
-        };
-        let state = TerminalState {
-            user: title::current_user(),
-            host: title::host_from_uri(&uri).or_else(title::local_hostname),
-            directory,
-        };
-        let target = resolver
-            .resolve_automatic(&state)
-            .or_else(|| resolver.try_resolve(&base_profile_id));
-        if let Some(target) = target
-            && target.profile.id != *appearance.profile_id.borrow()
-        {
-            appearance.apply(&target);
+    let check: Rc<dyn Fn(&vte4::Terminal)> = {
+        let appearance = Rc::downgrade(appearance);
+        let overrides = triggers.overrides();
+        Rc::new(move |terminal| {
+            let Some(appearance) = appearance.upgrade() else {
+                return;
+            };
+            let Some(state) = terminal_state(terminal, &overrides.borrow()) else {
+                return;
+            };
+            let target = resolver
+                .resolve_automatic(&state)
+                .or_else(|| resolver.try_resolve(&base_profile_id));
+            if let Some(target) = target
+                && target.profile.id != *appearance.profile_id.borrow()
+            {
+                appearance.apply(&target);
+            }
+        })
+    };
+    {
+        let check = check.clone();
+        terminal.connect_current_directory_uri_changed(move |terminal| check(terminal));
+    }
+    let terminal = terminal.downgrade();
+    triggers.connect_overrides_changed(move || {
+        if let Some(terminal) = terminal.upgrade() {
+            check(&terminal);
         }
     });
 }

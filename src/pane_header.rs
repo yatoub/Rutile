@@ -10,33 +10,47 @@ use crate::preferences::Preferences;
 use crate::session::SessionView;
 use crate::terminal::broadcast::SessionId;
 use crate::terminal::title;
+use crate::terminal::trigger_runner::Overrides;
 
 /// Live-updated title state for one pane's header label — rebuilt into
 /// text via `title::render_template` on every OSC 0/2 (`raw_title`) or
 /// OSC 7 (`directory`) update, unless the user has typed a manual
 /// override by editing the `GtkEditableLabel` directly (Tilix-style:
 /// clearing the override text back to empty restores the template).
+///
+/// Triggers (`trigger_runner::Overrides`) can replace the template and the
+/// user/host/directory it's rendered from; a manual override still wins.
 #[derive(Default)]
 struct PaneTitleState {
     raw_title: Option<String>,
     directory: Option<String>,
     override_text: Option<String>,
+    triggers: Option<Rc<RefCell<Overrides>>>,
 }
 
 fn refresh_title(label: &gtk4::EditableLabel, state: &PaneTitleState, pane_id: PaneId) {
     let text = match &state.override_text {
         Some(text) => text.clone(),
         None => {
-            let host = title::local_hostname();
-            let user = title::current_user();
+            let overrides = state
+                .triggers
+                .as_ref()
+                .map(|o| o.borrow().clone())
+                .unwrap_or_default();
+            let host = overrides.host.or_else(title::local_hostname);
+            let user = overrides.user.or_else(title::current_user);
+            let directory = overrides.directory.or_else(|| state.directory.clone());
             let ctx = title::TitleContext {
                 id: pane_id,
                 title: state.raw_title.as_deref(),
-                directory: state.directory.as_deref(),
+                directory: directory.as_deref(),
                 host: host.as_deref(),
                 user: user.as_deref(),
             };
-            title::render_template(title::DEFAULT_TEMPLATE, &ctx)
+            let template = overrides
+                .title_template
+                .unwrap_or_else(|| title::DEFAULT_TEMPLATE.to_string());
+            title::render_template(&template, &ctx)
         }
     };
     // Avoid clobbering the cursor/selection mid-edit if this ever fires
@@ -62,8 +76,22 @@ pub fn attach(
     title_label.set_halign(gtk4::Align::Start);
     title_label.set_hexpand(true);
 
-    let title_state = Rc::new(RefCell::new(PaneTitleState::default()));
+    let title_state = Rc::new(RefCell::new(PaneTitleState {
+        triggers: session_view.borrow().trigger_overrides(session_id, pane_id),
+        ..PaneTitleState::default()
+    }));
     refresh_title(&title_label, &title_state.borrow(), pane_id);
+    {
+        let title_state = title_state.clone();
+        let title_label = title_label.downgrade();
+        session_view
+            .borrow()
+            .connect_trigger_overrides_changed(session_id, pane_id, move || {
+                if let Some(label) = title_label.upgrade() {
+                    refresh_title(&label, &title_state.borrow(), pane_id);
+                }
+            });
+    }
 
     {
         let title_state = title_state.clone();
