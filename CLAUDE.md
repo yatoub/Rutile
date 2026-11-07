@@ -8,8 +8,10 @@ Voir `GUIDELINE.md` pour la vision complète et la roadmap priorisée
 
 ## Stack
 
-- Rust 2024, `gtk4` 0.11 (feature `v4_14`), `libadwaita` 0.9 (feature `v1_4`),
-  `vte4` 0.10 (feature `v0_70`) — **volontairement en dessous** de ce
+- Rust 2024, `gtk4` 0.11 (feature `v4_14`), `libadwaita` 0.9 (feature `v1_5`
+  — `adw::AlertDialog`/`adw::Dialog`/`adw::AboutDialog` disponibles, pas
+  besoin des anciennes `*Window`), `vte4` 0.10 (feature `v0_72`) — toujours
+  relire `Cargo.toml` plutôt que cette ligne en cas de doute — **volontairement en dessous** de ce
   qu'installe `pkg-config` sur la machine de dev (GTK4 4.22 etc.) : la
   feature `vX_Y` fixe la version MINIMALE système exigée par pkg-config au
   moment du link, pas la version utilisée. Choisir la version installée
