@@ -39,6 +39,9 @@ pub enum Action {
     SelectBookmark,
     /// Add a bookmark, starting from the focused terminal's selection.
     AddBookmark,
+    /// Type the focused terminal's number (its position in the session);
+    /// with synchronized input, every synchronized terminal types its own.
+    InsertNumber,
 }
 
 const CTRL_SHIFT: gdk::ModifierType =
@@ -122,6 +125,8 @@ const DEFAULT_KEYBINDINGS: &[(gdk::Key, gdk::ModifierType, Action)] = &[
     // Unbound by default in Tilix, but an action needs a chord to show up
     // (and be rebindable) in the Shortcuts page.
     (gdk::Key::B, CTRL_SHIFT_ALT, Action::AddBookmark),
+    // Unbound by default in Tilix too.
+    (gdk::Key::N, CTRL_SHIFT_ALT, Action::InsertNumber),
 ];
 
 const RELEVANT_MODIFIERS: gdk::ModifierType = gdk::ModifierType::CONTROL_MASK
@@ -323,6 +328,7 @@ pub fn action_label(action: Action) -> String {
         Action::OpenPreferences => "Open preferences".to_string(),
         Action::SelectBookmark => "Insert a bookmark".to_string(),
         Action::AddBookmark => "Add a bookmark".to_string(),
+        Action::InsertNumber => "Insert terminal number".to_string(),
     }
 }
 

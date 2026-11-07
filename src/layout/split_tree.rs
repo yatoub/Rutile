@@ -190,6 +190,16 @@ impl SplitTree {
         out
     }
 
+    /// Tilix's terminal number: `id`'s 1-based position among the leaves,
+    /// in reading order (left to right, top to bottom) — renumbered as
+    /// panes come and go, unlike `PaneId`s.
+    pub fn number_of(&self, id: PaneId) -> Option<usize> {
+        self.leaves()
+            .iter()
+            .position(|leaf| *leaf == id)
+            .map(|index| index + 1)
+    }
+
     fn collect_leaves(&self, out: &mut Vec<PaneId>) {
         match self {
             SplitTree::Leaf(id) => out.push(*id),

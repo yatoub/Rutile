@@ -581,6 +581,35 @@ impl SessionView {
         self.broadcasting.set(false);
     }
 
+    /// Tilix's "Insert terminal number": the focused terminal types its
+    /// number, and so does every terminal the broadcast reaches — each its
+    /// own number, so `host-` + Ctrl+Shift+Alt+N gives `host-1`,
+    /// `host-2`… across synchronized panes. The broadcast guard is held
+    /// throughout: otherwise the focused terminal's `commit` would send
+    /// its own number to everyone.
+    pub fn insert_terminal_number(&self) {
+        let Some(session_id) = self.current_session_id() else {
+            return;
+        };
+        let Some(pane_view) = self.sessions.get(&session_id) else {
+            return;
+        };
+        let origin = pane_view.focused();
+        let was_broadcasting = self.broadcasting.replace(true);
+        let targets = self.broadcast.targets(origin, session_id);
+        for pane_id in std::iter::once(origin).chain(targets) {
+            // A broadcast target is always in the origin's session.
+            if let (Some(number), Some(terminal)) = (
+                pane_view.terminal_number(pane_id),
+                pane_view.widget_for(pane_id),
+            ) {
+                terminal.feed_child(number.to_string().as_bytes());
+                crate::terminal::widget::scroll_on_input(terminal);
+            }
+        }
+        self.broadcasting.set(was_broadcasting);
+    }
+
     /// Marks `pane_id` as the focused pane of its session — called whenever
     /// GTK focus lands on that pane's terminal (mouse click, Tab, etc.), so
     /// that subsequent split/close/broadcast actions target whatever the
