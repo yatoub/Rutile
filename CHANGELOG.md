@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.12.0] — 2026-11-07
+
+### Added
+
+- Add regex triggers with display-only actions
+
+
 ## [0.11.0] — 2026-11-07
 
 ### Added
