@@ -603,6 +603,17 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
     }
     window.add_action(&preferences_action);
 
+    let about_action = gio::SimpleAction::new("about", None);
+    {
+        let window_weak = window.downgrade();
+        about_action.connect_activate(move |_, _| {
+            if let Some(window) = window_weak.upgrade() {
+                about_window(&window).present();
+            }
+        });
+    }
+    window.add_action(&about_action);
+
     let key_controller = gtk4::EventControllerKey::new();
     key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
     {
@@ -815,6 +826,7 @@ fn build_toolbar(
 
     let preferences_section = gio::Menu::new();
     preferences_section.append(Some("Préférences"), Some("win.preferences"));
+    preferences_section.append(Some("À propos de Rutile"), Some("win.about"));
     menu.append_section(None, &preferences_section);
 
     let menu_button = gtk4::MenuButton::builder()

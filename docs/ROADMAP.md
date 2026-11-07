@@ -1,7 +1,7 @@
 # Roadmap
 
-> **État réel au 2026-11-03 : série v0.6** (version exacte : badge Release
-> du README / `CHANGELOG.md`, jamais en dur ici). Ce document a été réaligné sur le
+> **État réel au 2026-11-07 : série v0.9** (version exacte : badge Release
+> du README / `CHANGELOG.md` / fenêtre « À propos », jamais en dur ici). Ce document a été réaligné sur le
 > code livré — l'ancien décrivait encore un « MVP v0.1 » alors que le socle
 > et une grosse partie de la parité étaient déjà codés, livrés et utilisés
 > au quotidien. La numérotation a été **renumérotée** : ce qui est déjà
@@ -14,7 +14,7 @@
 > stables et utilisés au quotidien, et couvre tout ce qui manque pour la
 > **parité fonctionnelle** avec Tilix.
 
-## ✅ Déjà livré (v0.1 → v0.6)
+## ✅ Déjà livré (v0.1 → v0.9)
 
 Ci-dessous ce qui est codé et fonctionnel aujourd'hui — le socle sur
 lequel la suite se construit.
@@ -128,7 +128,11 @@ nouvelle feature.
 - [x] Reclasser les pages Préférences placeholder comme telles et lister
   leur contenu réel restant (Appearance/Encoding → Phase 2, Bookmarks →
   Phase 4, Advanced → Phase 5)
-- [ ] S'assurer que `CHANGELOG.md` et la page `About`/version suivent
+- [x] S'assurer que `CHANGELOG.md` et la page `About`/version suivent —
+  fenêtre « À propos de Rutile » (menu hamburger), `adw::AboutWindow` et
+  pas `adw::AboutDialog` (libadwaita 1.5, au-dessus du plancher 1.4) ; la
+  version vient de `CARGO_PKG_VERSION`, donc suit le bump de release-plz
+  sans rien toucher
 
 ### Phase 1 — Profondeur des profils (M1) — le plus gros levier de parité
 
