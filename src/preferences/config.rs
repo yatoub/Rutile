@@ -86,6 +86,16 @@ pub struct Preferences {
     pub advanced_paste_tabs_to_spaces: bool,
     pub advanced_paste_tab_width: u32,
     pub advanced_paste_normalize_line_endings: bool,
+    /// Triggers every terminal checks, before its profile's own
+    /// (`terminal::triggers`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub triggers: Vec<crate::terminal::triggers::Trigger>,
+    /// How many rows triggers read per change of the terminal — Tilix's
+    /// "Limit number of lines for trigger processing" (256 by default).
+    /// Output scrolling faster than that is partly skipped, which keeps
+    /// heavy output from slowing down.
+    pub trigger_lines: u32,
+    pub trigger_unlimited_lines: bool,
 }
 
 /// Tilix's "On new instance" choices, shared with the `--action` command
@@ -274,6 +284,9 @@ impl Default for Preferences {
             advanced_paste_tabs_to_spaces: false,
             advanced_paste_tab_width: 4,
             advanced_paste_normalize_line_endings: false,
+            triggers: Vec::new(),
+            trigger_lines: 256,
+            trigger_unlimited_lines: false,
         }
     }
 }
@@ -292,6 +305,11 @@ impl Preferences {
             strip_trailing_whitespace: self.paste_strip_trailing_whitespace,
             strip_first_char: self.paste_strip_first_char,
         }
+    }
+
+    /// The trigger row limit per change, `None` for none.
+    pub fn trigger_max_lines(&self) -> Option<usize> {
+        (!self.trigger_unlimited_lines).then_some(self.trigger_lines.max(1) as usize)
     }
 
     /// The advanced paste dialog's current transforms.
@@ -361,6 +379,8 @@ mod tests {
         assert!(!old.wide_handles);
         assert!(old.show_title_when_single);
         assert!(old.unsafe_paste_alert);
+        assert!(old.triggers.is_empty());
+        assert_eq!(old.trigger_max_lines(), Some(256));
         assert!(!old.paste_advanced_default);
         assert_eq!(old.advanced_paste_tab_width, 4);
     }

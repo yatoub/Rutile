@@ -33,6 +33,7 @@ pub fn build(
 
     let prefs_for_appearance = prefs.clone();
     let prefs_for_bookmarks = prefs.clone();
+    let prefs_for_advanced = prefs.clone();
     window.add(&general_page(prefs.clone()));
     let profiles_page = ProfilesPage::new(&window, prefs, profiles, schemes.clone());
     window.add(profiles_page.page());
@@ -52,11 +53,7 @@ pub fn build(
         "text-x-generic-symbolic",
         "Choosing which encodings the terminal menu offers is planned. The encoding itself is already set per profile: Profiles → edit a profile → Compatibility.",
     ));
-    window.add(&placeholder_page(
-        "Advanced",
-        "applications-system-symbolic",
-        "Planned (roadmap phase 5): regex triggers and unsafe-paste warnings.",
-    ));
+    window.add(&advanced_page(prefs_for_advanced));
 
     window
 }
@@ -183,6 +180,89 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
 
     page.add(&behavior_group);
     page.add(&paste_group(prefs));
+    page
+}
+
+/// The "Advanced" page: the global triggers and how much output they read.
+fn advanced_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
+    let page = adw::PreferencesPage::builder()
+        .title("Advanced")
+        .icon_name("applications-system-symbolic")
+        .build();
+
+    let initial = prefs.borrow().triggers.clone();
+    {
+        let prefs = prefs.clone();
+        page.add(&super::triggers::group(
+            "Triggers",
+            "Regular expressions matched against every terminal's output, before \
+             the profile's own triggers. $0 is the whole match, $1 to $9 its groups.",
+            initial,
+            move |triggers| {
+                {
+                    let mut prefs = prefs.borrow_mut();
+                    prefs.triggers = triggers;
+                    prefs.save();
+                }
+                crate::window::reload_triggers_everywhere();
+            },
+        ));
+    }
+
+    let limits = adw::PreferencesGroup::builder()
+        .title("Trigger processing")
+        .description(
+            "Rows read each time a terminal's content changes. Output faster than \
+             that is partly skipped instead of slowing the terminal down.",
+        )
+        .build();
+    let (lines, unlimited) = {
+        let prefs = prefs.borrow();
+        (prefs.trigger_lines, prefs.trigger_unlimited_lines)
+    };
+    let lines_row = adw::SpinRow::builder()
+        .title("Rows checked per change")
+        .adjustment(&gtk4::Adjustment::new(
+            f64::from(lines),
+            1.0,
+            100_000.0,
+            1.0,
+            64.0,
+            0.0,
+        ))
+        .sensitive(!unlimited)
+        .build();
+    let unlimited_row = adw::SwitchRow::builder()
+        .title("No limit")
+        .subtitle("Every row is checked: heavy output gets slower with an unlimited scrollback")
+        .active(unlimited)
+        .build();
+    {
+        let prefs = prefs.clone();
+        lines_row.connect_value_notify(move |row| {
+            {
+                let mut prefs = prefs.borrow_mut();
+                prefs.trigger_lines = row.value() as u32;
+                prefs.save();
+            }
+            crate::window::reload_triggers_everywhere();
+        });
+    }
+    {
+        let lines_row = lines_row.clone();
+        unlimited_row.connect_active_notify(move |row| {
+            lines_row.set_sensitive(!row.is_active());
+            {
+                let mut prefs = prefs.borrow_mut();
+                prefs.trigger_unlimited_lines = row.is_active();
+                prefs.save();
+            }
+            crate::window::reload_triggers_everywhere();
+        });
+    }
+    limits.add(&lines_row);
+    limits.add(&unlimited_row);
+    page.add(&limits);
     page
 }
 

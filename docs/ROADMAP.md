@@ -319,12 +319,48 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
   synchronisée, chaque pane atteint tape **son propre** numéro (garde
   `broadcasting` tenue pendant l'insertion, sinon le `commit` d'origine
   rediffuserait le sien)
-- [ ] **Triggers** (regex → action) : `terminal/regex.rs`, CSV `pattern,
-  action, parameter`, éditeur dédié (comme Tilix AdvDialog), `Profiles`
-  globaux + par profil. **Point le plus risqué** : pas de signal natif
-  « ligne matchée » identifiée en vte4 — à spiker avant d'estimer, probable
-  diff via `connect_contents_changed` + `get_text_range`. Par défaut limité
-  en lignes de traitement (comme Tilix) si coût trop élevé
+- [ ] **Triggers** (regex → action) — spike fait, livré en deux PR
+  (décision utilisateur) :
+  - [x] **PR 1 — moteur + actions passives + éditeur** : `terminal/triggers.rs`
+    (sans GTK, testé sur un faux écran : tous les cas du spike),
+    `terminal/trigger_runner.rs` (branchement vte + actions),
+    `preferences/triggers.rs` (éditeur). Actions : mise à jour d'état
+    (user/host/dir → titre, badge **et changement automatique de profil**,
+    utile en ssh où OSC 7 ne remonte rien), notification (si le terminal
+    n'a pas le focus, une par pane et trigger), titre, badge, cloche.
+    Triggers globaux (page Advanced, ex-placeholder) puis ceux du profil
+    (onglet Advanced), appliqués **en direct** à tous les terminaux.
+    Limite de lignes par changement (256 par défaut, comme Tilix) ;
+    5 déclenchements/s max par trigger
+  - [ ] **PR 2 — actions actives** (envoyer du texte, exécuter une commande,
+    lancer un processus) avec garde-fous dédiés : argv uniquement (jamais
+    `sh -c`), groupes capturés débarrassés des caractères de contrôle,
+    limiteur qui désactive un trigger emballé, pas de diffusion du texte
+    injecté aux panes synchronisés (chacun a ses propres triggers).
+    « Insert password » attend un stockage de mots de passe (6.3)
+
+  **Résultats du spike** (vte 0.84, mesures sur une vraie fenêtre) :
+  - Le repère (ligne, colonne) de Tilix rate une ligne reçue en plusieurs
+    morceaux, une barre de progression réécrite par `\r`, et relit les
+    lignes déjà traitées en sortant de l'écran alternatif → moteur **par
+    ligne logique** avec déduplication (voir la doc de `terminal/triggers.rs`)
+  - Numéros de ligne vte absolus et croissants (même après `reset` ou
+    quand le scrollback jette des lignes) ; `text_range (r,0)→(r+1,0)` se
+    termine par `\n` à une vraie fin de ligne, sans `\n` pour une ligne
+    repliée — sauf la ligne du curseur, toujours avec
+  - **Aucun moyen de reconnaître l'écran alternatif** avec le vte standard
+    (Tilix ne traite ses triggers qu'avec son vte patché ; les termprops
+    vte ≥ 0.78 n'en parlent pas et sont au-dessus du plancher) : son
+    contenu est scanné comme le reste — documenté, couvert par la
+    déduplication et le limiteur
+  - vte regroupe énormément `contents-changed` (~22 événements pour 2 M
+    lignes) : sous gros débit, les lignes sorties du scrollback entre deux
+    événements ne sont jamais vues (Tilix pareil). Coût : négligeable
+    plafonné à 256 lignes ; sans plafond avec scrollback illimité, `yes`
+    passe de 2,5 s à 7,1 s et la boucle GTK monte à 113 ms
+  - Moteur regex : crate `regex` (temps linéaire). PCRE (`glib::Regex`)
+    sur `^(a+)+$` atteint sa limite après 30–220 ms par ligne et échoue en
+    silence → plusieurs secondes de gel par événement sur une sortie piégée
 
 ### Phase 6 — Mode quake, Nautilus, signets étendus, i18n (M10, M11, M4bis) — détaillé
 

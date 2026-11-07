@@ -97,6 +97,20 @@ fn about_dialog() -> adw::AboutDialog {
         .build()
 }
 
+/// Every terminal of every window re-reads its triggers — after the global
+/// or a profile's triggers were edited in Preferences, so a new pattern
+/// can be tried right away, like in Tilix.
+pub fn reload_triggers_everywhere() {
+    for window in gtk4::Window::list_toplevels() {
+        if let Ok(window) = window.downcast::<adw::ApplicationWindow>()
+            && let Some(handles) = WindowHandles::of(&window)
+            && let Ok(session_view) = handles.session_view.try_borrow()
+        {
+            session_view.reload_triggers(&handles.resolver());
+        }
+    }
+}
+
 /// The pane layout settings out of the Appearance preferences.
 fn layout_style(prefs: &Preferences) -> LayoutStyle {
     LayoutStyle {
@@ -231,7 +245,11 @@ impl WindowHandles {
     }
 
     fn resolver(&self) -> ProfileResolver {
-        ProfileResolver::new(self.profiles.clone(), self.schemes.clone())
+        ProfileResolver::new(
+            self.profiles.clone(),
+            self.schemes.clone(),
+            self.prefs.clone(),
+        )
     }
 }
 
@@ -368,7 +386,7 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
     // there's nothing that needs to invalidate this snapshot.
     let schemes = Rc::new(ColorSchemeStore::load());
 
-    let resolver = ProfileResolver::new(profiles.clone(), schemes.clone());
+    let resolver = ProfileResolver::new(profiles.clone(), schemes.clone(), prefs.clone());
     let resolve_config = {
         let resolver = resolver.clone();
         move |profile_id: &ProfileId| -> TerminalConfig { resolver.resolve(profile_id) }

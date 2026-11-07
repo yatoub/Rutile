@@ -729,6 +729,21 @@ impl ProfilesPage {
         refresh();
 
         page.add(&group);
+
+        let profiles = self.profiles.clone();
+        let profile_id = profile.id.clone();
+        page.add(&super::triggers::group(
+            "Triggers",
+            "Checked after the global triggers (Preferences → Advanced), in \
+             terminals using this profile. $0 is the whole match, $1 to $9 its groups.",
+            profile.triggers.clone(),
+            move |triggers| {
+                profiles
+                    .borrow_mut()
+                    .update(&profile_id, |p| p.triggers = triggers);
+                crate::window::reload_triggers_everywhere();
+            },
+        ));
         page
     }
 

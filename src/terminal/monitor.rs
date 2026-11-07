@@ -103,7 +103,9 @@ pub fn attach<Pid, Enabled, Silence>(
     });
 }
 
-fn pane_is_active(terminal: &vte4::Terminal) -> bool {
+/// Whether `terminal` has the keyboard focus in the active window — what
+/// the user is looking at, so not worth a notification.
+pub(crate) fn pane_is_active(terminal: &vte4::Terminal) -> bool {
     if !terminal.has_focus() {
         return false;
     }

@@ -5,7 +5,8 @@ use std::rc::Rc;
 use gtk4::prelude::*;
 
 use crate::layout::{Direction, Orientation, PaneId, SplitId, SplitTree};
-use crate::profile::{ProfileId, TerminalConfig};
+use crate::profile::{ProfileId, ProfileResolver, TerminalConfig};
+use crate::terminal::trigger_runner::Overrides;
 use crate::terminal::{MarginGuide, SearchBar, TerminalWidget};
 
 /// The Appearance preferences that shape how a session's panes are laid
@@ -231,6 +232,24 @@ impl PaneView {
     /// See `TerminalWidget::profile_id`.
     pub fn profile_id_of(&self, id: PaneId) -> Option<ProfileId> {
         self.widgets.get(&id).map(TerminalWidget::profile_id)
+    }
+
+    /// See `TerminalWidget::trigger_overrides`.
+    pub fn trigger_overrides(&self, id: PaneId) -> Option<Rc<RefCell<Overrides>>> {
+        self.widgets.get(&id).map(TerminalWidget::trigger_overrides)
+    }
+
+    pub fn connect_trigger_overrides_changed(&self, id: PaneId, listener: impl Fn() + 'static) {
+        if let Some(widget) = self.widgets.get(&id) {
+            widget.connect_trigger_overrides_changed(listener);
+        }
+    }
+
+    /// See `TerminalWidget::reload_triggers`.
+    pub fn reload_triggers(&self, resolver: &ProfileResolver) {
+        for widget in self.widgets.values() {
+            widget.reload_triggers(resolver);
+        }
     }
 
     /// See `SplitTree::number_of`.
