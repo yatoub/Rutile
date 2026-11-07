@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.11.0] — 2026-11-07
+
+### Added
+
+- Add Insert terminal number
+
+- Add Tilix's paste settings and advanced paste dialog
+
+
 ## [0.10.0] — 2026-11-07
 
 ### Added
