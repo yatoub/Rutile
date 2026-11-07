@@ -3,6 +3,7 @@ pub mod bookmarks;
 pub mod cli;
 pub mod context_menu;
 pub mod dialogs;
+pub mod i18n;
 pub mod keymap;
 pub mod layout;
 pub mod pane_header;
