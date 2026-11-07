@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.13.0] — 2026-11-07
+
+### Added
+
+- Add send text, execute command and run process actions
+
+
 ## [0.12.0] — 2026-11-07
 
 ### Added
