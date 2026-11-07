@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.10.0] — 2026-11-07
+
+### Added
+
+- Add an About window
+
+- Add wide splitter handles and hiding a lone pane's title
+
+
+### Fixed
+
+- Call AdwDialogExt::present explicitly
+
+- Use adw::AboutDialog
+
+- Use the pane's own profile for the silence delay
+
+
 ## [0.9.0] — 2026-11-06
 
 ### Added
