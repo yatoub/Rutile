@@ -235,7 +235,10 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
     (`Preferences::sidebar_position`) — Rutile n'a pas de barre d'onglets,
     l'équivalent de la « position des onglets » de Tilix est le panneau
     latéral, d'où seulement gauche/droite
-  - [ ] Poignées larges, « show title even when single »
+  - [x] Poignées larges, « show title even when single » (groupe
+    « Panes ») — défauts de Tilix (poignées fines, titre affiché).
+    `LayoutStyle` copié dans `SessionView`/`PaneView`, appliqué à chaque
+    rebuild et en direct sans rebuild (`PaneView::set_layout`)
 - [x] **Encodage** par profil (onglet Compatibility de l'éditeur) + largeur
   CJK narrow/wide. Le crate `vte4` sûr n'enveloppe plus `set_encoding`
   (déprécié par vte), appelé via `vte4::ffi` (`terminal/encoding.rs`) ; la

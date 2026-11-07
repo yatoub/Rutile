@@ -7,7 +7,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use vte4::TerminalExt;
 
-use crate::layout::pane_view::PaneView;
+use crate::layout::pane_view::{LayoutStyle, PaneView};
 use crate::layout::{Direction, Orientation, PaneId};
 use crate::profile::{ProfileId, TerminalConfig};
 use crate::session::persist::{PaneMeta, SavedSession};
@@ -80,6 +80,9 @@ pub struct SessionView {
     /// whichever pane is currently focused without `pane_header.rs` having
     /// to know anything about the keyboard layer.
     pane_title_labels: HashMap<PaneId, gtk4::EditableLabel>,
+    /// Splitter handles and lone-pane headers (Appearance preferences),
+    /// given to every session's `PaneView`.
+    layout: LayoutStyle,
 }
 
 impl SessionView {
@@ -103,6 +106,16 @@ impl SessionView {
             session_profiles: HashMap::new(),
             session_names: HashMap::new(),
             pane_title_labels: HashMap::new(),
+            layout: LayoutStyle::default(),
+        }
+    }
+
+    /// Applies a new layout style to every session, and to the ones
+    /// created from now on.
+    pub fn set_layout_style(&mut self, layout: LayoutStyle) {
+        self.layout = layout;
+        for pane_view in self.sessions.values_mut() {
+            pane_view.set_layout(layout);
         }
     }
 
@@ -212,7 +225,7 @@ impl SessionView {
         let pane_id = self.next_pane_id;
         self.next_pane_id += 1;
 
-        let pane_view = PaneView::new(pane_id, config, cwd);
+        let pane_view = PaneView::new(pane_id, config, self.layout, cwd);
         self.insert_session(profile_id, pane_view)
     }
 
@@ -236,7 +249,7 @@ impl SessionView {
             })
             .collect();
 
-        let pane_view = PaneView::from_tree(tree, config, move |id| {
+        let pane_view = PaneView::from_tree(tree, config, self.layout, move |id| {
             cwd_by_new_id.get(&id).cloned().flatten()
         });
         let session_id = self.insert_session(saved.profile_id.clone(), pane_view);

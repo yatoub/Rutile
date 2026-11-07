@@ -70,12 +70,13 @@ pub struct PaneView {
     /// profile changes later — matches Tilix, which also only applies a
     /// profile change to newly spawned terminals.
     config: TerminalConfig,
+    layout: LayoutStyle,
 }
 
 impl PaneView {
     /// `cwd`: the first terminal's starting directory, `None` for the
     /// profile's or vte's default (see `TerminalWidget::new`).
-    pub fn new(id: PaneId, config: TerminalConfig, cwd: Option<&str>) -> Self {
+    pub fn new(id: PaneId, config: TerminalConfig, layout: LayoutStyle, cwd: Option<&str>) -> Self {
         let mut this = Self {
             tree: Rc::new(RefCell::new(SplitTree::new_leaf(id))),
             widgets: HashMap::new(),
@@ -87,9 +88,11 @@ impl PaneView {
             maximized: None,
             root: gtk4::Box::new(gtk4::Orientation::Vertical, 0).upcast(),
             config,
+            layout,
         };
         this.create_pane_with_cwd(id, cwd);
         this.root = this.wrappers[&id].clone().upcast();
+        this.apply_layout();
         this
     }
 
@@ -101,6 +104,7 @@ impl PaneView {
     pub fn from_tree(
         tree: SplitTree,
         config: TerminalConfig,
+        layout: LayoutStyle,
         cwd_for: impl Fn(PaneId) -> Option<String>,
     ) -> Self {
         let leaves = tree.leaves();
@@ -118,6 +122,7 @@ impl PaneView {
             maximized: None,
             root: gtk4::Box::new(gtk4::Orientation::Vertical, 0).upcast(),
             config,
+            layout,
         };
         for id in leaves {
             this.create_pane_with_cwd(id, cwd_for(id).as_deref());
@@ -366,6 +371,26 @@ impl PaneView {
         true
     }
 
+    /// Switches to another layout style (Preferences changed) and applies
+    /// it to the current widgets, without a rebuild.
+    pub fn set_layout(&mut self, layout: LayoutStyle) {
+        self.layout = layout;
+        self.apply_layout();
+    }
+
+    /// Applies `self.layout` to the live widgets: the splitters' handle
+    /// width, and the pane headers' visibility (hidden only for a lone
+    /// pane, and only if the style asks for it).
+    fn apply_layout(&self) {
+        let show_headers = self.layout.title_when_single || !self.is_leaf_only();
+        for header in self.headers.values() {
+            header.set_visible(show_headers);
+        }
+        for_each_paned(&self.root, &|paned| {
+            paned.set_wide_handle(self.layout.wide_handles)
+        });
+    }
+
     pub fn is_leaf_only(&self) -> bool {
         self.tree.borrow().is_leaf_only()
     }
@@ -423,6 +448,7 @@ impl PaneView {
                 Self::build_widget(&self.tree, &node, &self.wrappers)
             }
         };
+        self.apply_layout();
     }
 
     /// `tree` is the whole-tree handle cloned into each `GtkPaned`'s
@@ -454,7 +480,6 @@ impl PaneView {
                     Orientation::Vertical => gtk4::Orientation::Vertical,
                 };
                 let paned = gtk4::Paned::new(gtk_orientation);
-                paned.set_wide_handle(true);
                 paned.set_start_child(Some(&Self::build_widget(tree, left, wrappers)));
                 paned.set_end_child(Some(&Self::build_widget(tree, right, wrappers)));
                 paned.set_vexpand(true);
@@ -508,6 +533,22 @@ impl PaneView {
                 paned.upcast()
             }
         }
+    }
+}
+
+/// Calls `f` on every `GtkPaned` of a split tree rendered by
+/// `PaneView::build_widget` — only Paneds are descended into, the pane
+/// wrappers at the leaves are left alone.
+fn for_each_paned(widget: &gtk4::Widget, f: &dyn Fn(&gtk4::Paned)) {
+    let Some(paned) = widget.downcast_ref::<gtk4::Paned>() else {
+        return;
+    };
+    f(paned);
+    for child in [paned.start_child(), paned.end_child()]
+        .into_iter()
+        .flatten()
+    {
+        for_each_paned(&child, f);
     }
 }
 

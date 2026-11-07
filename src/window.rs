@@ -11,6 +11,7 @@ use crate::cli::{LaunchRequest, WindowState};
 use crate::context_menu;
 use crate::dialogs::{bookmark_editor, bookmark_picker, confirm_close};
 use crate::keymap::{self, Action, Keymap};
+use crate::layout::pane_view::LayoutStyle;
 use crate::layout::{Orientation, PaneId};
 use crate::preferences::{self, NewInstanceMode, Preferences, SidebarPosition, WindowStyle};
 use crate::profile::{ColorSchemeStore, ProfileId, ProfileResolver, ProfileStore, TerminalConfig};
@@ -38,6 +39,13 @@ fn child_named(parent: &gtk4::Widget, name: &str) -> Option<gtk4::Widget> {
 /// either changes (see `apply_window_preferences_to_all`).
 pub fn apply_window_preferences(window: &adw::ApplicationWindow, prefs: &Preferences) {
     window.set_decorated(prefs.window_style != WindowStyle::Borderless);
+    // No handles yet while `build_window` is still putting the window
+    // together (it gives the SessionView its layout style itself).
+    if let Some(handles) = WindowHandles::of(window)
+        && let Ok(mut session_view) = handles.session_view.try_borrow_mut()
+    {
+        session_view.set_layout_style(layout_style(prefs));
+    }
     let Some(content) = adw::prelude::AdwApplicationWindowExt::content(window) else {
         return;
     };
@@ -72,6 +80,32 @@ pub fn apply_window_preferences(window: &adw::ApplicationWindow, prefs: &Prefere
     body.reorder_child_after(order[0], None::<&gtk4::Widget>);
     body.reorder_child_after(order[1], Some(order[0]));
     body.reorder_child_after(order[2], Some(order[1]));
+}
+
+/// The "About" window. `adw::AboutWindow` rather than `adw::AboutDialog`:
+/// the latter needs libadwaita 1.5, above the 1.4 floor (Ubuntu 24.04).
+fn about_window(parent: &adw::ApplicationWindow) -> adw::AboutWindow {
+    adw::AboutWindow::builder()
+        .transient_for(parent)
+        .modal(true)
+        .application_name("Rutile")
+        // Same generic icon as `resources/rutile.desktop`.
+        .application_icon("utilities-terminal")
+        .version(env!("CARGO_PKG_VERSION"))
+        .comments(env!("CARGO_PKG_DESCRIPTION"))
+        .website(env!("CARGO_PKG_REPOSITORY"))
+        .issue_url(concat!(env!("CARGO_PKG_REPOSITORY"), "/issues"))
+        .license_type(gtk4::License::MitX11)
+        .developer_name("Yatoub")
+        .build()
+}
+
+/// The pane layout settings out of the Appearance preferences.
+fn layout_style(prefs: &Preferences) -> LayoutStyle {
+    LayoutStyle {
+        wide_handles: prefs.wide_handles,
+        title_when_single: prefs.show_title_when_single,
+    }
 }
 
 /// `apply_window_preferences` on every open Rutile window.
@@ -355,6 +389,9 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
         })
     };
     let session_view = Rc::new(RefCell::new(SessionView::new(resolve_default)));
+    session_view
+        .borrow_mut()
+        .set_layout_style(layout_style(&prefs.borrow()));
 
     open_initial_sessions(&session_view, &resolver, &prefs, launch, first_window);
 
