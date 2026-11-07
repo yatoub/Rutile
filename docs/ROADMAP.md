@@ -300,12 +300,25 @@ Dépend de Phase 1 pour les champs par profil ; remplit les placeholders.
 
 ### Phase 5 — Collage avancé complet + triggers + insert number (M7, M8, M9)
 
-- [ ] **Paste avancé complet** : avertissement « paste non sûr » heuristique
-  (multiligne) + strip premier caractère (commentaire/déclaration variable),
-  options en préférences (`unsafe_paste_alert`, `strip_first_char_on_paste`,
-  `strip_trailing_whitespace`, `paste_advanced_default`)
-- [ ] **Insert number** (`Action::InsertNumber`) : insère l'id du terminal,
-  avec broadcast `INSERT_TERMINAL_NUMBER` pour paralléliser une itération
+- [x] **Paste avancé complet** : logique pure dans `terminal/paste.rs`
+  (testée), dialogues dans `dialogs/paste.rs`. Collage simple : nettoyage
+  (espaces de fin y compris le dernier saut de ligne, `#`/`$` en tête) puis
+  alerte si le texte contient `sudo` **et** un saut de ligne (heuristique
+  de Tilix) — « Paste Anyway » ne réavertit plus dans ce terminal, comme
+  Tilix. Collage avancé (Ctrl+Shift+Alt+V) : dialogue avec le texte
+  éditable, l'alerte si besoin, tabulations → espaces et CRLF/CR → LF
+  (choix mémorisés), Ctrl+Entrée pour coller ; un texte d'une ligne est
+  collé directement. Groupe « Paste » dans General (défauts de Tilix).
+  Le texte part par `paste_text` (bracketed paste respecté) et ressort par
+  `commit`, donc les panes synchronisés le reçoivent. Le collage au clic
+  milieu reste celui de vte (pas d'alerte, comme Tilix)
+- [x] **Insert number** (`Action::InsertNumber`, Ctrl+Shift+Alt+N — non lié
+  chez Tilix) : insère le numéro du terminal, sa position dans la session
+  en ordre de lecture (`SplitTree::number_of`, renuméroté à la fermeture,
+  comme le `terminalID` de Tilix — pas le `PaneId` global). En saisie
+  synchronisée, chaque pane atteint tape **son propre** numéro (garde
+  `broadcasting` tenue pendant l'insertion, sinon le `commit` d'origine
+  rediffuserait le sien)
 - [ ] **Triggers** (regex → action) : `terminal/regex.rs`, CSV `pattern,
   action, parameter`, éditeur dédié (comme Tilix AdvDialog), `Profiles`
   globaux + par profil. **Point le plus risqué** : pas de signal natif

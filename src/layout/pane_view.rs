@@ -233,6 +233,11 @@ impl PaneView {
         self.widgets.get(&id).map(TerminalWidget::profile_id)
     }
 
+    /// See `SplitTree::number_of`.
+    pub fn terminal_number(&self, id: PaneId) -> Option<usize> {
+        self.tree.borrow().number_of(id)
+    }
+
     pub fn widget_for(&self, id: PaneId) -> Option<&vte4::Terminal> {
         self.widgets.get(&id).map(|w| w.widget())
     }

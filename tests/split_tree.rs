@@ -220,3 +220,18 @@ fn find_resizable_ancestor_matches_nearest_matching_orientation() {
     assert_eq!(split_id, 102);
     assert!(!is_left);
 }
+
+#[test]
+fn terminal_numbers_follow_reading_order_and_close_up() {
+    let mut tree = SplitTree::new_leaf(10);
+    tree.split(10, Orientation::Horizontal, 20, 100);
+    // Split the first pane: the new one sits between 10 and 20.
+    tree.split(10, Orientation::Vertical, 30, 101);
+    assert_eq!(tree.number_of(10), Some(1));
+    assert_eq!(tree.number_of(30), Some(2));
+    assert_eq!(tree.number_of(20), Some(3));
+    assert_eq!(tree.number_of(99), None);
+
+    tree.close(30);
+    assert_eq!(tree.number_of(20), Some(2));
+}

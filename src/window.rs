@@ -705,6 +705,7 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
                     }
                 }
                 Action::ToggleMargin => session_view.borrow().toggle_margin_focused(),
+                Action::InsertNumber => session_view.borrow().insert_terminal_number(),
                 Action::SelectBookmark => {
                     if let Some(terminal) = session_view.borrow().focused_terminal() {
                         let include_return = prefs.borrow().bookmark_include_return;
