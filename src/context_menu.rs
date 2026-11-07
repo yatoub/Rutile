@@ -80,7 +80,7 @@ pub fn attach(
             move || {
                 session_view
                     .borrow()
-                    .profile_id_for(session_id)
+                    .pane_profile_id(session_id, pane_id)
                     .and_then(|id| profiles.borrow().get(&id).map(|p| p.silence_seconds))
                     .unwrap_or(10)
             }

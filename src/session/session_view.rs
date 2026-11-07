@@ -424,8 +424,8 @@ impl SessionView {
         Some(pane_id)
     }
 
-    /// The profile a session was created/restored with — for
-    /// `terminal::monitor` to look up its (live) `silence_seconds` per pane.
+    /// The profile a session was created/restored with — what a new split
+    /// of it starts with, and what `session::persist` saves.
     pub fn profile_id_for(&self, session_id: SessionId) -> Option<ProfileId> {
         self.session_profiles.get(&session_id).cloned()
     }
@@ -444,6 +444,13 @@ impl SessionView {
             .get(&session_id)
             .map(|pane_view| pane_view.pane_ids())
             .unwrap_or_default()
+    }
+
+    /// The profile a pane's terminal currently uses — not necessarily
+    /// its session's (`profile_id_for`): a split asked for with `-p`, or
+    /// automatic profile switching, can give it another one.
+    pub fn pane_profile_id(&self, session_id: SessionId, pane_id: PaneId) -> Option<ProfileId> {
+        self.sessions.get(&session_id)?.profile_id_of(pane_id)
     }
 
     pub fn widget_for(&self, session_id: SessionId, pane_id: PaneId) -> Option<vte4::Terminal> {

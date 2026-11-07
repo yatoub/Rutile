@@ -5,8 +5,30 @@ use std::rc::Rc;
 use gtk4::prelude::*;
 
 use crate::layout::{Direction, Orientation, PaneId, SplitId, SplitTree};
-use crate::profile::TerminalConfig;
+use crate::profile::{ProfileId, TerminalConfig};
 use crate::terminal::{MarginGuide, SearchBar, TerminalWidget};
+
+/// The Appearance preferences that shape how a session's panes are laid
+/// out — a copy of the two `Preferences` fields, so `PaneView` stays
+/// independent of the preferences module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LayoutStyle {
+    /// Tilix's "Use a wide handle for splitters".
+    pub wide_handles: bool,
+    /// Tilix's "Show the terminal title even if it's the only terminal":
+    /// when `false`, a session with a single pane hides its pane header.
+    pub title_when_single: bool,
+}
+
+impl Default for LayoutStyle {
+    /// Tilix's defaults.
+    fn default() -> Self {
+        Self {
+            wide_handles: false,
+            title_when_single: true,
+        }
+    }
+}
 
 /// Owns one session's split tree together with the live terminal widgets,
 /// and renders the tree into nested `GtkPaned`s. On every mutation the
@@ -199,6 +221,11 @@ impl PaneView {
     /// `None`.
     pub fn cwd_for(&self, id: PaneId) -> Option<String> {
         self.widgets.get(&id)?.current_directory()
+    }
+
+    /// See `TerminalWidget::profile_id`.
+    pub fn profile_id_of(&self, id: PaneId) -> Option<ProfileId> {
+        self.widgets.get(&id).map(TerminalWidget::profile_id)
     }
 
     pub fn widget_for(&self, id: PaneId) -> Option<&vte4::Terminal> {

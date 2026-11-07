@@ -195,8 +195,12 @@ rétro-compatible) :
   General / Command / Color / Scrolling (`src/preferences/profiles.rs`).
   Les onglets Compatibilité (encodage, Phase 2), Badge et Advanced
   (triggers, Phase 5) seront ajoutés avec leur contenu
-- [ ] Vérifier que `TerminalWidget::new(profile)` applique tous ces champs
-  au spawn et au rendu
+- [x] Vérifier que `TerminalWidget::new(profile)` applique tous ces champs
+  au spawn et au rendu — relu champ par champ (`Appearance::apply`,
+  `apply_options`, `apply_colors`, `Spawner`). Seul écart trouvé : le délai
+  de silence des notifications lisait le profil *de la session*, pas celui
+  du terminal (split `-p`, switch automatique) — corrigé via
+  `TerminalWidget::profile_id`
 
 ### Phase 2 — Appearance & encodage (M6, M5)
 

@@ -253,6 +253,12 @@ impl TerminalWidget {
         self.spawner.pid.get()
     }
 
+    /// The profile currently applied to this terminal: the one it was
+    /// created with, or the one automatic switching picked since.
+    pub fn profile_id(&self) -> ProfileId {
+        self.appearance.profile_id.borrow().clone()
+    }
+
     pub fn widget(&self) -> &vte4::Terminal {
         &self.terminal
     }
