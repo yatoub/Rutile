@@ -82,12 +82,9 @@ pub fn apply_window_preferences(window: &adw::ApplicationWindow, prefs: &Prefere
     body.reorder_child_after(order[2], Some(order[1]));
 }
 
-/// The "About" window. `adw::AboutWindow` rather than `adw::AboutDialog`:
-/// the latter needs libadwaita 1.5, above the 1.4 floor (Ubuntu 24.04).
-fn about_window(parent: &adw::ApplicationWindow) -> adw::AboutWindow {
-    adw::AboutWindow::builder()
-        .transient_for(parent)
-        .modal(true)
+/// The "About" dialog.
+fn about_dialog() -> adw::AboutDialog {
+    adw::AboutDialog::builder()
         .application_name("Rutile")
         // Same generic icon as `resources/rutile.desktop`.
         .application_icon("utilities-terminal")
@@ -608,7 +605,7 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
         let window_weak = window.downgrade();
         about_action.connect_activate(move |_, _| {
             if let Some(window) = window_weak.upgrade() {
-                about_window(&window).present();
+                about_dialog().present(Some(&window));
             }
         });
     }

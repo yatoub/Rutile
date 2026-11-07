@@ -129,8 +129,7 @@ nouvelle feature.
   leur contenu réel restant (Appearance/Encoding → Phase 2, Bookmarks →
   Phase 4, Advanced → Phase 5)
 - [x] S'assurer que `CHANGELOG.md` et la page `About`/version suivent —
-  fenêtre « À propos de Rutile » (menu hamburger), `adw::AboutWindow` et
-  pas `adw::AboutDialog` (libadwaita 1.5, au-dessus du plancher 1.4) ; la
+  dialogue « À propos de Rutile » (menu hamburger, `adw::AboutDialog`) ; la
   version vient de `CARGO_PKG_VERSION`, donc suit le bump de release-plz
   sans rien toucher
 
