@@ -322,6 +322,17 @@ impl TerminalWidget {
     }
 }
 
+/// Scrolls to the bottom after input that didn't come from the keyboard
+/// (a paste, an inserted number), if the profile scrolls on keystrokes —
+/// vte only does it for real key presses. Tilix does the same.
+pub fn scroll_on_input(terminal: &vte4::Terminal) {
+    if terminal.is_scroll_on_keystroke()
+        && let Some(adjustment) = terminal.vadjustment()
+    {
+        adjustment.set_value(adjustment.upper() - adjustment.page_size());
+    }
+}
+
 /// Applies a profile's font, cursor, scrolling and bell settings to a
 /// freshly created terminal.
 fn apply_options(terminal: &vte4::Terminal, options: &TerminalOptions) {

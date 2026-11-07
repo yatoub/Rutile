@@ -4,6 +4,7 @@ pub mod encoding;
 pub mod hyperlinks;
 pub mod margin;
 pub mod monitor;
+pub mod paste;
 pub mod search;
 pub mod title;
 pub mod widget;

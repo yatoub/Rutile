@@ -182,7 +182,53 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     behavior_group.add(&new_instance_row);
 
     page.add(&behavior_group);
+    page.add(&paste_group(prefs));
     page
+}
+
+/// Picks one `bool` field out of the preferences, for a switch row.
+type BoolField = fn(&mut Preferences) -> &mut bool;
+
+/// Tilix's paste settings (see `dialogs::paste`).
+fn paste_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder().title("Paste").build();
+    let rows: [(&str, &str, BoolField); 4] = [
+        (
+            "Warn before an unsafe paste",
+            "Several lines that use sudo",
+            |p| &mut p.unsafe_paste_alert,
+        ),
+        (
+            "Strip a leading # or $",
+            "A command copied with its prompt, or commented out",
+            |p| &mut p.paste_strip_first_char,
+        ),
+        (
+            "Strip trailing whitespace",
+            "Including the final line break, so the command doesn't run right away",
+            |p| &mut p.paste_strip_trailing_whitespace,
+        ),
+        (
+            "Advanced paste by default",
+            "Review and transform multi-line text before pasting it",
+            |p| &mut p.paste_advanced_default,
+        ),
+    ];
+    for (title, subtitle, field) in rows {
+        let row = adw::SwitchRow::builder()
+            .title(title)
+            .subtitle(subtitle)
+            .active(*field(&mut prefs.borrow_mut()))
+            .build();
+        let prefs = prefs.clone();
+        row.connect_active_notify(move |row| {
+            let mut prefs = prefs.borrow_mut();
+            *field(&mut prefs) = row.is_active();
+            prefs.save();
+        });
+        group.add(&row);
+    }
+    group
 }
 
 /// The "Appearance" page: theme variant, background image, window style

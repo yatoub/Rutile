@@ -69,6 +69,23 @@ pub struct Preferences {
     /// when off, a session with a single pane hides its pane header. On by
     /// default like there.
     pub show_title_when_single: bool,
+    /// Tilix's "Warn when attempting unsafe paste": ask before pasting
+    /// text that mentions `sudo` over several lines (`terminal::paste`).
+    pub unsafe_paste_alert: bool,
+    /// Tilix's "Strip first character of paste if comment or variable
+    /// declaration": drop a leading `#` or `$`.
+    pub paste_strip_first_char: bool,
+    /// Tilix's "Strip trailing whitespaces and linebreak characters on
+    /// paste".
+    pub paste_strip_trailing_whitespace: bool,
+    /// Tilix's "Advanced paste is default": the plain paste opens the
+    /// advanced paste dialog too.
+    pub paste_advanced_default: bool,
+    /// The advanced paste dialog's last choices, remembered like Tilix:
+    /// tabs to spaces (and every how many columns), CRLF/CR to LF.
+    pub advanced_paste_tabs_to_spaces: bool,
+    pub advanced_paste_tab_width: u32,
+    pub advanced_paste_normalize_line_endings: bool,
 }
 
 /// Tilix's "On new instance" choices, shared with the `--action` command
@@ -250,6 +267,13 @@ impl Default for Preferences {
             bookmark_include_return: true,
             wide_handles: false,
             show_title_when_single: true,
+            unsafe_paste_alert: true,
+            paste_strip_first_char: false,
+            paste_strip_trailing_whitespace: false,
+            paste_advanced_default: false,
+            advanced_paste_tabs_to_spaces: false,
+            advanced_paste_tab_width: 4,
+            advanced_paste_normalize_line_endings: false,
         }
     }
 }
@@ -262,6 +286,24 @@ fn config_path() -> PathBuf {
 }
 
 impl Preferences {
+    /// The settings that rewrite a plain paste's text.
+    pub fn paste_cleanup(&self) -> crate::terminal::paste::PasteCleanup {
+        crate::terminal::paste::PasteCleanup {
+            strip_trailing_whitespace: self.paste_strip_trailing_whitespace,
+            strip_first_char: self.paste_strip_first_char,
+        }
+    }
+
+    /// The advanced paste dialog's current transforms.
+    pub fn advanced_paste_transform(&self) -> crate::terminal::paste::AdvancedTransform {
+        crate::terminal::paste::AdvancedTransform {
+            tabs_to_spaces: self
+                .advanced_paste_tabs_to_spaces
+                .then_some(self.advanced_paste_tab_width as usize),
+            normalize_line_endings: self.advanced_paste_normalize_line_endings,
+        }
+    }
+
     /// Loads preferences from disk, falling back to defaults if the file
     /// doesn't exist yet or fails to parse (e.g. a future version wrote a
     /// format this build doesn't understand).
@@ -318,6 +360,9 @@ mod tests {
         assert_eq!(old.sidebar_position, SidebarPosition::Left);
         assert!(!old.wide_handles);
         assert!(old.show_title_when_single);
+        assert!(old.unsafe_paste_alert);
+        assert!(!old.paste_advanced_default);
+        assert_eq!(old.advanced_paste_tab_width, 4);
     }
 
     #[test]

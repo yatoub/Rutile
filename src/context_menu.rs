@@ -6,7 +6,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use vte4::TerminalExt;
 
-use crate::dialogs::{bookmark_editor, bookmark_picker};
+use crate::dialogs::{bookmark_editor, bookmark_picker, paste};
 use crate::layout::{Orientation, PaneId};
 use crate::pane_header;
 use crate::preferences::Preferences;
@@ -219,8 +219,9 @@ fn show_menu(
     }
     {
         let terminal = terminal.clone();
+        let prefs = prefs.clone();
         add_action(&menu_box, &popover, "Coller", move || {
-            terminal.paste_clipboard();
+            paste::paste_clipboard(&terminal, &prefs);
         });
     }
     {

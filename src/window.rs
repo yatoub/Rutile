@@ -9,7 +9,7 @@ use vte4::TerminalExt;
 
 use crate::cli::{LaunchRequest, WindowState};
 use crate::context_menu;
-use crate::dialogs::{bookmark_editor, bookmark_picker, confirm_close};
+use crate::dialogs::{bookmark_editor, bookmark_picker, confirm_close, paste};
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::pane_view::LayoutStyle;
 use crate::layout::{Orientation, PaneId};
@@ -671,7 +671,7 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
                 }
                 Action::Paste => {
                     if let Some(terminal) = session_view.borrow().focused_terminal() {
-                        terminal.paste_clipboard();
+                        paste::paste_clipboard(&terminal, &prefs);
                     }
                 }
                 Action::SwitchToSession(n) => {
@@ -701,7 +701,7 @@ pub fn build_window(app: &adw::Application, launch: &LaunchRequest) -> adw::Appl
                 }
                 Action::PasteAdvanced => {
                     if let Some(terminal) = session_view.borrow().focused_terminal() {
-                        paste_advanced(&terminal);
+                        paste::advanced_paste(&terminal, &prefs);
                     }
                 }
                 Action::ToggleMargin => session_view.borrow().toggle_margin_focused(),
@@ -860,30 +860,6 @@ fn split_focused_and_wire(
             );
         }
     }
-}
-
-/// `Action::PasteAdvanced`: pastes the clipboard's text with the same
-/// cleanup Tilix's own advanced paste applies before feeding it to the
-/// child process — CRLF/CR normalized to LF and trailing whitespace on each
-/// line stripped, so pasted shell commands don't pick up stray `^M`s or
-/// accidentally-included trailing spaces. The heuristic "this looks unsafe
-/// to paste" warning dialog Tilix also has is a separate, later addition
-/// (see `docs/ROADMAP.md` Phase 5) — this is just the transform itself.
-fn paste_advanced(terminal: &vte4::Terminal) {
-    let terminal = terminal.clone();
-    terminal
-        .clipboard()
-        .read_text_async(gio::Cancellable::NONE, move |result| {
-            let Ok(Some(text)) = result else { return };
-            let cleaned: String = text
-                .replace("\r\n", "\n")
-                .replace('\r', "\n")
-                .lines()
-                .map(|line| line.trim_end())
-                .collect::<Vec<_>>()
-                .join("\n");
-            terminal.feed_child(cleaned.as_bytes());
-        });
 }
 
 /// `Action::DetachSession`: pulls the currently selected session out of
