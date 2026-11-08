@@ -170,6 +170,7 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
 
     let current = prefs.borrow().new_instance_mode;
     let new_instance_row = adw::ComboRow::builder()
+        .factory(&super::combo_value_factory())
         .title(tr("On new instance"))
         .subtitle(tr(
             "When rutile is launched again while running (overridden by --action)",
@@ -340,6 +341,7 @@ fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
 
     let current = prefs.borrow().theme_variant;
     let row = adw::ComboRow::builder()
+        .factory(&super::combo_value_factory())
         .title(tr("Theme variant"))
         .subtitle(tr("Terminal colors come from each profile's color scheme"))
         .model(&gtk4::StringList::new(
@@ -405,6 +407,7 @@ fn window_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
 
     let current = prefs.borrow().window_style;
     let style_row = adw::ComboRow::builder()
+        .factory(&super::combo_value_factory())
         .title(tr("Window style"))
         .subtitle(tr("Without the toolbar, Preferences stay reachable with Ctrl+Comma and the terminal's right-click menu"))
         .model(&gtk4::StringList::new(&WindowStyle::ALL.map(WindowStyle::label)))
@@ -424,6 +427,7 @@ fn window_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
 
     let current = prefs.borrow().sidebar_position;
     let sidebar_row = adw::ComboRow::builder()
+        .factory(&super::combo_value_factory())
         .title(tr("Sidebar position"))
         .model(&gtk4::StringList::new(
             &SidebarPosition::ALL.map(SidebarPosition::label),
@@ -539,6 +543,7 @@ fn background_image_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGr
 
     let current = prefs.borrow().background_image_mode;
     let mode_row = adw::ComboRow::builder()
+        .factory(&super::combo_value_factory())
         .title(tr("Mode"))
         .model(&gtk4::StringList::new(
             &BackgroundImageMode::ALL.map(BackgroundImageMode::label),

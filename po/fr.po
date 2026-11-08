@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Rutile\n"
 "Report-Msgid-Bugs-To: https://github.com/yatoub/Rutile/issues\n"
-"POT-Creation-Date: 2026-11-08 13:03+0100\n"
+"POT-Creation-Date: 2026-11-08 13:19+0100\n"
 "PO-Revision-Date: 2026-11-08 13:00+0100\n"
 "Last-Translator: yatoub <yatoub@users.noreply.github.com>\n"
 "Language-Team: French\n"
@@ -41,7 +41,7 @@ msgid "Copy as HTML"
 msgstr "Copier au format HTML"
 
 #: src/context_menu.rs:229 src/dialogs/paste.rs:250 src/keymap.rs:313
-#: src/preferences/window.rs:292
+#: src/preferences/window.rs:293
 msgid "Paste"
 msgstr "Coller"
 
@@ -77,7 +77,7 @@ msgstr "Ajouter un signet…"
 msgid "Preferences"
 msgstr "Préférences"
 
-#: src/dialogs/bookmark_editor.rs:20 src/preferences/profiles.rs:223
+#: src/dialogs/bookmark_editor.rs:20 src/preferences/profiles.rs:232
 msgid "Name"
 msgstr "Nom"
 
@@ -316,7 +316,7 @@ msgstr "Modifier"
 msgid "Edit Bookmark"
 msgstr "Modifier le signet"
 
-#: src/preferences/bookmarks.rs:175 src/preferences/profiles.rs:447
+#: src/preferences/bookmarks.rs:175 src/preferences/profiles.rs:456
 msgid "Delete"
 msgstr "Supprimer"
 
@@ -412,7 +412,7 @@ msgstr "Par défaut"
 msgid "General"
 msgstr "Général"
 
-#: src/preferences/profiles.rs:170 src/preferences/profiles.rs:1161
+#: src/preferences/profiles.rs:170 src/preferences/profiles.rs:1173
 msgid "Color"
 msgstr "Couleur"
 
@@ -428,75 +428,75 @@ msgstr "Compatibilité"
 msgid "Badge"
 msgstr "Badge"
 
-#: src/preferences/profiles.rs:194 src/preferences/window.rs:204
+#: src/preferences/profiles.rs:194 src/preferences/window.rs:205
 msgid "Advanced"
 msgstr "Avancé"
 
-#: src/preferences/profiles.rs:250
+#: src/preferences/profiles.rs:259
 msgid "Default profile"
 msgstr "Profil par défaut"
 
-#: src/preferences/profiles.rs:251
+#: src/preferences/profiles.rs:260
 msgid "New sessions are created with this profile"
 msgstr "Les nouvelles sessions sont créées avec ce profil"
 
-#: src/preferences/profiles.rs:279 src/preferences/profiles.rs:1105
+#: src/preferences/profiles.rs:288 src/preferences/profiles.rs:1117
 msgid "Text"
 msgstr "Texte"
 
-#: src/preferences/profiles.rs:281
+#: src/preferences/profiles.rs:290
 msgid "Terminal font"
 msgstr "Police du terminal"
 
-#: src/preferences/profiles.rs:289 src/preferences/profiles.rs:854
+#: src/preferences/profiles.rs:298 src/preferences/profiles.rs:865
 msgid "Custom font"
 msgstr "Police personnalisée"
 
-#: src/preferences/profiles.rs:308
+#: src/preferences/profiles.rs:317
 msgid "Use the system monospace font"
 msgstr "Utiliser la police à chasse fixe du système"
 
-#: src/preferences/profiles.rs:322
+#: src/preferences/profiles.rs:331
 msgid "Cell width spacing"
 msgstr "Espacement horizontal des cellules"
 
-#: src/preferences/profiles.rs:329
+#: src/preferences/profiles.rs:338
 msgid "Cell height spacing"
 msgstr "Espacement vertical des cellules"
 
-#: src/preferences/profiles.rs:336
+#: src/preferences/profiles.rs:345
 msgid "Text blink"
 msgstr "Clignotement du texte"
 
-#: src/preferences/profiles.rs:345
+#: src/preferences/profiles.rs:354
 msgid "Cursor and selection"
 msgstr "Curseur et sélection"
 
-#: src/preferences/profiles.rs:350
+#: src/preferences/profiles.rs:359
 msgid "Cursor shape"
 msgstr "Forme du curseur"
 
-#: src/preferences/profiles.rs:359
+#: src/preferences/profiles.rs:368
 msgid "Cursor blink"
 msgstr "Clignotement du curseur"
 
-#: src/preferences/profiles.rs:366
+#: src/preferences/profiles.rs:375
 msgid "Word-wise select characters"
 msgstr "Caractères sélectionnés comme partie d’un mot"
 
-#: src/preferences/profiles.rs:384
+#: src/preferences/profiles.rs:393
 msgid "Bell and notifications"
 msgstr "Bip et notifications"
 
-#: src/preferences/profiles.rs:389
+#: src/preferences/profiles.rs:398
 msgid "Terminal bell"
 msgstr "Bip du terminal"
 
-#: src/preferences/profiles.rs:398
+#: src/preferences/profiles.rs:407
 msgid "Notify after silence"
 msgstr "Notifier après un silence"
 
-#: src/preferences/profiles.rs:400
+#: src/preferences/profiles.rs:409
 msgid ""
 "Seconds of no output, after activity, before a \"command finished\" "
 "notification"
@@ -504,71 +504,71 @@ msgstr ""
 "Secondes sans sortie, après de l’activité, avant une notification « commande "
 "terminée »"
 
-#: src/preferences/profiles.rs:428
+#: src/preferences/profiles.rs:437
 msgid "Clone"
 msgstr "Dupliquer"
 
-#: src/preferences/profiles.rs:490
+#: src/preferences/profiles.rs:499
 msgid "Run command as a login shell"
 msgstr "Lancer la commande en tant que shell de connexion"
 
-#: src/preferences/profiles.rs:506
+#: src/preferences/profiles.rs:515
 msgid "Run a custom command instead of my shell"
 msgstr "Exécuter une commande personnalisée au lieu de mon shell"
 
-#: src/preferences/profiles.rs:510
+#: src/preferences/profiles.rs:519
 msgid "Custom command"
 msgstr "Commande personnalisée"
 
-#: src/preferences/profiles.rs:546
+#: src/preferences/profiles.rs:555
 msgid "Working directory (empty: where Rutile was launched)"
 msgstr "Dossier de travail (vide : celui où Rutile a été lancé)"
 
-#: src/preferences/profiles.rs:564
+#: src/preferences/profiles.rs:573
 msgid "When command exits"
 msgstr "Quand la commande se termine"
 
-#: src/preferences/profiles.rs:590
+#: src/preferences/profiles.rs:600
 msgid "Color scheme"
 msgstr "Jeu de couleurs"
 
-#: src/preferences/profiles.rs:617
+#: src/preferences/profiles.rs:627
 msgid "Colors"
 msgstr "Couleurs"
 
-#: src/preferences/profiles.rs:618
+#: src/preferences/profiles.rs:628
 msgid "Set on top of the color scheme"
 msgstr "Appliquées par-dessus le jeu de couleurs"
 
-#: src/preferences/profiles.rs:624
+#: src/preferences/profiles.rs:634
 msgid "Show bold text in bright colors"
 msgstr "Afficher le texte gras en couleurs vives"
 
-#: src/preferences/profiles.rs:645
+#: src/preferences/profiles.rs:655
 msgid "Background transparency"
 msgstr "Transparence du fond"
 
-#: src/preferences/profiles.rs:646
+#: src/preferences/profiles.rs:656
 msgid "Percent — 0 is opaque"
 msgstr "Pourcentage — 0 est opaque"
 
-#: src/preferences/profiles.rs:662
+#: src/preferences/profiles.rs:672
 msgid "Custom cursor colors"
 msgstr "Couleurs du curseur personnalisées"
 
-#: src/preferences/profiles.rs:669
+#: src/preferences/profiles.rs:679
 msgid "Custom highlight colors"
 msgstr "Couleurs de surlignage personnalisées"
 
-#: src/preferences/profiles.rs:676
+#: src/preferences/profiles.rs:686
 msgid "Custom bold color"
 msgstr "Couleur du gras personnalisée"
 
-#: src/preferences/profiles.rs:690
+#: src/preferences/profiles.rs:700
 msgid "Automatic profile switching"
 msgstr "Changement de profil automatique"
 
-#: src/preferences/profiles.rs:692
+#: src/preferences/profiles.rs:702
 msgid ""
 "Switch a terminal to this profile while it is in a matching place: "
 "user@host:directory, every part optional (e.g. prod-db, :~/projets/work, "
@@ -581,15 +581,15 @@ msgstr ""
 "ses sous-dossiers. Les règles sont vérifiées quand le shell signale son "
 "dossier (OSC 7)."
 
-#: src/preferences/profiles.rs:698
+#: src/preferences/profiles.rs:708
 msgid "Add a rule"
 msgstr "Ajouter une règle"
 
-#: src/preferences/profiles.rs:738 src/preferences/window.rs:212
+#: src/preferences/profiles.rs:748 src/preferences/window.rs:213
 msgid "Triggers"
 msgstr "Déclencheurs"
 
-#: src/preferences/profiles.rs:739
+#: src/preferences/profiles.rs:749
 msgid ""
 "Checked after the global triggers (Preferences → Advanced), in terminals "
 "using this profile. $0 is the whole match, $1 to $9 its groups."
@@ -598,21 +598,21 @@ msgstr ""
 "terminaux qui utilisent ce profil. $0 est la correspondance entière, $1 à $9 "
 "ses groupes."
 
-#: src/preferences/profiles.rs:759 src/preferences/window.rs:53
+#: src/preferences/profiles.rs:770 src/preferences/window.rs:53
 msgid "Encoding"
 msgstr "Encodage"
 
-#: src/preferences/profiles.rs:761
+#: src/preferences/profiles.rs:772
 msgid "For legacy systems — the shell and programs must use the same one"
 msgstr ""
 "Pour les systèmes anciens — le shell et les programmes doivent utiliser le "
 "même"
 
-#: src/preferences/profiles.rs:792
+#: src/preferences/profiles.rs:803
 msgid "Ambiguous-width characters"
 msgstr "Caractères de largeur ambiguë"
 
-#: src/preferences/profiles.rs:808
+#: src/preferences/profiles.rs:819
 #, rust-format
 msgid ""
 "Large text in a corner of the terminal. Same variables as titles: ${title}, $"
@@ -621,51 +621,51 @@ msgstr ""
 "Grand texte dans un coin du terminal. Mêmes variables que pour les titres : $"
 "{title}, ${directory}, ${host}, ${user}, ${id}."
 
-#: src/preferences/profiles.rs:813
+#: src/preferences/profiles.rs:824
 msgid "Badge text (empty: no badge)"
 msgstr "Texte du badge (vide : pas de badge)"
 
-#: src/preferences/profiles.rs:830
+#: src/preferences/profiles.rs:841
 msgid "Position"
 msgstr "Position"
 
-#: src/preferences/profiles.rs:845
+#: src/preferences/profiles.rs:856
 msgid "Badge font"
 msgstr "Police du badge"
 
-#: src/preferences/profiles.rs:871
+#: src/preferences/profiles.rs:882
 msgid "Twice the terminal font size"
 msgstr "Deux fois la taille de la police du terminal"
 
-#: src/preferences/profiles.rs:892
+#: src/preferences/profiles.rs:903
 msgid "Custom badge color"
 msgstr "Couleur du badge personnalisée"
 
-#: src/preferences/profiles.rs:909
+#: src/preferences/profiles.rs:920
 msgid "Show scrollbar"
 msgstr "Afficher la barre de défilement"
 
-#: src/preferences/profiles.rs:916
+#: src/preferences/profiles.rs:927
 msgid "Scroll on output"
 msgstr "Défiler lors d’une sortie"
 
-#: src/preferences/profiles.rs:923
+#: src/preferences/profiles.rs:934
 msgid "Scroll on keystroke"
 msgstr "Défiler lors d’une frappe"
 
-#: src/preferences/profiles.rs:937
+#: src/preferences/profiles.rs:948
 msgid "Scrollback lines"
 msgstr "Lignes d’historique"
 
-#: src/preferences/profiles.rs:954
+#: src/preferences/profiles.rs:965
 msgid "Unlimited scrollback"
 msgstr "Historique illimité"
 
-#: src/preferences/profiles.rs:1105
+#: src/preferences/profiles.rs:1117
 msgid "Background"
 msgstr "Fond"
 
-#: src/preferences/profiles.rs:1210
+#: src/preferences/profiles.rs:1222
 msgid "Remove rule"
 msgstr "Supprimer la règle"
 
@@ -685,24 +685,24 @@ msgstr "Ajoutez-en un avec le bouton +"
 msgid "Regular expression"
 msgstr "Expression régulière"
 
-#: src/preferences/triggers.rs:113
+#: src/preferences/triggers.rs:114
 msgid "Action"
 msgstr "Action"
 
-#: src/preferences/triggers.rs:137
+#: src/preferences/triggers.rs:138
 msgid "Remove this trigger"
 msgstr "Supprimer ce déclencheur"
 
-#: src/preferences/triggers.rs:234
+#: src/preferences/triggers.rs:235
 msgid "New trigger"
 msgstr "Nouveau déclencheur"
 
-#: src/preferences/triggers.rs:244
+#: src/preferences/triggers.rs:245
 #, rust-format
 msgid "Not used — {error}"
 msgstr "Inutilisé — {error}"
 
-#: src/preferences/triggers.rs:284
+#: src/preferences/triggers.rs:285
 msgid ""
 "Acts on your system, on any program's output — remote ones and files being "
 "displayed included"
@@ -710,7 +710,7 @@ msgstr ""
 "Agit sur votre système, sur la sortie de n’importe quel programme — y "
 "compris distant, et les fichiers affichés"
 
-#: src/preferences/triggers.rs:288
+#: src/preferences/triggers.rs:289
 msgid ""
 "Captured text is typed without its control characters: only the parameter "
 "itself can contain \\n."
@@ -718,7 +718,7 @@ msgstr ""
 "Le texte capturé est tapé sans ses caractères de contrôle : seul le "
 "paramètre lui-même peut contenir \\n."
 
-#: src/preferences/triggers.rs:291
+#: src/preferences/triggers.rs:292
 msgid ""
 "The command runs without a shell; each $n is one argument, without its "
 "control characters. $$ is a literal $."
@@ -726,16 +726,16 @@ msgstr ""
 "La commande est lancée sans shell ; chaque $n est un seul argument, sans ses "
 "caractères de contrôle. $$ est un $ littéral."
 
-#: src/preferences/triggers.rs:298
+#: src/preferences/triggers.rs:299
 #, rust-format
 msgid "Not usable: {error}"
 msgstr "Inutilisable : {error}"
 
-#: src/preferences/triggers.rs:306
+#: src/preferences/triggers.rs:307
 msgid "Disabled if it fires more than 5 times a second."
 msgstr "Désactivé s’il se déclenche plus de 5 fois par seconde."
 
-#: src/preferences/triggers.rs:316
+#: src/preferences/triggers.rs:317
 #, rust-format
 msgid "Parameter — e.g. {example}"
 msgstr "Paramètre — ex. {example}"
@@ -804,16 +804,16 @@ msgstr ""
 "Confirmer avant de fermer un pane, une session ou une fenêtre où un "
 "processus est actif"
 
-#: src/preferences/window.rs:173
+#: src/preferences/window.rs:174
 msgid "On new instance"
 msgstr "À une nouvelle instance"
 
-#: src/preferences/window.rs:175
+#: src/preferences/window.rs:176
 msgid "When rutile is launched again while running (overridden by --action)"
 msgstr ""
 "Quand rutile est relancé alors qu’il tourne déjà (remplacé par --action)"
 
-#: src/preferences/window.rs:214
+#: src/preferences/window.rs:215
 msgid ""
 "Regular expressions matched against every terminal's output, before the "
 "profile's own triggers. $0 is the whole match, $1 to $9 its groups."
@@ -822,104 +822,104 @@ msgstr ""
 "déclencheurs du profil. $0 est la correspondance entière, $1 à $9 ses "
 "groupes."
 
-#: src/preferences/window.rs:229
+#: src/preferences/window.rs:230
 msgid "Trigger processing"
 msgstr "Traitement des déclencheurs"
 
-#: src/preferences/window.rs:240
+#: src/preferences/window.rs:241
 msgid "Rows checked per change"
 msgstr "Lignes vérifiées par changement"
 
-#: src/preferences/window.rs:252
+#: src/preferences/window.rs:253
 msgid "No limit"
 msgstr "Pas de limite"
 
-#: src/preferences/window.rs:254
+#: src/preferences/window.rs:255
 msgid ""
 "Every row is checked: heavy output gets slower with an unlimited scrollback"
 msgstr ""
 "Chaque ligne est vérifiée : une sortie abondante ralentit avec un historique "
 "illimité"
 
-#: src/preferences/window.rs:295
+#: src/preferences/window.rs:296
 msgid "Warn before an unsafe paste"
 msgstr "Avertir avant un collage dangereux"
 
-#: src/preferences/window.rs:296
+#: src/preferences/window.rs:297
 msgid "Several lines that use sudo"
 msgstr "Plusieurs lignes qui utilisent sudo"
 
-#: src/preferences/window.rs:300
+#: src/preferences/window.rs:301
 msgid "Strip a leading # or $"
 msgstr "Retirer un # ou un $ en tête"
 
-#: src/preferences/window.rs:301
+#: src/preferences/window.rs:302
 msgid "A command copied with its prompt, or commented out"
 msgstr "Une commande copiée avec son invite, ou mise en commentaire"
 
-#: src/preferences/window.rs:305
+#: src/preferences/window.rs:306
 msgid "Strip trailing whitespace"
 msgstr "Retirer les espaces de fin"
 
-#: src/preferences/window.rs:306
+#: src/preferences/window.rs:307
 msgid "Including the final line break, so the command doesn't run right away"
 msgstr ""
 "Y compris le dernier saut de ligne, pour que la commande ne s’exécute pas "
 "tout de suite"
 
-#: src/preferences/window.rs:310
+#: src/preferences/window.rs:311
 msgid "Advanced paste by default"
 msgstr "Collage avancé par défaut"
 
-#: src/preferences/window.rs:311
+#: src/preferences/window.rs:312
 msgid "Review and transform multi-line text before pasting it"
 msgstr "Relire et transformer un texte de plusieurs lignes avant de le coller"
 
-#: src/preferences/window.rs:336
+#: src/preferences/window.rs:337
 msgid "Appearance"
 msgstr "Apparence"
 
-#: src/preferences/window.rs:339
+#: src/preferences/window.rs:340
 msgid "Theme"
 msgstr "Thème"
 
-#: src/preferences/window.rs:343
+#: src/preferences/window.rs:345
 msgid "Theme variant"
 msgstr "Variante du thème"
 
-#: src/preferences/window.rs:344
+#: src/preferences/window.rs:346
 msgid "Terminal colors come from each profile's color scheme"
 msgstr "Les couleurs du terminal viennent du jeu de couleurs de chaque profil"
 
-#: src/preferences/window.rs:372
+#: src/preferences/window.rs:374
 msgid "Panes"
 msgstr "Panes"
 
-#: src/preferences/window.rs:375
+#: src/preferences/window.rs:377
 msgid "Wide splitter handles"
 msgstr "Poignées de séparation larges"
 
-#: src/preferences/window.rs:376
+#: src/preferences/window.rs:378
 msgid "Easier to grab with the mouse"
 msgstr "Plus faciles à saisir à la souris"
 
-#: src/preferences/window.rs:388
+#: src/preferences/window.rs:390
 msgid "Show the title of a lone pane"
 msgstr "Afficher le titre d’un pane seul"
 
-#: src/preferences/window.rs:390
+#: src/preferences/window.rs:392
 msgid "Otherwise a session with a single pane hides its title bar"
 msgstr "Sinon, une session d’un seul pane masque sa barre de titre"
 
-#: src/preferences/window.rs:404
+#: src/preferences/window.rs:406
 msgid "Window"
 msgstr "Fenêtre"
 
-#: src/preferences/window.rs:408
+#: src/preferences/window.rs:411
 msgid "Window style"
 msgstr "Style de fenêtre"
 
-#: src/preferences/window.rs:409
+#: src/preferences/window.rs:412
 msgid ""
 "Without the toolbar, Preferences stay reachable with Ctrl+Comma and the "
 "terminal's right-click menu"
@@ -927,63 +927,63 @@ msgstr ""
 "Sans barre d’outils, les Préférences restent accessibles par Ctrl+Virgule et "
 "le menu contextuel du terminal"
 
-#: src/preferences/window.rs:427
+#: src/preferences/window.rs:431
 msgid "Sidebar position"
 msgstr "Position de la barre latérale"
 
-#: src/preferences/window.rs:462 src/preferences/window.rs:502
+#: src/preferences/window.rs:466 src/preferences/window.rs:506
 msgid "Background image"
 msgstr "Image de fond"
 
-#: src/preferences/window.rs:464
+#: src/preferences/window.rs:468
 msgid "Shown through terminals whose profile has some background transparency."
 msgstr ""
 "Visible à travers les terminaux dont le profil a un fond en partie "
 "transparent."
 
-#: src/preferences/window.rs:468
+#: src/preferences/window.rs:472
 msgid "Image"
 msgstr "Image"
 
-#: src/preferences/window.rs:474 src/profile/model.rs:393
+#: src/preferences/window.rs:478 src/profile/model.rs:393
 msgid "None"
 msgstr "Aucune"
 
-#: src/preferences/window.rs:479
+#: src/preferences/window.rs:483
 msgid "Choose…"
 msgstr "Choisir…"
 
-#: src/preferences/window.rs:484
+#: src/preferences/window.rs:488
 msgid "Remove the background image"
 msgstr "Retirer l’image de fond"
 
-#: src/preferences/window.rs:497
+#: src/preferences/window.rs:501
 msgid "Images"
 msgstr "Images"
 
-#: src/preferences/window.rs:542
+#: src/preferences/window.rs:547
 msgid "Mode"
 msgstr "Mode"
 
-#: src/preferences/window.rs:568
+#: src/preferences/window.rs:573
 msgid "Coming later"
 msgstr "Prévu plus tard"
 
-#: src/preferences/window.rs:596
+#: src/preferences/window.rs:601
 msgid "Shortcuts"
 msgstr "Raccourcis"
 
-#: src/preferences/window.rs:600
+#: src/preferences/window.rs:605
 msgid "Keybindings"
 msgstr "Raccourcis clavier"
 
-#: src/preferences/window.rs:602
+#: src/preferences/window.rs:607
 msgid "Click a shortcut, then press the new key combination. Escape cancels."
 msgstr ""
 "Cliquez sur un raccourci, puis appuyez sur la nouvelle combinaison de "
 "touches. Échap annule."
 
-#: src/preferences/window.rs:639
+#: src/preferences/window.rs:644
 msgid "Press a key…"
 msgstr "Appuyez sur une touche…"
 

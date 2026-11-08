@@ -110,6 +110,7 @@ impl Editor {
         flag_pattern(&pattern, &trigger.pattern);
 
         let action = adw::ComboRow::builder()
+            .factory(&super::combo_value_factory())
             .title(tr("Action"))
             .model(&gtk4::StringList::new(
                 &TriggerAction::ALL.map(TriggerAction::label),

@@ -195,16 +195,25 @@ impl ProfilesPage {
             "applications-system-symbolic",
         );
 
-        let header = adw::HeaderBar::builder()
+        // The tabs get a bar of their own, under the header (where they
+        // shared its width with the back and window buttons), and the
+        // narrow style (icon over label, each tab as wide as its own
+        // label): the wide one gives every tab the widest one's width, and
+        // seven of them ellipsized every label below ~1000 px.
+        let tabs = adw::HeaderBar::builder()
+            .show_start_title_buttons(false)
+            .show_end_title_buttons(false)
+            .show_back_button(false)
             .title_widget(
                 &adw::ViewSwitcher::builder()
                     .stack(&stack)
-                    .policy(adw::ViewSwitcherPolicy::Wide)
+                    .policy(adw::ViewSwitcherPolicy::Narrow)
                     .build(),
             )
             .build();
         let toolbar = adw::ToolbarView::new();
-        toolbar.add_top_bar(&header);
+        toolbar.add_top_bar(&adw::HeaderBar::new());
+        toolbar.add_top_bar(&tabs);
         toolbar.set_content(Some(&stack));
         navigation_page.set_child(Some(&toolbar));
         navigation_page
@@ -587,6 +596,7 @@ impl ProfilesPage {
         let scheme_ids: Vec<String> = self.schemes.iter().map(|s| s.id.clone()).collect();
         let scheme_names: Vec<&str> = self.schemes.iter().map(|s| s.name.as_str()).collect();
         let scheme_row = adw::ComboRow::builder()
+            .factory(&super::combo_value_factory())
             .title(tr("Color scheme"))
             .model(&gtk4::StringList::new(&scheme_names))
             .build();
@@ -756,6 +766,7 @@ impl ProfilesPage {
         let encodings = crate::terminal::encoding::supported_encodings();
         let names: Vec<&str> = encodings.iter().map(String::as_str).collect();
         let encoding_row = adw::ComboRow::builder()
+            .factory(&super::combo_value_factory())
             .title(tr("Encoding"))
             .subtitle(tr(
                 "For legacy systems — the shell and programs must use the same one",
@@ -1003,6 +1014,7 @@ fn enum_combo_row<T: Copy + PartialEq + 'static>(
 ) -> adw::ComboRow {
     let labels: Vec<&str> = all.iter().map(|value| label(*value)).collect();
     let row = adw::ComboRow::builder()
+        .factory(&super::combo_value_factory())
         .title(title)
         .model(&gtk4::StringList::new(&labels))
         .build();
