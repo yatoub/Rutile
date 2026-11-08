@@ -2,6 +2,7 @@
 Type=Application
 Name=Rutile
 Comment=GNOME-native terminal emulator with split tiling and synchronized input
+Comment[fr]=Émulateur de terminal natif GNOME, avec division en panneaux et saisie synchronisée
 Exec=rutile
 Icon=utilities-terminal
 Terminal=false
