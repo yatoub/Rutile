@@ -2,6 +2,8 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use vte4::TerminalExt;
 
+use crate::i18n::tr;
+
 /// Tilix-style search-in-terminal overlay bar: a `gtk4::Revealer` anchored
 /// to the top of a pane's `gtk4::Overlay`, holding an entry plus
 /// prev/next/close buttons. Owns no terminal state itself — every action
@@ -16,15 +18,15 @@ pub struct SearchBar {
 impl SearchBar {
     pub fn new(terminal: &vte4::Terminal) -> Self {
         let entry = gtk4::SearchEntry::new();
-        entry.set_placeholder_text(Some("Find in terminal…"));
+        entry.set_placeholder_text(Some(tr("Find in terminal…")));
         entry.set_hexpand(true);
 
         let prev = gtk4::Button::from_icon_name("go-up-symbolic");
-        prev.set_tooltip_text(Some("Previous match"));
+        prev.set_tooltip_text(Some(tr("Previous match")));
         let next = gtk4::Button::from_icon_name("go-down-symbolic");
-        next.set_tooltip_text(Some("Next match"));
+        next.set_tooltip_text(Some(tr("Next match")));
         let close = gtk4::Button::from_icon_name("window-close-symbolic");
-        close.set_tooltip_text(Some("Close"));
+        close.set_tooltip_text(Some(tr("Close")));
 
         let bar = gtk4::Box::new(gtk4::Orientation::Horizontal, 4);
         bar.add_css_class("search-bar");

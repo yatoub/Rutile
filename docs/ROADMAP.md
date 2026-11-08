@@ -433,20 +433,29 @@ manquants de Tilix :
 - [ ] Dépend de : Phase 4 (CRUD), Phase 1 (badge/couleurs pour l'illustration
   dans l'arbre), libsecret (nouveau) ou alternative décidée
 
-#### 6.4 — i18n / gettext complet (M12)
+#### 6.4 — i18n / gettext complet (M12) — fait (#86)
 
-Tilix est traduit en 40+ langues via gettext. Rutile n'a aucun framework
-i18n :
-
-- [ ] Framework gettext Rust (`rust-embed` des `.mo` + le traditionnel
-  `gettext`-`bindgen`, ou `tr` crate) ; marquer les chaînes UI (Preferences,
-  toolbar, menu, dialogs, context menu, keymap labels)
-- [ ] Porter les traductions françaises (au moins `fr`) depuis le repo
-  Tilix `po/` pour démarrer
-- [ ] Chantier lourd et transversal (touches chaque widget) : à traiter **en
-  dernier**, idéalement quand les chaînes ont stabilisé (post-Phase 2 et
-  post-Phase 4), sinon toute nouvelle feature impose de retraduire
-- [ ] Aucune dépendance à la CLI ni au profils
+- [x] **Runtime maison, catalogues compilés dans le binaire** : `build.rs`
+  lit `po/*.po` (crate `polib`, build seulement) et génère des tables
+  triées ; `src/i18n.rs` fournit `tr()`, `trn()` (pluriels), `tr_args()`
+  (paramètres **nommés** `{name}`, une traduction peut les réordonner) et
+  `n_()` (marque une constante, traduite plus tard). Pas de `.mo` à
+  installer ni de dépendance native (`gettext-rs` lie `libintl`) : le
+  binaire autonome, le `.deb`, le `.rpm` et l'AUR sont traduits pareil.
+  Langue choisie comme gettext (`LANGUAGE`, puis `LC_ALL` / `LC_MESSAGES`
+  / `LANG` ; `C`/`POSIX` = anglais)
+- [x] **Chaînes marquées partout** (préférences, barre d'outils, menus,
+  dialogues, menu contextuel, raccourcis, notifications, bannières,
+  erreurs de lancement et de la CLI) ; les chaînes françaises codées en
+  dur (#86) passent en anglais, langue source. Les journaux (`eprintln!`)
+  et l'aide `--help` (clap) restent en anglais
+- [x] **`po/fr.po`** : 286 chaînes, traduites directement plutôt que
+  copiées du `fr.po` de Tilix (MPL-2.0 alors que Rutile est MIT) — Tilix
+  a servi de référence de vocabulaire. `Comment[fr]` dans le `.desktop`
+- [x] `scripts/update-po.sh` (xgettext ≥ 0.24 pour lire du Rust, côté
+  mainteneur seulement) ; `cargo test` vérifie que chaque traduction garde
+  ses paramètres ; les tests unitaires tournent toujours en anglais
+- [ ] Autres langues : sur contribution (procédure dans le README)
 
 ---
 

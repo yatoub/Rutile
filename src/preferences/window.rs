@@ -5,6 +5,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
+use crate::i18n::{n_, tr};
 use crate::keymap::{self, Keymap};
 use crate::preferences::bookmarks::BookmarksPage;
 use crate::preferences::config::{
@@ -26,7 +27,7 @@ pub fn build(
     keymap: Rc<RefCell<Keymap>>,
 ) -> adw::PreferencesWindow {
     let window = adw::PreferencesWindow::builder()
-        .title("Preferences")
+        .title(tr("Preferences"))
         .transient_for(parent)
         .modal(true)
         .build();
@@ -49,9 +50,11 @@ pub fn build(
     });
     window.add(ShortcutsPage::new(keymap).page());
     window.add(&placeholder_page(
-        "Encoding",
+        tr("Encoding"),
         "text-x-generic-symbolic",
-        "Choosing which encodings the terminal menu offers is planned. The encoding itself is already set per profile: Profiles → edit a profile → Compatibility.",
+        tr(
+            "Choosing which encodings the terminal menu offers is planned. The encoding itself is already set per profile: Profiles → edit a profile → Compatibility.",
+        ),
     ));
     window.add(&advanced_page(prefs_for_advanced));
 
@@ -60,15 +63,19 @@ pub fn build(
 
 fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     let page = adw::PreferencesPage::builder()
-        .title("General")
+        .title(tr("General"))
         .icon_name("preferences-system-symbolic")
         .build();
 
-    let behavior_group = adw::PreferencesGroup::builder().title("Behavior").build();
+    let behavior_group = adw::PreferencesGroup::builder()
+        .title(tr("Behavior"))
+        .build();
 
     let focus_row = adw::SwitchRow::builder()
-        .title("Focus terminal on mouse hover")
-        .subtitle("Move the pointer over a pane to focus it, without clicking")
+        .title(tr("Focus terminal on mouse hover"))
+        .subtitle(tr(
+            "Move the pointer over a pane to focus it, without clicking",
+        ))
         .active(prefs.borrow().focus_follows_mouse)
         .build();
     {
@@ -82,7 +89,7 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     behavior_group.add(&focus_row);
 
     let close_window_row = adw::SwitchRow::builder()
-        .title("Close window when last session is closed")
+        .title(tr("Close window when last session is closed"))
         .active(prefs.borrow().close_window_on_last_session_closed)
         .build();
     {
@@ -96,8 +103,8 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     behavior_group.add(&close_window_row);
 
     let copy_on_select_row = adw::SwitchRow::builder()
-        .title("Copy on select")
-        .subtitle("Automatically copy the selected text to the clipboard")
+        .title(tr("Copy on select"))
+        .subtitle(tr("Automatically copy the selected text to the clipboard"))
         .active(prefs.borrow().copy_on_select)
         .build();
     {
@@ -111,8 +118,10 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     behavior_group.add(&copy_on_select_row);
 
     let hyperlinks_row = adw::SwitchRow::builder()
-        .title("Enable hyperlinks")
-        .subtitle("Ctrl+Click opens OSC 8 links and filesystem paths in terminal output")
+        .title(tr("Enable hyperlinks"))
+        .subtitle(tr(
+            "Ctrl+Click opens OSC 8 links and filesystem paths in terminal output",
+        ))
         .active(prefs.borrow().enable_hyperlinks)
         .build();
     {
@@ -126,8 +135,10 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     behavior_group.add(&hyperlinks_row);
 
     let notifications_row = adw::SwitchRow::builder()
-        .title("Enable notifications")
-        .subtitle("Desktop notification on bell, or when a pane goes quiet after activity")
+        .title(tr("Enable notifications"))
+        .subtitle(tr(
+            "Desktop notification on bell, or when a pane goes quiet after activity",
+        ))
         .active(prefs.borrow().enable_notifications)
         .build();
     {
@@ -141,8 +152,10 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     behavior_group.add(&notifications_row);
 
     let prompt_on_close_row = adw::SwitchRow::builder()
-        .title("Prompt before closing a running process")
-        .subtitle("Confirm before closing a pane, session, or window with an active process")
+        .title(tr("Prompt before closing a running process"))
+        .subtitle(tr(
+            "Confirm before closing a pane, session, or window with an active process",
+        ))
         .active(prefs.borrow().prompt_on_close_with_process)
         .build();
     {
@@ -157,8 +170,11 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
 
     let current = prefs.borrow().new_instance_mode;
     let new_instance_row = adw::ComboRow::builder()
-        .title("On new instance")
-        .subtitle("When rutile is launched again while running (overridden by --action)")
+        .factory(&super::combo_value_factory())
+        .title(tr("On new instance"))
+        .subtitle(tr(
+            "When rutile is launched again while running (overridden by --action)",
+        ))
         .model(&gtk4::StringList::new(
             &NewInstanceMode::ALL.map(NewInstanceMode::label),
         ))
@@ -186,7 +202,7 @@ fn general_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
 /// The "Advanced" page: the global triggers and how much output they read.
 fn advanced_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     let page = adw::PreferencesPage::builder()
-        .title("Advanced")
+        .title(tr("Advanced"))
         .icon_name("applications-system-symbolic")
         .build();
 
@@ -194,9 +210,10 @@ fn advanced_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     {
         let prefs = prefs.clone();
         page.add(&super::triggers::group(
-            "Triggers",
-            "Regular expressions matched against every terminal's output, before \
-             the profile's own triggers. $0 is the whole match, $1 to $9 its groups.",
+            tr("Triggers"),
+            tr(
+                "Regular expressions matched against every terminal's output, before the profile's own triggers. $0 is the whole match, $1 to $9 its groups.",
+            ),
             initial,
             move |triggers| {
                 {
@@ -210,7 +227,7 @@ fn advanced_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     }
 
     let limits = adw::PreferencesGroup::builder()
-        .title("Trigger processing")
+        .title(tr("Trigger processing"))
         .description(
             "Rows read each time a terminal's content changes. Output faster than \
              that is partly skipped instead of slowing the terminal down.",
@@ -221,7 +238,7 @@ fn advanced_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
         (prefs.trigger_lines, prefs.trigger_unlimited_lines)
     };
     let lines_row = adw::SpinRow::builder()
-        .title("Rows checked per change")
+        .title(tr("Rows checked per change"))
         .adjustment(&gtk4::Adjustment::new(
             f64::from(lines),
             1.0,
@@ -233,8 +250,10 @@ fn advanced_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
         .sensitive(!unlimited)
         .build();
     let unlimited_row = adw::SwitchRow::builder()
-        .title("No limit")
-        .subtitle("Every row is checked: heavy output gets slower with an unlimited scrollback")
+        .title(tr("No limit"))
+        .subtitle(tr(
+            "Every row is checked: heavy output gets slower with an unlimited scrollback",
+        ))
         .active(unlimited)
         .build();
     {
@@ -271,33 +290,33 @@ type BoolField = fn(&mut Preferences) -> &mut bool;
 
 /// Tilix's paste settings (see `dialogs::paste`).
 fn paste_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
-    let group = adw::PreferencesGroup::builder().title("Paste").build();
-    let rows: [(&str, &str, BoolField); 4] = [
+    let group = adw::PreferencesGroup::builder().title(tr("Paste")).build();
+    let rows: [(&'static str, &'static str, BoolField); 4] = [
         (
-            "Warn before an unsafe paste",
-            "Several lines that use sudo",
+            n_("Warn before an unsafe paste"),
+            n_("Several lines that use sudo"),
             |p| &mut p.unsafe_paste_alert,
         ),
         (
-            "Strip a leading # or $",
-            "A command copied with its prompt, or commented out",
+            n_("Strip a leading # or $"),
+            n_("A command copied with its prompt, or commented out"),
             |p| &mut p.paste_strip_first_char,
         ),
         (
-            "Strip trailing whitespace",
-            "Including the final line break, so the command doesn't run right away",
+            n_("Strip trailing whitespace"),
+            n_("Including the final line break, so the command doesn't run right away"),
             |p| &mut p.paste_strip_trailing_whitespace,
         ),
         (
-            "Advanced paste by default",
-            "Review and transform multi-line text before pasting it",
+            n_("Advanced paste by default"),
+            n_("Review and transform multi-line text before pasting it"),
             |p| &mut p.paste_advanced_default,
         ),
     ];
     for (title, subtitle, field) in rows {
         let row = adw::SwitchRow::builder()
-            .title(title)
-            .subtitle(subtitle)
+            .title(tr(title))
+            .subtitle(tr(subtitle))
             .active(*field(&mut prefs.borrow_mut()))
             .build();
         let prefs = prefs.clone();
@@ -315,15 +334,16 @@ fn paste_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
 /// and pane layout.
 fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
     let page = adw::PreferencesPage::builder()
-        .title("Appearance")
+        .title(tr("Appearance"))
         .icon_name("view-grid-symbolic")
         .build();
-    let group = adw::PreferencesGroup::builder().title("Theme").build();
+    let group = adw::PreferencesGroup::builder().title(tr("Theme")).build();
 
     let current = prefs.borrow().theme_variant;
     let row = adw::ComboRow::builder()
-        .title("Theme variant")
-        .subtitle("Terminal colors come from each profile's color scheme")
+        .factory(&super::combo_value_factory())
+        .title(tr("Theme variant"))
+        .subtitle(tr("Terminal colors come from each profile's color scheme"))
         .model(&gtk4::StringList::new(
             &ThemeVariant::ALL.map(ThemeVariant::label),
         ))
@@ -351,11 +371,11 @@ fn appearance_page(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesPage {
 
 /// Splitter handles and lone-pane headers.
 fn panes_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
-    let group = adw::PreferencesGroup::builder().title("Panes").build();
+    let group = adw::PreferencesGroup::builder().title(tr("Panes")).build();
 
     let wide_row = adw::SwitchRow::builder()
-        .title("Wide splitter handles")
-        .subtitle("Easier to grab with the mouse")
+        .title(tr("Wide splitter handles"))
+        .subtitle(tr("Easier to grab with the mouse"))
         .active(prefs.borrow().wide_handles)
         .build();
     {
@@ -367,8 +387,10 @@ fn panes_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
     group.add(&wide_row);
 
     let title_row = adw::SwitchRow::builder()
-        .title("Show the title of a lone pane")
-        .subtitle("Otherwise a session with a single pane hides its title bar")
+        .title(tr("Show the title of a lone pane"))
+        .subtitle(tr(
+            "Otherwise a session with a single pane hides its title bar",
+        ))
         .active(prefs.borrow().show_title_when_single)
         .build();
     title_row.connect_active_notify(move |row| {
@@ -381,12 +403,13 @@ fn panes_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
 
 /// Window style and sidebar position.
 fn window_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
-    let group = adw::PreferencesGroup::builder().title("Window").build();
+    let group = adw::PreferencesGroup::builder().title(tr("Window")).build();
 
     let current = prefs.borrow().window_style;
     let style_row = adw::ComboRow::builder()
-        .title("Window style")
-        .subtitle("Without the toolbar, Preferences stay reachable with Ctrl+Comma and the terminal's right-click menu")
+        .factory(&super::combo_value_factory())
+        .title(tr("Window style"))
+        .subtitle(tr("Without the toolbar, Preferences stay reachable with Ctrl+Comma and the terminal's right-click menu"))
         .model(&gtk4::StringList::new(&WindowStyle::ALL.map(WindowStyle::label)))
         .build();
     if let Some(index) = WindowStyle::ALL.iter().position(|s| *s == current) {
@@ -404,7 +427,8 @@ fn window_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
 
     let current = prefs.borrow().sidebar_position;
     let sidebar_row = adw::ComboRow::builder()
-        .title("Sidebar position")
+        .factory(&super::combo_value_factory())
+        .title(tr("Sidebar position"))
         .model(&gtk4::StringList::new(
             &SidebarPosition::ALL.map(SidebarPosition::label),
         ))
@@ -439,27 +463,29 @@ fn update_appearance(prefs: &Rc<RefCell<Preferences>>, edit: impl FnOnce(&mut Pr
 /// terminals whose profile has some background transparency.
 fn background_image_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::builder()
-        .title("Background image")
-        .description("Shown through terminals whose profile has some background transparency.")
+        .title(tr("Background image"))
+        .description(tr(
+            "Shown through terminals whose profile has some background transparency.",
+        ))
         .build();
 
-    let image_row = adw::ActionRow::builder().title("Image").build();
+    let image_row = adw::ActionRow::builder().title(tr("Image")).build();
     let describe = |path: Option<&std::path::Path>| match path {
         Some(path) => path
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_else(|| path.display().to_string()),
-        None => "None".to_string(),
+        None => tr("None").to_string(),
     };
     image_row.set_subtitle(&describe(prefs.borrow().background_image.as_deref()));
 
     let choose = gtk4::Button::builder()
-        .label("Choose…")
+        .label(tr("Choose…"))
         .valign(gtk4::Align::Center)
         .build();
     let clear = gtk4::Button::builder()
         .icon_name("edit-clear-symbolic")
-        .tooltip_text("Remove the background image")
+        .tooltip_text(tr("Remove the background image"))
         .valign(gtk4::Align::Center)
         .sensitive(prefs.borrow().background_image.is_some())
         .build();
@@ -472,12 +498,12 @@ fn background_image_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGr
         let clear = clear.downgrade();
         choose.connect_clicked(move |button| {
             let filter = gtk4::FileFilter::new();
-            filter.set_name(Some("Images"));
+            filter.set_name(Some(tr("Images")));
             filter.add_pixbuf_formats();
             let filters = gtk4::gio::ListStore::new::<gtk4::FileFilter>();
             filters.append(&filter);
             let dialog = gtk4::FileDialog::builder()
-                .title("Background image")
+                .title(tr("Background image"))
                 .filters(&filters)
                 .default_filter(&filter)
                 .build();
@@ -517,7 +543,8 @@ fn background_image_group(prefs: Rc<RefCell<Preferences>>) -> adw::PreferencesGr
 
     let current = prefs.borrow().background_image_mode;
     let mode_row = adw::ComboRow::builder()
-        .title("Mode")
+        .factory(&super::combo_value_factory())
+        .title(tr("Mode"))
         .model(&gtk4::StringList::new(
             &BackgroundImageMode::ALL.map(BackgroundImageMode::label),
         ))
@@ -543,7 +570,7 @@ fn placeholder_page(title: &str, icon_name: &str, message: &str) -> adw::Prefere
 
     let status = adw::StatusPage::builder()
         .icon_name(icon_name)
-        .title("Coming later")
+        .title(tr("Coming later"))
         .description(message)
         .vexpand(true)
         .build();
@@ -571,12 +598,14 @@ struct ShortcutsPage {
 impl ShortcutsPage {
     fn new(keymap: Rc<RefCell<Keymap>>) -> Rc<Self> {
         let page = adw::PreferencesPage::builder()
-            .title("Shortcuts")
+            .title(tr("Shortcuts"))
             .icon_name("input-keyboard-symbolic")
             .build();
         let group = adw::PreferencesGroup::builder()
-            .title("Keybindings")
-            .description("Click Edit, then press the new key combination.")
+            .title(tr("Keybindings"))
+            .description(tr(
+                "Click a shortcut, then press the new key combination. Escape cancels.",
+            ))
             .build();
         page.add(&group);
 
@@ -612,7 +641,7 @@ impl ShortcutsPage {
                 let this = self.clone();
                 let edit_button_for_click = edit_button.clone();
                 edit_button.connect_clicked(move |button| {
-                    button.set_label("Press a key…");
+                    button.set_label(tr("Press a key…"));
                     let controller = gtk4::EventControllerKey::new();
                     controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
                     let this = this.clone();

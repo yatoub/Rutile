@@ -35,6 +35,8 @@ Voir `GUIDELINE.md` pour la vision complète et la roadmap priorisée
 src/
 ├── main.rs / lib.rs      # binaire mince ; toute la logique vit dans la lib
 ├── cli.rs                # options clap → LaunchRequest (SANS GTK, testé)
+├── i18n.rs               # tr()/tr_args()/trn()/n_(), catalogues po/*.po
+│                         #   compilés par build.rs (SANS GTK, testé)
 ├── bookmarks/mod.rs      # signets (commandes, dossiers imbriqués), SANS GTK, testé
 ├── app.rs                # activation GTK, chargement du thème CSS
 ├── window.rs             # fenêtre, barre d'outils globale, raccourcis clavier
@@ -247,6 +249,52 @@ navigation par sidebar de catégories gratuitement (une `AdwPreferencesPage`
   …` (bus privé) avec `XDG_CONFIG_HOME`/`XDG_STATE_HOME` temporaires, et
   observer l'effet par les processus fils (`/proc/<pid>/cwd`, cmdline des
   shells/commandes lancés).
+
+## Traductions (i18n)
+
+Runtime maison dans `src/i18n.rs`, catalogues `po/*.po` compilés dans le
+binaire par `build.rs` (crate `polib`, build seulement) — rien à
+installer, aucun `.mo`, aucune dépendance native. Détails et choix dans
+`docs/ROADMAP.md` (6.4).
+
+- **Toute chaîne visible passe par `tr("…")`**, en anglais (langue source
+  = msgid). Paramètres : `tr_args("… {name} …", &[("name", &v)])`, jamais
+  `format!` autour d'une phrase traduite (l'ordre des mots change selon la
+  langue). Pluriels : `trn`. Les journaux `eprintln!` restent en anglais.
+- `xgettext` ne voit que les **littéraux passés directement** à `tr`/
+  `tr_args`/`trn`/`n_` : `tr(variable)` n'est jamais extrait. Une chaîne
+  rangée dans une constante ou un tableau se marque `n_("…")` et se
+  traduit `tr(constante)` à l'affichage (voir `dialogs/paste.rs`,
+  `paste_group`). Les `label()` des énumérations de réglages renvoient
+  directement `tr(…)`.
+- Après avoir ajouté/modifié des chaînes : `scripts/update-po.sh`
+  (xgettext ≥ 0.24, présent ici, absent d'Ubuntu 24.04 — d'où pas de
+  vérification en CI) puis traduire les nouvelles entrées de `po/fr.po`
+  (les entrées modifiées deviennent *fuzzy* = affichées en anglais tant
+  qu'on n'a pas relu). `msgfmt --check` tourne dans le script.
+- `cargo test` vérifie que chaque traduction garde les mêmes `{name}`
+  — y compris les `${title}` des modèles de titre/badge, qui doivent donc
+  rester identiques dans la traduction.
+- Les tests unitaires (`cfg!(test)`) sont toujours en anglais, quelle que
+  soit la locale du développeur. **Pas les tests d'intégration de
+  `tests/`** (la lib y est compilée sans `cfg(test)`) : n'y comparer
+  aucun texte traduit, ou lancer avec `LANG=C`.
+- Un même msgid a une seule traduction partout (pas de `msgctxt` exposé
+  par `tr`, bien que `build.rs` sache les lire) : choisir des libellés
+  sans ambiguïté plutôt que des mots isolés quand le sens diffère.
+- Typographie du `fr.po` : espace insécable (U+00A0) avant `:` et dans
+  `« »`, espace fine insécable (U+202F) avant `?`, `!`, `;`.
+- **Texte tronqué** (vécu sur la #98, déjà présent en anglais, aggravé par
+  le français) : se détecte sans capture d'écran, dans un exemple jetable
+  qui ouvre `preferences::window::build` sous `LANG=fr_FR.UTF-8`, affiche
+  chaque page (et chaque onglet de l'éditeur de profil, via son
+  `AdwViewStack`, pas celui de la fenêtre) puis liste les `gtk4::Label`
+  mappés dont `label.layout().is_ellipsized()`. Deux causes corrigées :
+  la valeur d'une `AdwComboRow` est ellipsée dès que titre + sous-titre
+  sont longs → toute `ComboRow` prend `.factory(&combo_value_factory())`
+  (`preferences/mod.rs`, la valeur entière, le titre passe à la ligne) ;
+  un `AdwViewSwitcher` `Wide` donne à chaque onglet la largeur du plus
+  long → onglets du profil en `Narrow`, dans leur propre barre sous l'en-tête.
 
 ## Triggers (regex → action)
 

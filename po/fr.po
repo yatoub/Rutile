@@ -1,0 +1,1271 @@
+# French translations for Rutile package
+# Traductions françaises du paquet Rutile.
+# Copyright (C) 2026 yatoub
+# This file is distributed under the same license as the Rutile package (MIT).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Rutile\n"
+"Report-Msgid-Bugs-To: https://github.com/yatoub/Rutile/issues\n"
+"POT-Creation-Date: 2026-11-08 13:19+0100\n"
+"PO-Revision-Date: 2026-11-08 13:00+0100\n"
+"Last-Translator: yatoub <yatoub@users.noreply.github.com>\n"
+"Language-Team: French\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: src/app.rs:60
+#, rust-format
+msgid "{path}: not a directory"
+msgstr "{path} : ce n’est pas un dossier"
+
+#: src/app.rs:68
+#, rust-format
+msgid "{path}: no such session file"
+msgstr "{path} : fichier de session introuvable"
+
+#: src/app.rs:79
+#, rust-format
+msgid "unknown profile “{name}” (profiles: {profiles})"
+msgstr "profil inconnu « {name} » (profils : {profiles})"
+
+#: src/context_menu.rs:214 src/keymap.rs:312
+msgid "Copy"
+msgstr "Copier"
+
+#: src/context_menu.rs:221 src/keymap.rs:325
+msgid "Copy as HTML"
+msgstr "Copier au format HTML"
+
+#: src/context_menu.rs:229 src/dialogs/paste.rs:250 src/keymap.rs:313
+#: src/preferences/window.rs:293
+msgid "Paste"
+msgstr "Coller"
+
+#: src/context_menu.rs:235
+msgid "Select All"
+msgstr "Tout sélectionner"
+
+#: src/context_menu.rs:247 src/keymap.rs:300 src/window.rs:790
+msgid "Split horizontally"
+msgstr "Diviser horizontalement"
+
+#: src/context_menu.rs:264 src/keymap.rs:301 src/window.rs:811
+msgid "Split vertically"
+msgstr "Diviser verticalement"
+
+#: src/context_menu.rs:281
+msgid "Synchronize input: off"
+msgstr "Saisie synchronisée : désactivée"
+
+#: src/context_menu.rs:282
+msgid "Synchronize input: session"
+msgstr "Saisie synchronisée : session"
+
+#: src/context_menu.rs:297
+msgid "Bookmarks…"
+msgstr "Signets…"
+
+#: src/context_menu.rs:306
+msgid "Add Bookmark…"
+msgstr "Ajouter un signet…"
+
+#: src/context_menu.rs:317 src/preferences/window.rs:30 src/window.rs:842
+msgid "Preferences"
+msgstr "Préférences"
+
+#: src/dialogs/bookmark_editor.rs:20 src/preferences/profiles.rs:232
+msgid "Name"
+msgstr "Nom"
+
+#: src/dialogs/bookmark_editor.rs:24 src/preferences/profiles.rs:164
+msgid "Command"
+msgstr "Commande"
+
+#: src/dialogs/bookmark_editor.rs:29
+msgid "Folder (nested with /, empty: top level)"
+msgstr "Dossier (imbriqué avec /, vide : racine)"
+
+#: src/dialogs/bookmark_editor.rs:40
+msgid "Inserted into the terminal as if typed."
+msgstr "Insérée dans le terminal comme si elle était tapée."
+
+#: src/dialogs/bookmark_editor.rs:43
+#, rust-format
+msgid "Inserted into the terminal as if typed. Existing folders: {folders}"
+msgstr ""
+"Insérée dans le terminal comme si elle était tapée. Dossiers existants : "
+"{folders}"
+
+#: src/dialogs/bookmark_editor.rs:55
+msgid "Save"
+msgstr "Enregistrer"
+
+#: src/dialogs/bookmark_editor.rs:126 src/preferences/bookmarks.rs:69
+#: src/preferences/bookmarks.rs:82
+msgid "Add Bookmark"
+msgstr "Ajouter un signet"
+
+#: src/dialogs/bookmark_picker.rs:18
+msgid "Search bookmarks"
+msgstr "Rechercher dans les signets"
+
+#: src/dialogs/bookmark_picker.rs:48 src/preferences/bookmarks.rs:27
+#: src/preferences/bookmarks.rs:101 src/preferences/bookmarks.rs:123
+msgid "Bookmarks"
+msgstr "Signets"
+
+#: src/dialogs/bookmark_picker.rs:98
+msgid ""
+"No bookmarks yet — add one from the terminal's right-click menu or "
+"Preferences → Bookmarks"
+msgstr ""
+"Aucun signet pour l’instant — ajoutez-en un depuis le menu contextuel du "
+"terminal ou Préférences → Signets"
+
+#: src/dialogs/bookmark_picker.rs:101
+msgid "No bookmark matches"
+msgstr "Aucun signet ne correspond"
+
+#: src/dialogs/confirm_close.rs:57
+msgid "Close this?"
+msgstr "Fermer ?"
+
+#: src/dialogs/confirm_close.rs:59
+msgid "There is still a process running. Closing will terminate it."
+msgstr "Un processus est encore en cours. Fermer va l’arrêter."
+
+#: src/dialogs/confirm_close.rs:62 src/dialogs/paste.rs:95
+msgid "Cancel"
+msgstr "Annuler"
+
+#: src/dialogs/confirm_close.rs:63 src/pane_header.rs:182
+#: src/terminal/search.rs:29
+msgid "Close"
+msgstr "Fermer"
+
+#: src/dialogs/paste.rs:28
+msgid "This command asks for administrative access"
+msgstr "Cette commande demande un accès administrateur"
+
+#: src/dialogs/paste.rs:30
+msgid ""
+"Copying commands from the internet can be dangerous. Be sure you understand "
+"what each part of this command does."
+msgstr ""
+"Copier des commandes depuis Internet peut être dangereux. Assurez-vous de "
+"comprendre ce que fait chaque partie de cette commande."
+
+#: src/dialogs/paste.rs:96
+msgid "Paste Anyway"
+msgstr "Coller quand même"
+
+#: src/dialogs/paste.rs:195
+msgid "Convert tabs to spaces"
+msgstr "Convertir les tabulations en espaces"
+
+#: src/dialogs/paste.rs:196
+msgid "Tab width"
+msgstr "Largeur de tabulation"
+
+#: src/dialogs/paste.rs:213
+msgid "Convert CRLF and CR to LF"
+msgstr "Convertir CRLF et CR en LF"
+
+#: src/dialogs/paste.rs:217
+msgid "Transform"
+msgstr "Transformations"
+
+#: src/dialogs/paste.rs:262
+msgid "Advanced Paste"
+msgstr "Collage avancé"
+
+#: src/keymap.rs:302
+msgid "Close pane"
+msgstr "Fermer le pane"
+
+#: src/keymap.rs:303
+msgid "Navigate up"
+msgstr "Aller en haut"
+
+#: src/keymap.rs:304
+msgid "Navigate down"
+msgstr "Aller en bas"
+
+#: src/keymap.rs:305
+msgid "Navigate left"
+msgstr "Aller à gauche"
+
+#: src/keymap.rs:306
+msgid "Navigate right"
+msgstr "Aller à droite"
+
+#: src/keymap.rs:307
+msgid "New session"
+msgstr "Nouvelle session"
+
+#: src/keymap.rs:308 src/session/sidebar.rs:314
+msgid "Close session"
+msgstr "Fermer la session"
+
+#: src/keymap.rs:309
+msgid "Next session"
+msgstr "Session suivante"
+
+#: src/keymap.rs:310
+msgid "Previous session"
+msgstr "Session précédente"
+
+#: src/keymap.rs:311
+msgid "Find in terminal"
+msgstr "Rechercher dans le terminal"
+
+#: src/keymap.rs:315
+#, rust-format
+msgid "Switch to session {number}"
+msgstr "Aller à la session {number}"
+
+#: src/keymap.rs:317
+msgid "Resize pane up"
+msgstr "Agrandir le pane vers le haut"
+
+#: src/keymap.rs:318
+msgid "Resize pane down"
+msgstr "Agrandir le pane vers le bas"
+
+#: src/keymap.rs:319
+msgid "Resize pane left"
+msgstr "Agrandir le pane vers la gauche"
+
+#: src/keymap.rs:320
+msgid "Resize pane right"
+msgstr "Agrandir le pane vers la droite"
+
+#: src/keymap.rs:321
+msgid "Toggle sync for current pane"
+msgstr "Basculer la synchronisation du pane actif"
+
+#: src/keymap.rs:322
+msgid "Rename session"
+msgstr "Renommer la session"
+
+#: src/keymap.rs:323
+msgid "Rename pane"
+msgstr "Renommer le pane"
+
+#: src/keymap.rs:324
+msgid "Detach session into new window"
+msgstr "Détacher la session dans une nouvelle fenêtre"
+
+#: src/keymap.rs:326
+msgid "Paste (advanced)"
+msgstr "Coller (avancé)"
+
+#: src/keymap.rs:327
+msgid "Toggle margin guide"
+msgstr "Afficher/masquer le guide de marge"
+
+#: src/keymap.rs:328
+msgid "Open preferences"
+msgstr "Ouvrir les préférences"
+
+#: src/keymap.rs:329
+msgid "Insert a bookmark"
+msgstr "Insérer un signet"
+
+#: src/keymap.rs:330
+msgid "Add a bookmark"
+msgstr "Ajouter un signet"
+
+#: src/keymap.rs:331
+msgid "Insert terminal number"
+msgstr "Insérer le numéro du terminal"
+
+#: src/pane_header.rs:162 src/pane_header.rs:174
+msgid "Maximize"
+msgstr "Maximiser"
+
+#: src/pane_header.rs:172
+msgid "Restore"
+msgstr "Restaurer"
+
+#: src/pane_header.rs:219
+msgid "Enable input synchronization for this terminal"
+msgstr "Activer la synchronisation de la saisie pour ce terminal"
+
+#: src/pane_header.rs:224
+msgid "Disable input synchronization for this terminal"
+msgstr "Désactiver la synchronisation de la saisie pour ce terminal"
+
+#: src/preferences/bookmarks.rs:38
+msgid "Press Enter after inserting a bookmark"
+msgstr "Appuyer sur Entrée après l’insertion d’un signet"
+
+#: src/preferences/bookmarks.rs:124
+msgid "No bookmarks yet."
+msgstr "Aucun signet pour l’instant."
+
+#: src/preferences/bookmarks.rs:146
+msgid "Edit"
+msgstr "Modifier"
+
+#: src/preferences/bookmarks.rs:158
+msgid "Edit Bookmark"
+msgstr "Modifier le signet"
+
+#: src/preferences/bookmarks.rs:175 src/preferences/profiles.rs:456
+msgid "Delete"
+msgstr "Supprimer"
+
+#: src/preferences/config.rs:128
+msgid "Open a new window"
+msgstr "Ouvrir une nouvelle fenêtre"
+
+#: src/preferences/config.rs:129
+msgid "Open a new session"
+msgstr "Ouvrir une nouvelle session"
+
+#: src/preferences/config.rs:130
+msgid "Split right"
+msgstr "Diviser à droite"
+
+#: src/preferences/config.rs:131
+msgid "Split down"
+msgstr "Diviser en bas"
+
+#: src/preferences/config.rs:132
+msgid "Focus the window"
+msgstr "Mettre la fenêtre au premier plan"
+
+#: src/preferences/config.rs:158
+msgid "Normal"
+msgstr "Normal"
+
+#: src/preferences/config.rs:159
+msgid "Hide the toolbar"
+msgstr "Masquer la barre d’outils"
+
+#: src/preferences/config.rs:160
+msgid "Borderless"
+msgstr "Sans bordure"
+
+#: src/preferences/config.rs:178
+msgid "Left"
+msgstr "Gauche"
+
+#: src/preferences/config.rs:179
+msgid "Right"
+msgstr "Droite"
+
+#: src/preferences/config.rs:210
+msgid "Scale"
+msgstr "Mise à l’échelle"
+
+#: src/preferences/config.rs:211
+msgid "Tile"
+msgstr "Mosaïque"
+
+#: src/preferences/config.rs:212
+msgid "Center"
+msgstr "Centrée"
+
+#: src/preferences/config.rs:213
+msgid "Stretch"
+msgstr "Étirée"
+
+#: src/preferences/config.rs:256 src/profile/model.rs:364
+msgid "Follow system"
+msgstr "Suivre le système"
+
+#: src/preferences/config.rs:257
+msgid "Light (Catppuccin Latte)"
+msgstr "Clair (Catppuccin Latte)"
+
+#: src/preferences/config.rs:258
+msgid "Dark (Catppuccin Mocha)"
+msgstr "Sombre (Catppuccin Mocha)"
+
+#: src/preferences/profiles.rs:43 src/preferences/profiles.rs:47
+msgid "Profiles"
+msgstr "Profils"
+
+#: src/preferences/profiles.rs:48
+msgid "New sessions use the default profile."
+msgstr "Les nouvelles sessions utilisent le profil par défaut."
+
+#: src/preferences/profiles.rs:64
+msgid "Add Profile"
+msgstr "Ajouter un profil"
+
+#: src/preferences/profiles.rs:83
+msgid "New Profile"
+msgstr "Nouveau profil"
+
+#: src/preferences/profiles.rs:114
+msgid "Default"
+msgstr "Par défaut"
+
+#: src/preferences/profiles.rs:158 src/preferences/window.rs:66
+msgid "General"
+msgstr "Général"
+
+#: src/preferences/profiles.rs:170 src/preferences/profiles.rs:1173
+msgid "Color"
+msgstr "Couleur"
+
+#: src/preferences/profiles.rs:176
+msgid "Scrolling"
+msgstr "Défilement"
+
+#: src/preferences/profiles.rs:182
+msgid "Compatibility"
+msgstr "Compatibilité"
+
+#: src/preferences/profiles.rs:188
+msgid "Badge"
+msgstr "Badge"
+
+#: src/preferences/profiles.rs:194 src/preferences/window.rs:205
+msgid "Advanced"
+msgstr "Avancé"
+
+#: src/preferences/profiles.rs:259
+msgid "Default profile"
+msgstr "Profil par défaut"
+
+#: src/preferences/profiles.rs:260
+msgid "New sessions are created with this profile"
+msgstr "Les nouvelles sessions sont créées avec ce profil"
+
+#: src/preferences/profiles.rs:288 src/preferences/profiles.rs:1117
+msgid "Text"
+msgstr "Texte"
+
+#: src/preferences/profiles.rs:290
+msgid "Terminal font"
+msgstr "Police du terminal"
+
+#: src/preferences/profiles.rs:298 src/preferences/profiles.rs:865
+msgid "Custom font"
+msgstr "Police personnalisée"
+
+#: src/preferences/profiles.rs:317
+msgid "Use the system monospace font"
+msgstr "Utiliser la police à chasse fixe du système"
+
+#: src/preferences/profiles.rs:331
+msgid "Cell width spacing"
+msgstr "Espacement horizontal des cellules"
+
+#: src/preferences/profiles.rs:338
+msgid "Cell height spacing"
+msgstr "Espacement vertical des cellules"
+
+#: src/preferences/profiles.rs:345
+msgid "Text blink"
+msgstr "Clignotement du texte"
+
+#: src/preferences/profiles.rs:354
+msgid "Cursor and selection"
+msgstr "Curseur et sélection"
+
+#: src/preferences/profiles.rs:359
+msgid "Cursor shape"
+msgstr "Forme du curseur"
+
+#: src/preferences/profiles.rs:368
+msgid "Cursor blink"
+msgstr "Clignotement du curseur"
+
+#: src/preferences/profiles.rs:375
+msgid "Word-wise select characters"
+msgstr "Caractères sélectionnés comme partie d’un mot"
+
+#: src/preferences/profiles.rs:393
+msgid "Bell and notifications"
+msgstr "Bip et notifications"
+
+#: src/preferences/profiles.rs:398
+msgid "Terminal bell"
+msgstr "Bip du terminal"
+
+#: src/preferences/profiles.rs:407
+msgid "Notify after silence"
+msgstr "Notifier après un silence"
+
+#: src/preferences/profiles.rs:409
+msgid ""
+"Seconds of no output, after activity, before a \"command finished\" "
+"notification"
+msgstr ""
+"Secondes sans sortie, après de l’activité, avant une notification « commande "
+"terminée »"
+
+#: src/preferences/profiles.rs:437
+msgid "Clone"
+msgstr "Dupliquer"
+
+#: src/preferences/profiles.rs:499
+msgid "Run command as a login shell"
+msgstr "Lancer la commande en tant que shell de connexion"
+
+#: src/preferences/profiles.rs:515
+msgid "Run a custom command instead of my shell"
+msgstr "Exécuter une commande personnalisée au lieu de mon shell"
+
+#: src/preferences/profiles.rs:519
+msgid "Custom command"
+msgstr "Commande personnalisée"
+
+#: src/preferences/profiles.rs:555
+msgid "Working directory (empty: where Rutile was launched)"
+msgstr "Dossier de travail (vide : celui où Rutile a été lancé)"
+
+#: src/preferences/profiles.rs:573
+msgid "When command exits"
+msgstr "Quand la commande se termine"
+
+#: src/preferences/profiles.rs:600
+msgid "Color scheme"
+msgstr "Jeu de couleurs"
+
+#: src/preferences/profiles.rs:627
+msgid "Colors"
+msgstr "Couleurs"
+
+#: src/preferences/profiles.rs:628
+msgid "Set on top of the color scheme"
+msgstr "Appliquées par-dessus le jeu de couleurs"
+
+#: src/preferences/profiles.rs:634
+msgid "Show bold text in bright colors"
+msgstr "Afficher le texte gras en couleurs vives"
+
+#: src/preferences/profiles.rs:655
+msgid "Background transparency"
+msgstr "Transparence du fond"
+
+#: src/preferences/profiles.rs:656
+msgid "Percent — 0 is opaque"
+msgstr "Pourcentage — 0 est opaque"
+
+#: src/preferences/profiles.rs:672
+msgid "Custom cursor colors"
+msgstr "Couleurs du curseur personnalisées"
+
+#: src/preferences/profiles.rs:679
+msgid "Custom highlight colors"
+msgstr "Couleurs de surlignage personnalisées"
+
+#: src/preferences/profiles.rs:686
+msgid "Custom bold color"
+msgstr "Couleur du gras personnalisée"
+
+#: src/preferences/profiles.rs:700
+msgid "Automatic profile switching"
+msgstr "Changement de profil automatique"
+
+#: src/preferences/profiles.rs:702
+msgid ""
+"Switch a terminal to this profile while it is in a matching place: "
+"user@host:directory, every part optional (e.g. prod-db, :~/projets/work, "
+"root@server:/etc). A directory matches its subdirectories too. Rules are "
+"checked when the shell reports its directory (OSC 7)."
+msgstr ""
+"Passer un terminal à ce profil tant qu’il se trouve à un endroit "
+"correspondant : utilisateur@hôte:dossier, chaque partie facultative (ex. "
+"prod-db, :~/projets/work, root@server:/etc). Un dossier correspond aussi à "
+"ses sous-dossiers. Les règles sont vérifiées quand le shell signale son "
+"dossier (OSC 7)."
+
+#: src/preferences/profiles.rs:708
+msgid "Add a rule"
+msgstr "Ajouter une règle"
+
+#: src/preferences/profiles.rs:748 src/preferences/window.rs:213
+msgid "Triggers"
+msgstr "Déclencheurs"
+
+#: src/preferences/profiles.rs:749
+msgid ""
+"Checked after the global triggers (Preferences → Advanced), in terminals "
+"using this profile. $0 is the whole match, $1 to $9 its groups."
+msgstr ""
+"Vérifiés après les déclencheurs globaux (Préférences → Avancé), dans les "
+"terminaux qui utilisent ce profil. $0 est la correspondance entière, $1 à $9 "
+"ses groupes."
+
+#: src/preferences/profiles.rs:770 src/preferences/window.rs:53
+msgid "Encoding"
+msgstr "Encodage"
+
+#: src/preferences/profiles.rs:772
+msgid "For legacy systems — the shell and programs must use the same one"
+msgstr ""
+"Pour les systèmes anciens — le shell et les programmes doivent utiliser le "
+"même"
+
+#: src/preferences/profiles.rs:803
+msgid "Ambiguous-width characters"
+msgstr "Caractères de largeur ambiguë"
+
+#: src/preferences/profiles.rs:819
+#, rust-format
+msgid ""
+"Large text in a corner of the terminal. Same variables as titles: ${title}, $"
+"{directory}, ${host}, ${user}, ${id}."
+msgstr ""
+"Grand texte dans un coin du terminal. Mêmes variables que pour les titres : $"
+"{title}, ${directory}, ${host}, ${user}, ${id}."
+
+#: src/preferences/profiles.rs:824
+msgid "Badge text (empty: no badge)"
+msgstr "Texte du badge (vide : pas de badge)"
+
+#: src/preferences/profiles.rs:841
+msgid "Position"
+msgstr "Position"
+
+#: src/preferences/profiles.rs:856
+msgid "Badge font"
+msgstr "Police du badge"
+
+#: src/preferences/profiles.rs:882
+msgid "Twice the terminal font size"
+msgstr "Deux fois la taille de la police du terminal"
+
+#: src/preferences/profiles.rs:903
+msgid "Custom badge color"
+msgstr "Couleur du badge personnalisée"
+
+#: src/preferences/profiles.rs:920
+msgid "Show scrollbar"
+msgstr "Afficher la barre de défilement"
+
+#: src/preferences/profiles.rs:927
+msgid "Scroll on output"
+msgstr "Défiler lors d’une sortie"
+
+#: src/preferences/profiles.rs:934
+msgid "Scroll on keystroke"
+msgstr "Défiler lors d’une frappe"
+
+#: src/preferences/profiles.rs:948
+msgid "Scrollback lines"
+msgstr "Lignes d’historique"
+
+#: src/preferences/profiles.rs:965
+msgid "Unlimited scrollback"
+msgstr "Historique illimité"
+
+#: src/preferences/profiles.rs:1117
+msgid "Background"
+msgstr "Fond"
+
+#: src/preferences/profiles.rs:1222
+msgid "Remove rule"
+msgstr "Supprimer la règle"
+
+#: src/preferences/triggers.rs:30
+msgid "Add a trigger"
+msgstr "Ajouter un déclencheur"
+
+#: src/preferences/triggers.rs:85
+msgid "No triggers"
+msgstr "Aucun déclencheur"
+
+#: src/preferences/triggers.rs:86
+msgid "Add one with the + button"
+msgstr "Ajoutez-en un avec le bouton +"
+
+#: src/preferences/triggers.rs:106
+msgid "Regular expression"
+msgstr "Expression régulière"
+
+#: src/preferences/triggers.rs:114
+msgid "Action"
+msgstr "Action"
+
+#: src/preferences/triggers.rs:138
+msgid "Remove this trigger"
+msgstr "Supprimer ce déclencheur"
+
+#: src/preferences/triggers.rs:235
+msgid "New trigger"
+msgstr "Nouveau déclencheur"
+
+#: src/preferences/triggers.rs:245
+#, rust-format
+msgid "Not used — {error}"
+msgstr "Inutilisé — {error}"
+
+#: src/preferences/triggers.rs:285
+msgid ""
+"Acts on your system, on any program's output — remote ones and files being "
+"displayed included"
+msgstr ""
+"Agit sur votre système, sur la sortie de n’importe quel programme — y "
+"compris distant, et les fichiers affichés"
+
+#: src/preferences/triggers.rs:289
+msgid ""
+"Captured text is typed without its control characters: only the parameter "
+"itself can contain \\n."
+msgstr ""
+"Le texte capturé est tapé sans ses caractères de contrôle : seul le "
+"paramètre lui-même peut contenir \\n."
+
+#: src/preferences/triggers.rs:292
+msgid ""
+"The command runs without a shell; each $n is one argument, without its "
+"control characters. $$ is a literal $."
+msgstr ""
+"La commande est lancée sans shell ; chaque $n est un seul argument, sans ses "
+"caractères de contrôle. $$ est un $ littéral."
+
+#: src/preferences/triggers.rs:299
+#, rust-format
+msgid "Not usable: {error}"
+msgstr "Inutilisable : {error}"
+
+#: src/preferences/triggers.rs:307
+msgid "Disabled if it fires more than 5 times a second."
+msgstr "Désactivé s’il se déclenche plus de 5 fois par seconde."
+
+#: src/preferences/triggers.rs:317
+#, rust-format
+msgid "Parameter — e.g. {example}"
+msgstr "Paramètre — ex. {example}"
+
+#: src/preferences/window.rs:56
+msgid ""
+"Choosing which encodings the terminal menu offers is planned. The encoding "
+"itself is already set per profile: Profiles → edit a profile → Compatibility."
+msgstr ""
+"Le choix des encodages proposés par le menu du terminal est prévu. "
+"L’encodage lui-même se règle déjà par profil : Profils → modifier un profil "
+"→ Compatibilité."
+
+#: src/preferences/window.rs:71
+msgid "Behavior"
+msgstr "Comportement"
+
+#: src/preferences/window.rs:75
+msgid "Focus terminal on mouse hover"
+msgstr "Donner le focus au terminal survolé par la souris"
+
+#: src/preferences/window.rs:77
+msgid "Move the pointer over a pane to focus it, without clicking"
+msgstr "Survoler un pane avec le pointeur lui donne le focus, sans cliquer"
+
+#: src/preferences/window.rs:92
+msgid "Close window when last session is closed"
+msgstr "Fermer la fenêtre quand la dernière session est fermée"
+
+#: src/preferences/window.rs:106
+msgid "Copy on select"
+msgstr "Copier la sélection"
+
+#: src/preferences/window.rs:107
+msgid "Automatically copy the selected text to the clipboard"
+msgstr "Copier automatiquement le texte sélectionné dans le presse-papiers"
+
+#: src/preferences/window.rs:121
+msgid "Enable hyperlinks"
+msgstr "Activer les hyperliens"
+
+#: src/preferences/window.rs:123
+msgid "Ctrl+Click opens OSC 8 links and filesystem paths in terminal output"
+msgstr ""
+"Ctrl+clic ouvre les liens OSC 8 et les chemins de fichiers affichés par le "
+"terminal"
+
+#: src/preferences/window.rs:138
+msgid "Enable notifications"
+msgstr "Activer les notifications"
+
+#: src/preferences/window.rs:140
+msgid "Desktop notification on bell, or when a pane goes quiet after activity"
+msgstr ""
+"Notification de bureau sur un bip, ou quand un pane redevient silencieux "
+"après de l’activité"
+
+#: src/preferences/window.rs:155
+msgid "Prompt before closing a running process"
+msgstr "Demander avant de fermer un processus en cours"
+
+#: src/preferences/window.rs:157
+msgid ""
+"Confirm before closing a pane, session, or window with an active process"
+msgstr ""
+"Confirmer avant de fermer un pane, une session ou une fenêtre où un "
+"processus est actif"
+
+#: src/preferences/window.rs:174
+msgid "On new instance"
+msgstr "À une nouvelle instance"
+
+#: src/preferences/window.rs:176
+msgid "When rutile is launched again while running (overridden by --action)"
+msgstr ""
+"Quand rutile est relancé alors qu’il tourne déjà (remplacé par --action)"
+
+#: src/preferences/window.rs:215
+msgid ""
+"Regular expressions matched against every terminal's output, before the "
+"profile's own triggers. $0 is the whole match, $1 to $9 its groups."
+msgstr ""
+"Expressions régulières testées sur la sortie de chaque terminal, avant les "
+"déclencheurs du profil. $0 est la correspondance entière, $1 à $9 ses "
+"groupes."
+
+#: src/preferences/window.rs:230
+msgid "Trigger processing"
+msgstr "Traitement des déclencheurs"
+
+#: src/preferences/window.rs:241
+msgid "Rows checked per change"
+msgstr "Lignes vérifiées par changement"
+
+#: src/preferences/window.rs:253
+msgid "No limit"
+msgstr "Pas de limite"
+
+#: src/preferences/window.rs:255
+msgid ""
+"Every row is checked: heavy output gets slower with an unlimited scrollback"
+msgstr ""
+"Chaque ligne est vérifiée : une sortie abondante ralentit avec un historique "
+"illimité"
+
+#: src/preferences/window.rs:296
+msgid "Warn before an unsafe paste"
+msgstr "Avertir avant un collage dangereux"
+
+#: src/preferences/window.rs:297
+msgid "Several lines that use sudo"
+msgstr "Plusieurs lignes qui utilisent sudo"
+
+#: src/preferences/window.rs:301
+msgid "Strip a leading # or $"
+msgstr "Retirer un # ou un $ en tête"
+
+#: src/preferences/window.rs:302
+msgid "A command copied with its prompt, or commented out"
+msgstr "Une commande copiée avec son invite, ou mise en commentaire"
+
+#: src/preferences/window.rs:306
+msgid "Strip trailing whitespace"
+msgstr "Retirer les espaces de fin"
+
+#: src/preferences/window.rs:307
+msgid "Including the final line break, so the command doesn't run right away"
+msgstr ""
+"Y compris le dernier saut de ligne, pour que la commande ne s’exécute pas "
+"tout de suite"
+
+#: src/preferences/window.rs:311
+msgid "Advanced paste by default"
+msgstr "Collage avancé par défaut"
+
+#: src/preferences/window.rs:312
+msgid "Review and transform multi-line text before pasting it"
+msgstr "Relire et transformer un texte de plusieurs lignes avant de le coller"
+
+#: src/preferences/window.rs:337
+msgid "Appearance"
+msgstr "Apparence"
+
+#: src/preferences/window.rs:340
+msgid "Theme"
+msgstr "Thème"
+
+#: src/preferences/window.rs:345
+msgid "Theme variant"
+msgstr "Variante du thème"
+
+#: src/preferences/window.rs:346
+msgid "Terminal colors come from each profile's color scheme"
+msgstr "Les couleurs du terminal viennent du jeu de couleurs de chaque profil"
+
+#: src/preferences/window.rs:374
+msgid "Panes"
+msgstr "Panes"
+
+#: src/preferences/window.rs:377
+msgid "Wide splitter handles"
+msgstr "Poignées de séparation larges"
+
+#: src/preferences/window.rs:378
+msgid "Easier to grab with the mouse"
+msgstr "Plus faciles à saisir à la souris"
+
+#: src/preferences/window.rs:390
+msgid "Show the title of a lone pane"
+msgstr "Afficher le titre d’un pane seul"
+
+#: src/preferences/window.rs:392
+msgid "Otherwise a session with a single pane hides its title bar"
+msgstr "Sinon, une session d’un seul pane masque sa barre de titre"
+
+#: src/preferences/window.rs:406
+msgid "Window"
+msgstr "Fenêtre"
+
+#: src/preferences/window.rs:411
+msgid "Window style"
+msgstr "Style de fenêtre"
+
+#: src/preferences/window.rs:412
+msgid ""
+"Without the toolbar, Preferences stay reachable with Ctrl+Comma and the "
+"terminal's right-click menu"
+msgstr ""
+"Sans barre d’outils, les Préférences restent accessibles par Ctrl+Virgule et "
+"le menu contextuel du terminal"
+
+#: src/preferences/window.rs:431
+msgid "Sidebar position"
+msgstr "Position de la barre latérale"
+
+#: src/preferences/window.rs:466 src/preferences/window.rs:506
+msgid "Background image"
+msgstr "Image de fond"
+
+#: src/preferences/window.rs:468
+msgid "Shown through terminals whose profile has some background transparency."
+msgstr ""
+"Visible à travers les terminaux dont le profil a un fond en partie "
+"transparent."
+
+#: src/preferences/window.rs:472
+msgid "Image"
+msgstr "Image"
+
+#: src/preferences/window.rs:478 src/profile/model.rs:393
+msgid "None"
+msgstr "Aucune"
+
+#: src/preferences/window.rs:483
+msgid "Choose…"
+msgstr "Choisir…"
+
+#: src/preferences/window.rs:488
+msgid "Remove the background image"
+msgstr "Retirer l’image de fond"
+
+#: src/preferences/window.rs:501
+msgid "Images"
+msgstr "Images"
+
+#: src/preferences/window.rs:547
+msgid "Mode"
+msgstr "Mode"
+
+#: src/preferences/window.rs:573
+msgid "Coming later"
+msgstr "Prévu plus tard"
+
+#: src/preferences/window.rs:601
+msgid "Shortcuts"
+msgstr "Raccourcis"
+
+#: src/preferences/window.rs:605
+msgid "Keybindings"
+msgstr "Raccourcis clavier"
+
+#: src/preferences/window.rs:607
+msgid "Click a shortcut, then press the new key combination. Escape cancels."
+msgstr ""
+"Cliquez sur un raccourci, puis appuyez sur la nouvelle combinaison de "
+"touches. Échap annule."
+
+#: src/preferences/window.rs:644
+msgid "Press a key…"
+msgstr "Appuyez sur une touche…"
+
+#: src/profile/model.rs:258
+msgid "Top left"
+msgstr "En haut à gauche"
+
+#: src/profile/model.rs:259
+msgid "Top right"
+msgstr "En haut à droite"
+
+#: src/profile/model.rs:260
+msgid "Bottom left"
+msgstr "En bas à gauche"
+
+#: src/profile/model.rs:261
+msgid "Bottom right"
+msgstr "En bas à droite"
+
+#: src/profile/model.rs:281
+msgid "Narrow"
+msgstr "Étroits"
+
+#: src/profile/model.rs:282
+msgid "Wide"
+msgstr "Larges"
+
+#: src/profile/model.rs:316
+msgid "Never"
+msgstr "Jamais"
+
+#: src/profile/model.rs:317
+msgid "When focused"
+msgstr "Avec le focus"
+
+#: src/profile/model.rs:318
+msgid "When unfocused"
+msgstr "Sans le focus"
+
+#: src/profile/model.rs:319
+msgid "Always"
+msgstr "Toujours"
+
+#: src/profile/model.rs:342
+msgid "Block"
+msgstr "Bloc"
+
+#: src/profile/model.rs:343
+msgid "I-beam"
+msgstr "Barre verticale"
+
+#: src/profile/model.rs:344
+msgid "Underline"
+msgstr "Souligné"
+
+#: src/profile/model.rs:365
+msgid "On"
+msgstr "Activé"
+
+#: src/profile/model.rs:366
+msgid "Off"
+msgstr "Désactivé"
+
+#: src/profile/model.rs:394
+msgid "Sound"
+msgstr "Son"
+
+#: src/profile/model.rs:395
+msgid "Icon"
+msgstr "Icône"
+
+#: src/profile/model.rs:396
+msgid "Icon and sound"
+msgstr "Icône et son"
+
+#: src/profile/model.rs:428
+msgid "Close the terminal"
+msgstr "Fermer le terminal"
+
+#: src/profile/model.rs:429
+msgid "Restart the command"
+msgstr "Relancer la commande"
+
+#: src/profile/model.rs:430
+msgid "Hold the terminal open"
+msgstr "Garder le terminal ouvert"
+
+#: src/profile/spawn.rs:94
+#, rust-format
+msgid "The command exited with status {status}"
+msgstr "La commande s’est terminée avec le code {status}"
+
+#: src/profile/spawn.rs:99
+#, rust-format
+msgid "The command was terminated by signal {signal}"
+msgstr "La commande a été arrêtée par le signal {signal}"
+
+#: src/profile/spawn.rs:103
+msgid "The command was terminated"
+msgstr "La commande a été arrêtée"
+
+#: src/session/session_view.rs:292
+#, rust-format
+msgid "Session {number}"
+msgstr "Session {number}"
+
+#: src/terminal/monitor.rs:59 src/terminal/widget.rs:214
+msgid "Bell"
+msgstr "Bip"
+
+#: src/terminal/monitor.rs:101
+msgid "Command finished"
+msgstr "Commande terminée"
+
+#: src/terminal/search.rs:21
+msgid "Find in terminal…"
+msgstr "Rechercher dans le terminal…"
+
+#: src/terminal/search.rs:25
+msgid "Previous match"
+msgstr "Résultat précédent"
+
+#: src/terminal/search.rs:27
+msgid "Next match"
+msgstr "Résultat suivant"
+
+#: src/terminal/title.rs:32
+msgid "Terminal"
+msgstr "Terminal"
+
+#: src/terminal/trigger_runner.rs:204
+#, rust-format
+msgid "Trigger “{pattern}” disabled: it fired more than {count} times a second"
+msgstr ""
+"Déclencheur « {pattern} » désactivé : il s’est déclenché plus de {count} "
+"fois par seconde"
+
+#: src/terminal/trigger_runner.rs:207
+msgid "Re-enable"
+msgstr "Réactiver"
+
+#: src/terminal/trigger_runner.rs:268 src/terminal/trigger_runner.rs:274
+msgid "Dismiss"
+msgstr "Ignorer"
+
+#: src/terminal/trigger_runner.rs:295
+#, rust-format
+msgid "Trigger command can't be parsed: {error}"
+msgstr "Commande du déclencheur illisible : {error}"
+
+#: src/terminal/trigger_runner.rs:315
+#, rust-format
+msgid "Trigger command failed to start: {error}"
+msgstr "Échec du lancement de la commande du déclencheur : {error}"
+
+#: src/terminal/triggers.rs:111
+msgid "Update state"
+msgstr "Mettre à jour l’état"
+
+#: src/terminal/triggers.rs:112
+msgid "Send notification"
+msgstr "Envoyer une notification"
+
+#: src/terminal/triggers.rs:113
+msgid "Update title"
+msgstr "Mettre à jour le titre"
+
+#: src/terminal/triggers.rs:114
+msgid "Update badge"
+msgstr "Mettre à jour le badge"
+
+#: src/terminal/triggers.rs:115
+msgid "Play bell"
+msgstr "Émettre un bip"
+
+#: src/terminal/triggers.rs:116
+msgid "Send text"
+msgstr "Envoyer du texte"
+
+#: src/terminal/triggers.rs:117
+msgid "Execute command"
+msgstr "Exécuter une commande"
+
+#: src/terminal/triggers.rs:118
+msgid "Run process and send its output"
+msgstr "Lancer un processus et envoyer sa sortie"
+
+#: src/terminal/triggers.rs:129
+msgid "(no parameter)"
+msgstr "(aucun paramètre)"
+
+#: src/terminal/triggers.rs:151
+msgid ""
+"Captured text is typed as is: a shell reading it would run $(…), `…` or ; in "
+"it — only use $n on output you trust"
+msgstr ""
+"Le texte capturé est tapé tel quel : un shell qui le lit exécuterait les $"
+"(…), `…` ou ; qu’il contient — n’utilisez $n que sur une sortie de confiance"
+
+#: src/terminal/triggers.rs:171
+msgid ""
+"Captured text would be run as code there: pass it as a separate argument "
+"instead (sh -c '… \"$$1\"' sh $1)"
+msgstr ""
+"Le texte capturé y serait exécuté comme du code : passez-le plutôt en "
+"argument séparé (sh -c '… \"$$1\"' sh $1)"
+
+#: src/terminal/triggers.rs:180
+msgid "Empty command"
+msgstr "Commande vide"
+
+#: src/terminal/triggers.rs:284
+msgid "Empty pattern"
+msgstr "Motif vide"
+
+#: src/terminal/triggers.rs:298
+msgid "Pattern too complex"
+msgstr "Motif trop complexe"
+
+#: src/terminal/widget.rs:139
+#, rust-format
+msgid "Invalid custom command: {error}"
+msgstr "Commande personnalisée invalide : {error}"
+
+#: src/terminal/widget.rs:172
+#, rust-format
+msgid "Failed to start {program}: {error}"
+msgstr "Impossible de lancer {program} : {error}"
+
+#: src/terminal/widget.rs:248
+msgid "Relaunch"
+msgstr "Relancer"
+
+#: src/terminal/widget.rs:351
+#, rust-format
+msgid "{reason} — too quickly to restart"
+msgstr "{reason} — trop vite pour relancer"
+
+#: src/window.rs:777
+msgid "View session sidebar"
+msgstr "Afficher la barre latérale des sessions"
+
+#: src/window.rs:789
+msgid "Split ↔"
+msgstr "Diviser ↔"
+
+#: src/window.rs:810
+msgid "Split ↕"
+msgstr "Diviser ↕"
+
+#: src/window.rs:832
+msgid "New Session"
+msgstr "Nouvelle session"
+
+#: src/window.rs:833
+msgid "Close Session"
+msgstr "Fermer la session"
+
+#: src/window.rs:837
+msgid "Save Session As…"
+msgstr "Enregistrer la session sous…"
+
+#: src/window.rs:838
+msgid "Open Session…"
+msgstr "Ouvrir une session…"
+
+#: src/window.rs:843
+msgid "About Rutile"
+msgstr "À propos de Rutile"
+
+#: src/window.rs:848
+msgid "Menu"
+msgstr "Menu"
+
+#: src/window.rs:998
+msgid "Rutile session (*.rutile-session.toml)"
+msgstr "Session Rutile (*.rutile-session.toml)"
+
+#: src/window.rs:1005
+msgid "Save Session As"
+msgstr "Enregistrer la session sous"
+
+#: src/window.rs:1028
+msgid "Open Session"
+msgstr "Ouvrir une session"

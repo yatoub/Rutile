@@ -17,12 +17,18 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 use vte4::TerminalExt;
 
+use crate::i18n::{n_, tr};
 use crate::preferences::Preferences;
 use crate::terminal::paste::{self, AdvancedTransform};
 
 /// Set on a terminal once its user chose to paste an unsafe text anyway:
 /// like Tilix, that terminal doesn't warn again.
 const UNSAFE_PASTE_IGNORED: &str = "rutile-unsafe-paste-ignored";
+
+const UNSAFE_PASTE_HEADING: &str = n_("This command asks for administrative access");
+const UNSAFE_PASTE_BODY: &str = n_(
+    "Copying commands from the internet can be dangerous. Be sure you understand what each part of this command does.",
+);
 
 /// The "Paste" action (Ctrl+Shift+V, context menu): the advanced paste
 /// dialog if that's the default, else a plain paste.
@@ -84,16 +90,10 @@ fn plain_paste(terminal: &vte4::Terminal, prefs: &Rc<RefCell<Preferences>>, text
         return;
     }
 
-    let dialog = adw::AlertDialog::new(
-        Some("This command asks for administrative access"),
-        Some(
-            "Copying commands from the internet can be dangerous. \
-             Be sure you understand what each part of this command does.",
-        ),
-    );
+    let dialog = adw::AlertDialog::new(Some(tr(UNSAFE_PASTE_HEADING)), Some(tr(UNSAFE_PASTE_BODY)));
     dialog.set_extra_child(Some(&preview(&text)));
-    dialog.add_response("cancel", "Cancel");
-    dialog.add_response("paste", "Paste Anyway");
+    dialog.add_response("cancel", tr("Cancel"));
+    dialog.add_response("paste", tr("Paste Anyway"));
     dialog.set_response_appearance("paste", adw::ResponseAppearance::Destructive);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");
@@ -159,11 +159,11 @@ fn show_advanced_dialog(terminal: &vte4::Terminal, prefs: &Rc<RefCell<Preference
     let unsafe_text = paste::is_unsafe(text);
     if unsafe_text {
         let warning = gtk4::Label::builder()
-            .label(
-                "<b>This command asks for administrative access</b>\n\
-                 Copying commands from the internet can be dangerous. \
-                 Be sure you understand what each part of this command does.",
-            )
+            .label(format!(
+                "<b>{}</b>\n{}",
+                glib::markup_escape_text(tr(UNSAFE_PASTE_HEADING)),
+                glib::markup_escape_text(tr(UNSAFE_PASTE_BODY)),
+            ))
             .use_markup(true)
             .wrap(true)
             .xalign(0.0)
@@ -192,8 +192,8 @@ fn show_advanced_dialog(terminal: &vte4::Terminal, prefs: &Rc<RefCell<Preference
 
     let current = prefs.borrow().advanced_paste_transform();
     let tabs_row = adw::SpinRow::builder()
-        .title("Convert tabs to spaces")
-        .subtitle("Tab width")
+        .title(tr("Convert tabs to spaces"))
+        .subtitle(tr("Tab width"))
         .adjustment(&gtk4::Adjustment::new(
             f64::from(prefs.borrow().advanced_paste_tab_width),
             1.0,
@@ -210,10 +210,12 @@ fn show_advanced_dialog(terminal: &vte4::Terminal, prefs: &Rc<RefCell<Preference
         .build();
     tabs_row.add_prefix(&tabs_switch);
     let crlf_row = adw::SwitchRow::builder()
-        .title("Convert CRLF and CR to LF")
+        .title(tr("Convert CRLF and CR to LF"))
         .active(current.normalize_line_endings)
         .build();
-    let transforms = adw::PreferencesGroup::builder().title("Transform").build();
+    let transforms = adw::PreferencesGroup::builder()
+        .title(tr("Transform"))
+        .build();
     transforms.add(&tabs_row);
     transforms.add(&crlf_row);
     content.append(&transforms);
@@ -245,7 +247,7 @@ fn show_advanced_dialog(terminal: &vte4::Terminal, prefs: &Rc<RefCell<Preference
         });
     }
 
-    let paste_button = gtk4::Button::with_label("Paste");
+    let paste_button = gtk4::Button::with_label(tr("Paste"));
     paste_button.add_css_class(if unsafe_text {
         "destructive-action"
     } else {
@@ -257,7 +259,7 @@ fn show_advanced_dialog(terminal: &vte4::Terminal, prefs: &Rc<RefCell<Preference
     toolbar.add_top_bar(&header);
     toolbar.set_content(Some(&content));
     let dialog = adw::Dialog::builder()
-        .title("Advanced Paste")
+        .title(tr("Advanced Paste"))
         .content_width(560)
         .content_height(440)
         .child(&toolbar)

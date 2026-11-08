@@ -5,6 +5,7 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 
 use crate::bookmarks::{self, Bookmark, BookmarkStore};
+use crate::i18n::tr;
 
 /// Tilix's "Select bookmark" (Ctrl+Shift+B): a searchable list of every
 /// bookmark — every typed word must appear in its name, command or folder.
@@ -14,7 +15,7 @@ pub fn show(parent: &impl IsA<gtk4::Widget>, on_pick: impl Fn(Bookmark) + 'stati
     let store = BookmarkStore::load();
 
     let search = gtk4::SearchEntry::builder()
-        .placeholder_text("Search bookmarks")
+        .placeholder_text(tr("Search bookmarks"))
         .hexpand(true)
         .build();
     let search_bar = gtk4::Box::builder()
@@ -44,7 +45,7 @@ pub fn show(parent: &impl IsA<gtk4::Widget>, on_pick: impl Fn(Bookmark) + 'stati
     toolbar.add_top_bar(&search_bar);
     toolbar.set_content(Some(&scrolled));
     let dialog = adw::Dialog::builder()
-        .title("Bookmarks")
+        .title(tr("Bookmarks"))
         .content_width(560)
         .content_height(480)
         .child(&toolbar)
@@ -93,9 +94,11 @@ pub fn show(parent: &impl IsA<gtk4::Widget>, on_pick: impl Fn(Bookmark) + 'stati
             }
             if matches.is_empty() {
                 let message = if empty_store {
-                    "No bookmarks yet — add one from the terminal's right-click menu or Preferences → Bookmarks"
+                    tr(
+                        "No bookmarks yet — add one from the terminal's right-click menu or Preferences → Bookmarks",
+                    )
                 } else {
-                    "No bookmark matches"
+                    tr("No bookmark matches")
                 };
                 let row = adw::ActionRow::builder()
                     .title(message)

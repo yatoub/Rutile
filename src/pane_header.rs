@@ -5,6 +5,7 @@ use gtk4::prelude::*;
 use vte4::TerminalExt;
 
 use crate::dialogs::confirm_close;
+use crate::i18n::tr;
 use crate::layout::PaneId;
 use crate::preferences::Preferences;
 use crate::session::SessionView;
@@ -158,7 +159,7 @@ pub fn attach(
 
     let maximize_button = gtk4::Button::from_icon_name(maximize_icon_name(false));
     maximize_button.add_css_class("flat");
-    maximize_button.set_tooltip_text(Some("Maximiser le pane"));
+    maximize_button.set_tooltip_text(Some(tr("Maximize")));
     {
         let session_view = session_view.clone();
         let maximize_button_for_click = maximize_button.clone();
@@ -168,9 +169,9 @@ pub fn attach(
                 .toggle_maximize(session_id, pane_id);
             maximize_button_for_click.set_icon_name(maximize_icon_name(now_maximized));
             maximize_button_for_click.set_tooltip_text(Some(if now_maximized {
-                "Restaurer le pane"
+                tr("Restore")
             } else {
-                "Maximiser le pane"
+                tr("Maximize")
             }));
         });
     }
@@ -178,7 +179,7 @@ pub fn attach(
 
     let close_button = gtk4::Button::from_icon_name("window-close-symbolic");
     close_button.add_css_class("flat");
-    close_button.set_tooltip_text(Some("Fermer le pane"));
+    close_button.set_tooltip_text(Some(tr("Close")));
     {
         let header = header.clone();
         close_button.connect_clicked(move |_| {
@@ -215,16 +216,12 @@ fn update_sync_button(button: &gtk4::Button, visible: bool, excluded: bool) {
 
     if excluded {
         button.set_icon_name("action-unavailable-symbolic");
-        button.set_tooltip_text(Some(
-            "Saisie synchro : désactivée pour ce pane (cliquer pour réactiver)",
-        ));
+        button.set_tooltip_text(Some(tr("Enable input synchronization for this terminal")));
         button.add_css_class("pane-sync-excluded");
         button.remove_css_class("suggested-action");
     } else {
         button.set_icon_name("input-keyboard-symbolic");
-        button.set_tooltip_text(Some(
-            "Saisie synchro active pour ce pane (cliquer pour désactiver)",
-        ));
+        button.set_tooltip_text(Some(tr("Disable input synchronization for this terminal")));
         button.remove_css_class("pane-sync-excluded");
         button.add_css_class("suggested-action");
     }

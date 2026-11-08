@@ -3,6 +3,7 @@ use std::path::Path;
 use gtk4::glib;
 
 use super::Profile;
+use crate::i18n::{tr, tr_args};
 
 /// What to hand `vte4::Terminal::spawn_async` for a profile, resolved
 /// without touching any widget — kept apart from `terminal::widget` so the
@@ -89,17 +90,17 @@ pub fn working_directory_for(
 /// like Tilix's own info bar.
 pub fn describe_exit(status: i32) -> String {
     if libc::WIFEXITED(status) {
-        format!(
-            "The command exited with status {}",
-            libc::WEXITSTATUS(status)
+        tr_args(
+            "The command exited with status {status}",
+            &[("status", &libc::WEXITSTATUS(status))],
         )
     } else if libc::WIFSIGNALED(status) {
-        format!(
-            "The command was terminated by signal {}",
-            libc::WTERMSIG(status)
+        tr_args(
+            "The command was terminated by signal {signal}",
+            &[("signal", &libc::WTERMSIG(status))],
         )
     } else {
-        "The command was terminated".to_string()
+        tr("The command was terminated").to_string()
     }
 }
 

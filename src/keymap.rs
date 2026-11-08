@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use gtk4::gdk;
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::{tr, tr_args};
 use crate::layout::{Direction, Orientation};
 
 /// Actions dispatchable from the keyboard. Pane-level actions are handled
@@ -293,43 +294,43 @@ fn parse_chord(chord: &str) -> Option<(gdk::Key, gdk::ModifierType)> {
     Some((key?, modifiers))
 }
 
-fn direction_label(direction: Direction) -> &'static str {
-    match direction {
-        Direction::Up => "Up",
-        Direction::Down => "Down",
-        Direction::Left => "Left",
-        Direction::Right => "Right",
-    }
-}
-
 /// Human-readable label for the Preferences "Shortcuts" page.
 pub fn action_label(action: Action) -> String {
-    match action {
-        Action::SplitHorizontal => "Split horizontally".to_string(),
-        Action::SplitVertical => "Split vertically".to_string(),
-        Action::ClosePane => "Close pane".to_string(),
-        Action::Navigate(d) => format!("Navigate {}", direction_label(d)),
-        Action::NewSession => "New session".to_string(),
-        Action::CloseSession => "Close session".to_string(),
-        Action::NextSession => "Next session".to_string(),
-        Action::PrevSession => "Previous session".to_string(),
-        Action::ToggleSearch => "Find in terminal".to_string(),
-        Action::Copy => "Copy".to_string(),
-        Action::Paste => "Paste".to_string(),
-        Action::SwitchToSession(n) => format!("Switch to session {n}"),
-        Action::ResizePane(d) => format!("Resize pane {}", direction_label(d)),
-        Action::ToggleSyncCurrentPane => "Toggle sync for current pane".to_string(),
-        Action::RenameSession => "Rename session".to_string(),
-        Action::RenamePane => "Rename pane".to_string(),
-        Action::DetachSession => "Detach session into new window".to_string(),
-        Action::CopyAsHtml => "Copy as HTML".to_string(),
-        Action::PasteAdvanced => "Paste (advanced)".to_string(),
-        Action::ToggleMargin => "Toggle margin guide".to_string(),
-        Action::OpenPreferences => "Open preferences".to_string(),
-        Action::SelectBookmark => "Insert a bookmark".to_string(),
-        Action::AddBookmark => "Add a bookmark".to_string(),
-        Action::InsertNumber => "Insert terminal number".to_string(),
-    }
+    let label = match action {
+        Action::SplitHorizontal => tr("Split horizontally"),
+        Action::SplitVertical => tr("Split vertically"),
+        Action::ClosePane => tr("Close pane"),
+        Action::Navigate(Direction::Up) => tr("Navigate up"),
+        Action::Navigate(Direction::Down) => tr("Navigate down"),
+        Action::Navigate(Direction::Left) => tr("Navigate left"),
+        Action::Navigate(Direction::Right) => tr("Navigate right"),
+        Action::NewSession => tr("New session"),
+        Action::CloseSession => tr("Close session"),
+        Action::NextSession => tr("Next session"),
+        Action::PrevSession => tr("Previous session"),
+        Action::ToggleSearch => tr("Find in terminal"),
+        Action::Copy => tr("Copy"),
+        Action::Paste => tr("Paste"),
+        Action::SwitchToSession(n) => {
+            return tr_args("Switch to session {number}", &[("number", &n)]);
+        }
+        Action::ResizePane(Direction::Up) => tr("Resize pane up"),
+        Action::ResizePane(Direction::Down) => tr("Resize pane down"),
+        Action::ResizePane(Direction::Left) => tr("Resize pane left"),
+        Action::ResizePane(Direction::Right) => tr("Resize pane right"),
+        Action::ToggleSyncCurrentPane => tr("Toggle sync for current pane"),
+        Action::RenameSession => tr("Rename session"),
+        Action::RenamePane => tr("Rename pane"),
+        Action::DetachSession => tr("Detach session into new window"),
+        Action::CopyAsHtml => tr("Copy as HTML"),
+        Action::PasteAdvanced => tr("Paste (advanced)"),
+        Action::ToggleMargin => tr("Toggle margin guide"),
+        Action::OpenPreferences => tr("Open preferences"),
+        Action::SelectBookmark => tr("Insert a bookmark"),
+        Action::AddBookmark => tr("Add a bookmark"),
+        Action::InsertNumber => tr("Insert terminal number"),
+    };
+    label.to_string()
 }
 
 pub fn orientation_for(action: Action) -> Option<Orientation> {

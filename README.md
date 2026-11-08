@@ -42,10 +42,11 @@ The four pillars above are stable and usable daily; everything else (session sav
 - Copy as HTML, advanced paste (CRLF/whitespace normalization), an 80-column margin guide
 - Confirm-before-close dialog when a pane/session/window still has a foreground process
 - Session save/restore (layout + cwd + profile, TOML) and detach-session-into-new-window
+- English and French interface, following `LANGUAGE`/`LC_ALL`/`LC_MESSAGES`/`LANG` (translations are compiled into the binary)
 
 ### Yet to come (see [`docs/ROADMAP.md`](docs/ROADMAP.md))
 
-Deep profiles (custom command, font, cursor, scrollback, badge, triggers), appearance options (theme variant/transparency/background image), non-UTF-8 encodings, a CLI, bookmarks, sidebar drag-and-drop, advanced paste warnings, and (deferred, on request) quake mode, Nautilus integration, libsecret passwords, and i18n.
+Deep profiles (custom command, font, cursor, scrollback, badge, triggers), appearance options (theme variant/transparency/background image), non-UTF-8 encodings, a CLI, bookmarks, sidebar drag-and-drop, advanced paste warnings, and (deferred, on request) quake mode, Nautilus integration, and libsecret passwords.
 
 ## Command line
 
@@ -134,6 +135,19 @@ Run the test suite (no display required — the split-tree and broadcast models 
 ```bash
 cargo test
 ```
+
+## Translating
+
+The interface is in English; translations live in `po/<language>.po` and are compiled into the binary by `build.rs` — no `.mo` file to install. To add a language (needs GNU gettext ≥ 0.24, the first `xgettext` that reads Rust):
+
+```sh
+scripts/update-po.sh                                         # refresh po/rutile.pot from the sources
+msginit --no-translator -i po/rutile.pot -l de -o po/de.po   # start a catalog, then fill in its msgstr
+scripts/update-po.sh                                         # check it (msgfmt --check)
+LANG=de_DE.UTF-8 cargo run
+```
+
+Keep the `{name}` placeholders as they are (their order may change); `cargo test` checks it. Untranslated and fuzzy entries show in English.
 
 ## Stack
 
