@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.14.0] — 2026-11-08
+
+### Added
+
+- Add the French translation
+
+
+### Fixed
+
+- Stop ellipsizing combo values and profile tabs
+
+- Mark every UI string and use English as the source language
+
+
 ## [0.13.0] — 2026-11-07
 
 ### Added
