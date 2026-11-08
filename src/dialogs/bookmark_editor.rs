@@ -5,6 +5,7 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 
 use crate::bookmarks::{self, Bookmark, BookmarkStore};
+use crate::i18n::{tr, tr_args};
 
 /// Adds or edits a bookmark: name, command and folder (`/` nests folders,
 /// existing ones are listed as a reminder). `on_save` gets the result once
@@ -16,16 +17,16 @@ pub fn show(
     on_save: impl Fn(Bookmark) + 'static,
 ) {
     let name_row = adw::EntryRow::builder()
-        .title("Name")
+        .title(tr("Name"))
         .text(initial.name.as_str())
         .build();
     let command_row = adw::EntryRow::builder()
-        .title("Command")
+        .title(tr("Command"))
         .text(initial.command.as_str())
         .build();
     command_row.add_css_class("monospace");
     let folder_row = adw::EntryRow::builder()
-        .title("Folder (nested with /, empty: top level)")
+        .title(tr("Folder (nested with /, empty: top level)"))
         .text(bookmarks::format_folder(&initial.folder))
         .build();
 
@@ -36,11 +37,11 @@ pub fn show(
         .collect();
     let group = adw::PreferencesGroup::builder()
         .description(if existing.is_empty() {
-            "Inserted into the terminal as if typed.".to_string()
+            tr("Inserted into the terminal as if typed.").to_string()
         } else {
-            format!(
-                "Inserted into the terminal as if typed. Existing folders: {}",
-                existing.join(", ")
+            tr_args(
+                "Inserted into the terminal as if typed. Existing folders: {folders}",
+                &[("folders", &existing.join(", "))],
             )
         })
         .build();
@@ -51,7 +52,7 @@ pub fn show(
     page.add(&group);
 
     let save = gtk4::Button::builder()
-        .label("Save")
+        .label(tr("Save"))
         .sensitive(false)
         .build();
     save.add_css_class("suggested-action");
@@ -122,7 +123,7 @@ pub fn add_from_terminal(terminal: &vte4::Terminal) {
         command: selection,
         folder: Vec::new(),
     };
-    show(terminal, "Add Bookmark", initial, |bookmark| {
+    show(terminal, tr("Add Bookmark"), initial, |bookmark| {
         BookmarkStore::load().add(bookmark);
     });
 }

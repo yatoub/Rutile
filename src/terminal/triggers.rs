@@ -37,6 +37,8 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::tr;
+
 /// How many rows behind the scan position matches are remembered.
 const DEDUPE_ROWS: i64 = 1024;
 
@@ -106,14 +108,14 @@ impl TriggerAction {
 
     pub fn label(self) -> &'static str {
         match self {
-            TriggerAction::UpdateState => "Update state",
-            TriggerAction::SendNotification => "Send notification",
-            TriggerAction::UpdateTitle => "Update title",
-            TriggerAction::UpdateBadge => "Update badge",
-            TriggerAction::PlayBell => "Play bell",
-            TriggerAction::SendText => "Send text",
-            TriggerAction::ExecuteCommand => "Execute command",
-            TriggerAction::RunProcess => "Run process and send its output",
+            TriggerAction::UpdateState => tr("Update state"),
+            TriggerAction::SendNotification => tr("Send notification"),
+            TriggerAction::UpdateTitle => tr("Update title"),
+            TriggerAction::UpdateBadge => tr("Update badge"),
+            TriggerAction::PlayBell => tr("Play bell"),
+            TriggerAction::SendText => tr("Send text"),
+            TriggerAction::ExecuteCommand => tr("Execute command"),
+            TriggerAction::RunProcess => tr("Run process and send its output"),
         }
     }
 
@@ -124,7 +126,7 @@ impl TriggerAction {
             TriggerAction::SendNotification => "title=…;body=$0",
             TriggerAction::UpdateTitle => "${title} — $1",
             TriggerAction::UpdateBadge => "$1",
-            TriggerAction::PlayBell => "(no parameter)",
+            TriggerAction::PlayBell => tr("(no parameter)"),
             TriggerAction::SendText => r"cd $1\n",
             TriggerAction::ExecuteCommand => r#"notify-send "Build done" $1"#,
             TriggerAction::RunProcess => "pass show $1",
@@ -145,9 +147,10 @@ pub fn parameter_issue(action: TriggerAction, parameter: &str) -> Option<Paramet
         // Control characters are stripped, but `$(…)`, backquotes or `;`
         // are printable: typed into a shell, captured text runs.
         return Some(ParameterIssue::Warning(
-            "Captured text is typed as is: a shell reading it would run \
-             $(…), `…` or ; in it — only use $n on output you trust"
-                .to_string(),
+            tr(
+                "Captured text is typed as is: a shell reading it would run $(…), `…` or ; in it — only use $n on output you trust",
+            )
+            .to_string(),
         ));
     }
     if !matches!(
@@ -164,16 +167,17 @@ pub fn parameter_issue(action: TriggerAction, parameter: &str) -> Option<Paramet
         .filter(|code| has_placeholder(code))
         .map(|_| {
             ParameterIssue::Warning(
-                "Captured text would be run as code there: pass it as a separate \
-                 argument instead (sh -c '… \"$$1\"' sh $1)"
-                    .to_string(),
+                tr(
+                    "Captured text would be run as code there: pass it as a separate argument instead (sh -c '… \"$$1\"' sh $1)",
+                )
+                .to_string(),
             )
         })
 }
 
 fn parse_command(template: &str) -> Result<Vec<String>, String> {
     if template.trim().is_empty() {
-        return Err("Empty command".to_string());
+        return Err(tr("Empty command").to_string());
     }
     // GLib's shell-style splitting only handles quotes and backslashes:
     // nothing is expanded, nothing runs.
@@ -277,7 +281,7 @@ pub fn sanitize_process_output(output: &str, max_bytes: usize) -> String {
 /// Why a pattern can't be used, for the editor — `None` when it's valid.
 pub fn pattern_error(pattern: &str) -> Option<String> {
     if pattern.is_empty() {
-        return Some("Empty pattern".to_string());
+        return Some(tr("Empty pattern").to_string());
     }
     compile_pattern(pattern).err()
 }
@@ -291,7 +295,7 @@ fn compile_pattern(pattern: &str) -> Result<regex::Regex, String> {
         .build()
         .map_err(|err| match err {
             regex::Error::Syntax(message) => message,
-            regex::Error::CompiledTooBig(_) => "Pattern too complex".to_string(),
+            regex::Error::CompiledTooBig(_) => tr("Pattern too complex").to_string(),
             other => other.to_string(),
         })
 }

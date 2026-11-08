@@ -8,6 +8,7 @@ use libadwaita as adw;
 use vte4::TerminalExt;
 use vte4::TerminalExtManual;
 
+use crate::i18n::{tr, tr_args};
 use crate::layout::PaneId;
 use crate::profile::scheme::parse_or_fallback;
 use crate::profile::spawn::{self, SpawnCommand};
@@ -134,7 +135,10 @@ impl Spawner {
         let command = match &self.command {
             Ok(command) => command,
             Err(message) => {
-                self.hold(&format!("Invalid custom command: {message}"));
+                self.hold(&tr_args(
+                    "Invalid custom command: {error}",
+                    &[("error", message)],
+                ));
                 return;
             }
         };
@@ -164,7 +168,10 @@ impl Spawner {
                 };
                 match result {
                     Ok(child_pid) => this.pid.set(Some(child_pid.0)),
-                    Err(err) => this.hold(&format!("Failed to start {program}: {err}")),
+                    Err(err) => this.hold(&tr_args(
+                        "Failed to start {program}: {error}",
+                        &[("program", &program), ("error", &err)],
+                    )),
                 }
             },
         );
@@ -204,7 +211,7 @@ impl TerminalWidget {
 
         let bell_icon = gtk4::Image::builder()
             .icon_name("alarm-symbolic")
-            .tooltip_text("Bell")
+            .tooltip_text(tr("Bell"))
             .visible(false)
             .build();
         let bell = Rc::new(Cell::new(config.profile.options.bell));
@@ -238,7 +245,7 @@ impl TerminalWidget {
             );
         }
 
-        let banner = adw::Banner::builder().button_label("Relaunch").build();
+        let banner = adw::Banner::builder().button_label(tr("Relaunch")).build();
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
         let spawner = Rc::new(Spawner {
             terminal: terminal.clone(),
@@ -340,9 +347,9 @@ impl TerminalWidget {
                 false
             }
             ExitAction::Restart => {
-                self.spawner.hold(&format!(
-                    "{} — too quickly to restart",
-                    spawn::describe_exit(status)
+                self.spawner.hold(&tr_args(
+                    "{reason} — too quickly to restart",
+                    &[("reason", &spawn::describe_exit(status))],
                 ));
                 false
             }

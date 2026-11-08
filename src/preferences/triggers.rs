@@ -8,6 +8,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
+use crate::i18n::{tr, tr_args};
 use crate::terminal::triggers::{self, ParameterIssue, Trigger, TriggerAction};
 
 /// A group listing `initial` with add/edit/remove. `on_change` gets the
@@ -26,7 +27,7 @@ pub fn group(
         .build();
     let add = gtk4::Button::builder()
         .icon_name("list-add-symbolic")
-        .tooltip_text("Add a trigger")
+        .tooltip_text(tr("Add a trigger"))
         .valign(gtk4::Align::Center)
         .build();
     add.add_css_class("flat");
@@ -81,8 +82,8 @@ impl Editor {
         let triggers = self.triggers.borrow().clone();
         if triggers.is_empty() {
             let empty = adw::ActionRow::builder()
-                .title("No triggers")
-                .subtitle("Add one with the + button")
+                .title(tr("No triggers"))
+                .subtitle(tr("Add one with the + button"))
                 .sensitive(false)
                 .build();
             group.add(&empty);
@@ -102,14 +103,14 @@ impl Editor {
         describe(&row, trigger);
 
         let pattern = adw::EntryRow::builder()
-            .title("Regular expression")
+            .title(tr("Regular expression"))
             .text(trigger.pattern.as_str())
             .build();
         pattern.add_css_class("monospace");
         flag_pattern(&pattern, &trigger.pattern);
 
         let action = adw::ComboRow::builder()
-            .title("Action")
+            .title(tr("Action"))
             .model(&gtk4::StringList::new(
                 &TriggerAction::ALL.map(TriggerAction::label),
             ))
@@ -133,7 +134,7 @@ impl Editor {
         update_notice(&notice, &parameter, trigger.action, &trigger.parameter);
 
         let remove = adw::ActionRow::builder()
-            .title("Remove this trigger")
+            .title(tr("Remove this trigger"))
             .build();
         let remove_button = gtk4::Button::builder()
             .icon_name("user-trash-symbolic")
@@ -230,7 +231,7 @@ impl Editor {
 /// pattern can't be used).
 fn describe(row: &adw::ExpanderRow, trigger: &Trigger) {
     let title = if trigger.pattern.is_empty() {
-        "New trigger".to_string()
+        tr("New trigger").to_string()
     } else {
         trigger.pattern.clone()
     };
@@ -239,7 +240,10 @@ fn describe(row: &adw::ExpanderRow, trigger: &Trigger) {
     row.set_title(&title);
     match triggers::pattern_error(&trigger.pattern) {
         Some(error) => {
-            row.set_subtitle(&format!("Not used — {}", error_summary(&error)));
+            row.set_subtitle(&tr_args(
+                "Not used — {error}",
+                &[("error", &error_summary(&error))],
+            ));
             row.add_css_class("error");
         }
         None => {
@@ -276,31 +280,31 @@ fn update_notice(
     if !action.is_active() {
         return;
     }
-    notice.set_title(
-        "Acts on your system, on any program's output — remote ones and files \
-         being displayed included",
-    );
+    notice.set_title(tr(
+        "Acts on your system, on any program's output — remote ones and files being displayed included",
+    ));
     let safeguards = match action {
-        TriggerAction::SendText => {
-            "Captured text is typed without its control characters: only the \
-             parameter itself can contain \\n."
-        }
-        _ => {
-            "The command runs without a shell; each $n is one argument, without \
-             its control characters. $$ is a literal $."
-        }
+        TriggerAction::SendText => tr(
+            "Captured text is typed without its control characters: only the parameter itself can contain \\n.",
+        ),
+        _ => tr(
+            "The command runs without a shell; each $n is one argument, without its control characters. $$ is a literal $.",
+        ),
     };
     let issue = triggers::parameter_issue(action, text);
     let subtitle = match &issue {
         Some(ParameterIssue::Error(error)) => {
             parameter.add_css_class("error");
-            format!("Not usable: {error}")
+            tr_args("Not usable: {error}", &[("error", error)])
         }
         Some(ParameterIssue::Warning(warning)) => {
             parameter.add_css_class("warning");
             warning.clone()
         }
-        None => format!("{safeguards} Disabled if it fires more than 5 times a second."),
+        None => format!(
+            "{safeguards} {}",
+            tr("Disabled if it fires more than 5 times a second.")
+        ),
     };
     notice.set_subtitle(&subtitle);
 }
@@ -308,7 +312,10 @@ fn update_notice(
 /// The parameter field's title, with what it expects — `EntryRow` has no
 /// placeholder of its own.
 fn parameter_title(action: TriggerAction) -> String {
-    format!("Parameter — e.g. {}", action.parameter_hint())
+    tr_args(
+        "Parameter — e.g. {example}",
+        &[("example", &action.parameter_hint())],
+    )
 }
 
 /// `regex`'s syntax errors span several lines (pattern, caret, message):

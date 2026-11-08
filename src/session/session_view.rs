@@ -7,6 +7,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use vte4::TerminalExt;
 
+use crate::i18n::tr_args;
 use crate::layout::pane_view::{LayoutStyle, PaneView};
 use crate::layout::{Direction, Orientation, PaneId};
 use crate::profile::{ProfileId, ProfileResolver, TerminalConfig};
@@ -288,7 +289,7 @@ impl SessionView {
         self.session_names
             .get(&session_id)
             .cloned()
-            .unwrap_or_else(|| format!("Session {session_id}"))
+            .unwrap_or_else(|| tr_args("Session {number}", &[("number", &session_id)]))
     }
 
     /// Sets this session's display name (sidebar rename). `None`/empty

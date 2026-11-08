@@ -6,6 +6,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
+use crate::i18n::tr;
 use crate::preferences::config::Preferences;
 use crate::profile::{
     BadgePosition, BellMode, CjkWidth, ColorPair, ColorSchemeStore, CursorBlink, CursorShape,
@@ -39,12 +40,12 @@ impl ProfilesPage {
         schemes: Rc<ColorSchemeStore>,
     ) -> Rc<Self> {
         let page = adw::PreferencesPage::builder()
-            .title("Profiles")
+            .title(tr("Profiles"))
             .icon_name("avatar-default-symbolic")
             .build();
         let list = adw::PreferencesGroup::builder()
-            .title("Profiles")
-            .description("New sessions use the default profile.")
+            .title(tr("Profiles"))
+            .description(tr("New sessions use the default profile."))
             .build();
         page.add(&list);
 
@@ -60,7 +61,7 @@ impl ProfilesPage {
 
         let add_button = gtk4::Button::builder()
             .icon_name("list-add-symbolic")
-            .tooltip_text("Add Profile")
+            .tooltip_text(tr("Add Profile"))
             .valign(gtk4::Align::Center)
             .build();
         add_button.add_css_class("flat");
@@ -76,7 +77,10 @@ impl ProfilesPage {
                     .next()
                     .map(|s| s.id.clone())
                     .unwrap_or_else(|| "catppuccin-mocha".to_string());
-                let id = this.profiles.borrow_mut().create("New Profile", &scheme_id);
+                let id = this
+                    .profiles
+                    .borrow_mut()
+                    .create(tr("New Profile"), &scheme_id);
                 this.rebuild();
                 this.open_editor(&id);
             });
@@ -107,7 +111,7 @@ impl ProfilesPage {
                 .build();
             if profile.id == default_id {
                 let badge = gtk4::Label::builder()
-                    .label("Default")
+                    .label(tr("Default"))
                     .valign(gtk4::Align::Center)
                     .build();
                 badge.add_css_class("dim-label");
@@ -151,43 +155,43 @@ impl ProfilesPage {
         stack.add_titled_with_icon(
             &self.general_tab(profile, &navigation_page),
             Some("general"),
-            "General",
+            tr("General"),
             "preferences-system-symbolic",
         );
         stack.add_titled_with_icon(
             &self.command_tab(profile),
             Some("command"),
-            "Command",
+            tr("Command"),
             "utilities-terminal-symbolic",
         );
         stack.add_titled_with_icon(
             &self.color_tab(profile),
             Some("color"),
-            "Color",
+            tr("Color"),
             "applications-graphics-symbolic",
         );
         stack.add_titled_with_icon(
             &self.scrolling_tab(profile),
             Some("scrolling"),
-            "Scrolling",
+            tr("Scrolling"),
             "view-continuous-symbolic",
         );
         stack.add_titled_with_icon(
             &self.compatibility_tab(profile),
             Some("compatibility"),
-            "Compatibility",
+            tr("Compatibility"),
             "text-x-generic-symbolic",
         );
         stack.add_titled_with_icon(
             &self.badge_tab(profile),
             Some("badge"),
-            "Badge",
+            tr("Badge"),
             "text-x-generic-symbolic",
         );
         stack.add_titled_with_icon(
             &self.advanced_tab(profile),
             Some("advanced"),
-            "Advanced",
+            tr("Advanced"),
             "applications-system-symbolic",
         );
 
@@ -216,7 +220,7 @@ impl ProfilesPage {
 
         let identity = adw::PreferencesGroup::new();
         let name_row = adw::EntryRow::builder()
-            .title("Name")
+            .title(tr("Name"))
             .text(profile.name.clone())
             .show_apply_button(true)
             .build();
@@ -243,8 +247,8 @@ impl ProfilesPage {
 
         let is_default = self.prefs.borrow().default_profile_id == profile.id;
         let default_row = adw::SwitchRow::builder()
-            .title("Default profile")
-            .subtitle("New sessions are created with this profile")
+            .title(tr("Default profile"))
+            .subtitle(tr("New sessions are created with this profile"))
             .active(is_default)
             .build();
         {
@@ -272,15 +276,17 @@ impl ProfilesPage {
         identity.add(&default_row);
         page.add(&identity);
 
-        let text = adw::PreferencesGroup::builder().title("Text").build();
-        let font_dialog = gtk4::FontDialog::builder().title("Terminal font").build();
+        let text = adw::PreferencesGroup::builder().title(tr("Text")).build();
+        let font_dialog = gtk4::FontDialog::builder()
+            .title(tr("Terminal font"))
+            .build();
         let font_button = gtk4::FontDialogButton::builder()
             .dialog(&font_dialog)
             .font_desc(&gtk4::pango::FontDescription::from_string(&options.font))
             .valign(gtk4::Align::Center)
             .build();
         let font_row = adw::ActionRow::builder()
-            .title("Custom font")
+            .title(tr("Custom font"))
             .sensitive(!options.use_system_font)
             .build();
         font_row.add_suffix(&font_button);
@@ -299,7 +305,7 @@ impl ProfilesPage {
         let system_font_row = options_switch_row(
             &self.profiles,
             &profile.id,
-            "Use the system monospace font",
+            tr("Use the system monospace font"),
             options.use_system_font,
             |o, v| o.use_system_font = v,
         );
@@ -313,21 +319,21 @@ impl ProfilesPage {
         text.add(&options_spin_row(
             &self.profiles,
             &profile.id,
-            "Cell width spacing",
+            tr("Cell width spacing"),
             options.cell_width_scale,
             |o, v| o.cell_width_scale = v,
         ));
         text.add(&options_spin_row(
             &self.profiles,
             &profile.id,
-            "Cell height spacing",
+            tr("Cell height spacing"),
             options.cell_height_scale,
             |o, v| o.cell_height_scale = v,
         ));
         text.add(&options_combo_row(
             &self.profiles,
             &profile.id,
-            "Text blink",
+            tr("Text blink"),
             &TextBlink::ALL,
             TextBlink::label,
             options.text_blink,
@@ -336,12 +342,12 @@ impl ProfilesPage {
         page.add(&text);
 
         let cursor = adw::PreferencesGroup::builder()
-            .title("Cursor and selection")
+            .title(tr("Cursor and selection"))
             .build();
         cursor.add(&options_combo_row(
             &self.profiles,
             &profile.id,
-            "Cursor shape",
+            tr("Cursor shape"),
             &CursorShape::ALL,
             CursorShape::label,
             options.cursor_shape,
@@ -350,14 +356,14 @@ impl ProfilesPage {
         cursor.add(&options_combo_row(
             &self.profiles,
             &profile.id,
-            "Cursor blink",
+            tr("Cursor blink"),
             &CursorBlink::ALL,
             CursorBlink::label,
             options.cursor_blink,
             |o, v| o.cursor_blink = v,
         ));
         let word_chars_row = adw::EntryRow::builder()
-            .title("Word-wise select characters")
+            .title(tr("Word-wise select characters"))
             .text(options.word_chars.clone())
             .show_apply_button(true)
             .build();
@@ -375,12 +381,12 @@ impl ProfilesPage {
         page.add(&cursor);
 
         let notifications = adw::PreferencesGroup::builder()
-            .title("Bell and notifications")
+            .title(tr("Bell and notifications"))
             .build();
         notifications.add(&options_combo_row(
             &self.profiles,
             &profile.id,
-            "Terminal bell",
+            tr("Terminal bell"),
             &BellMode::ALL,
             BellMode::label,
             options.bell,
@@ -389,10 +395,10 @@ impl ProfilesPage {
         let silence_adjustment =
             gtk4::Adjustment::new(profile.silence_seconds as f64, 1.0, 300.0, 1.0, 5.0, 0.0);
         let silence_row = adw::SpinRow::builder()
-            .title("Notify after silence")
-            .subtitle(
+            .title(tr("Notify after silence"))
+            .subtitle(tr(
                 "Seconds of no output, after activity, before a \"command finished\" notification",
-            )
+            ))
             .adjustment(&silence_adjustment)
             .build();
         {
@@ -419,7 +425,7 @@ impl ProfilesPage {
         let button_box = gtk4::Box::new(gtk4::Orientation::Horizontal, 8);
         button_box.set_halign(gtk4::Align::End);
 
-        let clone_button = gtk4::Button::builder().label("Clone").build();
+        let clone_button = gtk4::Button::builder().label(tr("Clone")).build();
         {
             let this = Rc::downgrade(self);
             let profile_id = profile_id.to_string();
@@ -438,7 +444,7 @@ impl ProfilesPage {
         button_box.append(&clone_button);
 
         if self.profiles.borrow().iter().count() > 1 {
-            let delete_button = gtk4::Button::builder().label("Delete").build();
+            let delete_button = gtk4::Button::builder().label(tr("Delete")).build();
             delete_button.add_css_class("destructive-action");
             {
                 let this = Rc::downgrade(self);
@@ -481,7 +487,7 @@ impl ProfilesPage {
         let group = adw::PreferencesGroup::new();
 
         let login_shell_row = adw::SwitchRow::builder()
-            .title("Run command as a login shell")
+            .title(tr("Run command as a login shell"))
             .active(profile.login_shell)
             .build();
         {
@@ -497,11 +503,11 @@ impl ProfilesPage {
         group.add(&login_shell_row);
 
         let use_custom_command_row = adw::SwitchRow::builder()
-            .title("Run a custom command instead of my shell")
+            .title(tr("Run a custom command instead of my shell"))
             .active(profile.use_custom_command)
             .build();
         let custom_command_row = adw::EntryRow::builder()
-            .title("Custom command")
+            .title(tr("Custom command"))
             .text(profile.custom_command.clone())
             .show_apply_button(true)
             .sensitive(profile.use_custom_command)
@@ -537,7 +543,7 @@ impl ProfilesPage {
         group.add(&custom_command_row);
 
         let working_directory_row = adw::EntryRow::builder()
-            .title("Working directory (empty: where Rutile was launched)")
+            .title(tr("Working directory (empty: where Rutile was launched)"))
             .text(profile.working_directory.clone().unwrap_or_default())
             .show_apply_button(true)
             .build();
@@ -555,7 +561,7 @@ impl ProfilesPage {
         group.add(&working_directory_row);
 
         group.add(&enum_combo_row(
-            "When command exits",
+            tr("When command exits"),
             &ExitAction::ALL,
             ExitAction::label,
             profile.exit_action,
@@ -581,7 +587,7 @@ impl ProfilesPage {
         let scheme_ids: Vec<String> = self.schemes.iter().map(|s| s.id.clone()).collect();
         let scheme_names: Vec<&str> = self.schemes.iter().map(|s| s.name.as_str()).collect();
         let scheme_row = adw::ComboRow::builder()
-            .title("Color scheme")
+            .title(tr("Color scheme"))
             .model(&gtk4::StringList::new(&scheme_names))
             .build();
         if let Some(index) = scheme_ids.iter().position(|id| *id == profile.scheme_id) {
@@ -608,14 +614,14 @@ impl ProfilesPage {
 
         let colors = &profile.colors;
         let overrides = adw::PreferencesGroup::builder()
-            .title("Colors")
-            .description("Set on top of the color scheme")
+            .title(tr("Colors"))
+            .description(tr("Set on top of the color scheme"))
             .build();
         overrides.add(&{
             let profiles = self.profiles.clone();
             let profile_id = profile.id.clone();
             let row = adw::SwitchRow::builder()
-                .title("Show bold text in bright colors")
+                .title(tr("Show bold text in bright colors"))
                 .active(colors.bold_is_bright)
                 .build();
             row.connect_active_notify(move |row| {
@@ -636,8 +642,8 @@ impl ProfilesPage {
                 0.0,
             );
             let row = adw::SpinRow::builder()
-                .title("Background transparency")
-                .subtitle("Percent — 0 is opaque")
+                .title(tr("Background transparency"))
+                .subtitle(tr("Percent — 0 is opaque"))
                 .adjustment(&adjustment)
                 .build();
             let profiles = self.profiles.clone();
@@ -653,21 +659,21 @@ impl ProfilesPage {
         overrides.add(&color_pair_expander(
             &self.profiles,
             &profile.id,
-            "Custom cursor colors",
+            tr("Custom cursor colors"),
             colors.cursor_colors.clone(),
             |c| &mut c.cursor_colors,
         ));
         overrides.add(&color_pair_expander(
             &self.profiles,
             &profile.id,
-            "Custom highlight colors",
+            tr("Custom highlight colors"),
             colors.highlight_colors.clone(),
             |c| &mut c.highlight_colors,
         ));
         overrides.add(&color_expander(
             &self.profiles,
             &profile.id,
-            "Custom bold color",
+            tr("Custom bold color"),
             colors.bold_color.clone(),
             |c| &mut c.bold_color,
         ));
@@ -681,19 +687,15 @@ impl ProfilesPage {
     fn advanced_tab(self: &Rc<Self>, profile: &Profile) -> adw::PreferencesPage {
         let page = adw::PreferencesPage::new();
         let group = adw::PreferencesGroup::builder()
-            .title("Automatic profile switching")
+            .title(tr("Automatic profile switching"))
             .description(
-                "Switch a terminal to this profile while it is in a matching place: \
-                 user@host:directory, every part optional (e.g. prod-db, \
-                 :~/projets/work, root@server:/etc). A directory matches its \
-                 subdirectories too. Rules are checked when the shell reports \
-                 its directory (OSC 7).",
+                tr("Switch a terminal to this profile while it is in a matching place: user@host:directory, every part optional (e.g. prod-db, :~/projets/work, root@server:/etc). A directory matches its subdirectories too. Rules are checked when the shell reports its directory (OSC 7)."),
             )
             .build();
         let rows: Rc<RefCell<Vec<adw::ActionRow>>> = Rc::default();
 
         let add_row = adw::EntryRow::builder()
-            .title("Add a rule")
+            .title(tr("Add a rule"))
             .show_apply_button(true)
             .build();
         group.add(&add_row);
@@ -733,9 +735,8 @@ impl ProfilesPage {
         let profiles = self.profiles.clone();
         let profile_id = profile.id.clone();
         page.add(&super::triggers::group(
-            "Triggers",
-            "Checked after the global triggers (Preferences → Advanced), in \
-             terminals using this profile. $0 is the whole match, $1 to $9 its groups.",
+            tr("Triggers"),
+            tr("Checked after the global triggers (Preferences → Advanced), in terminals using this profile. $0 is the whole match, $1 to $9 its groups."),
             profile.triggers.clone(),
             move |triggers| {
                 profiles
@@ -755,8 +756,10 @@ impl ProfilesPage {
         let encodings = crate::terminal::encoding::supported_encodings();
         let names: Vec<&str> = encodings.iter().map(String::as_str).collect();
         let encoding_row = adw::ComboRow::builder()
-            .title("Encoding")
-            .subtitle("For legacy systems — the shell and programs must use the same one")
+            .title(tr("Encoding"))
+            .subtitle(tr(
+                "For legacy systems — the shell and programs must use the same one",
+            ))
             .model(&gtk4::StringList::new(&names))
             .enable_search(true)
             .expression(gtk4::PropertyExpression::new(
@@ -786,7 +789,7 @@ impl ProfilesPage {
         group.add(&options_combo_row(
             &self.profiles,
             &profile.id,
-            "Ambiguous-width characters",
+            tr("Ambiguous-width characters"),
             &CjkWidth::ALL,
             CjkWidth::label,
             profile.options.cjk_ambiguous_width,
@@ -802,13 +805,12 @@ impl ProfilesPage {
         let badge = &profile.badge;
         let group = adw::PreferencesGroup::builder()
             .description(
-                "Large text in a corner of the terminal. Same variables as titles: \
-                 ${title}, ${directory}, ${host}, ${user}, ${id}.",
+                tr("Large text in a corner of the terminal. Same variables as titles: ${title}, ${directory}, ${host}, ${user}, ${id}."),
             )
             .build();
 
         let text_row = adw::EntryRow::builder()
-            .title("Badge text (empty: no badge)")
+            .title(tr("Badge text (empty: no badge)"))
             .text(badge.badge_text.clone())
             .show_apply_button(true)
             .build();
@@ -825,7 +827,7 @@ impl ProfilesPage {
         group.add(&text_row);
 
         group.add(&enum_combo_row(
-            "Position",
+            tr("Position"),
             &BadgePosition::ALL,
             BadgePosition::label,
             badge.badge_position,
@@ -840,7 +842,7 @@ impl ProfilesPage {
             },
         ));
 
-        let font_dialog = gtk4::FontDialog::builder().title("Badge font").build();
+        let font_dialog = gtk4::FontDialog::builder().title(tr("Badge font")).build();
         let font_button = gtk4::FontDialogButton::builder()
             .dialog(&font_dialog)
             .font_desc(&gtk4::pango::FontDescription::from_string(
@@ -849,7 +851,7 @@ impl ProfilesPage {
             .valign(gtk4::Align::Center)
             .build();
         let font_row = adw::ActionRow::builder()
-            .title("Custom font")
+            .title(tr("Custom font"))
             .sensitive(!badge.badge_use_system_font)
             .build();
         font_row.add_suffix(&font_button);
@@ -866,7 +868,7 @@ impl ProfilesPage {
             });
         }
         let system_font_row = adw::SwitchRow::builder()
-            .title("Twice the terminal font size")
+            .title(tr("Twice the terminal font size"))
             .active(badge.badge_use_system_font)
             .build();
         {
@@ -887,7 +889,7 @@ impl ProfilesPage {
         group.add(&color_expander(
             &self.profiles,
             &profile.id,
-            "Custom badge color",
+            tr("Custom badge color"),
             profile.colors.badge_color.clone(),
             |c| &mut c.badge_color,
         ));
@@ -904,21 +906,21 @@ impl ProfilesPage {
         group.add(&options_switch_row(
             &self.profiles,
             &profile.id,
-            "Show scrollbar",
+            tr("Show scrollbar"),
             options.show_scrollbar,
             |o, v| o.show_scrollbar = v,
         ));
         group.add(&options_switch_row(
             &self.profiles,
             &profile.id,
-            "Scroll on output",
+            tr("Scroll on output"),
             options.scroll_on_output,
             |o, v| o.scroll_on_output = v,
         ));
         group.add(&options_switch_row(
             &self.profiles,
             &profile.id,
-            "Scroll on keystroke",
+            tr("Scroll on keystroke"),
             options.scroll_on_keystroke,
             |o, v| o.scroll_on_keystroke = v,
         ));
@@ -932,7 +934,7 @@ impl ProfilesPage {
             0.0,
         );
         let lines_row = adw::SpinRow::builder()
-            .title("Scrollback lines")
+            .title(tr("Scrollback lines"))
             .adjustment(&lines_adjustment)
             .sensitive(!options.scrollback_unlimited)
             .build();
@@ -949,7 +951,7 @@ impl ProfilesPage {
         let unlimited_row = options_switch_row(
             &self.profiles,
             &profile.id,
-            "Unlimited scrollback",
+            tr("Unlimited scrollback"),
             options.scrollback_unlimited,
             |o, v| o.scrollback_unlimited = v,
         );
@@ -1100,7 +1102,7 @@ fn color_pair_expander(
         .show_enable_switch(true)
         .enable_expansion(enabled)
         .build();
-    for (label, button) in [("Text", &foreground), ("Background", &background)] {
+    for (label, button) in [(tr("Text"), &foreground), (tr("Background"), &background)] {
         let row = adw::ActionRow::builder().title(label).build();
         row.add_suffix(button);
         expander.add_row(&row);
@@ -1156,7 +1158,7 @@ fn color_expander(
         .show_enable_switch(true)
         .enable_expansion(enabled)
         .build();
-    let row = adw::ActionRow::builder().title("Color").build();
+    let row = adw::ActionRow::builder().title(tr("Color")).build();
     row.add_suffix(&button);
     expander.add_row(&row);
 
@@ -1205,7 +1207,7 @@ fn rebuild_rule_rows(
         let row = adw::ActionRow::builder().title(rule.as_str()).build();
         let remove = gtk4::Button::builder()
             .icon_name("user-trash-symbolic")
-            .tooltip_text("Remove rule")
+            .tooltip_text(tr("Remove rule"))
             .valign(gtk4::Align::Center)
             .build();
         remove.add_css_class("flat");

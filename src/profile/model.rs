@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::tr;
+
 pub type ProfileId = String;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -253,10 +255,10 @@ impl BadgePosition {
 
     pub fn label(self) -> &'static str {
         match self {
-            BadgePosition::Northwest => "Top left",
-            BadgePosition::Northeast => "Top right",
-            BadgePosition::Southwest => "Bottom left",
-            BadgePosition::Southeast => "Bottom right",
+            BadgePosition::Northwest => tr("Top left"),
+            BadgePosition::Northeast => tr("Top right"),
+            BadgePosition::Southwest => tr("Bottom left"),
+            BadgePosition::Southeast => tr("Bottom right"),
         }
     }
 }
@@ -276,8 +278,8 @@ impl CjkWidth {
 
     pub fn label(self) -> &'static str {
         match self {
-            CjkWidth::Narrow => "Narrow",
-            CjkWidth::Wide => "Wide",
+            CjkWidth::Narrow => tr("Narrow"),
+            CjkWidth::Wide => tr("Wide"),
         }
     }
 
@@ -311,10 +313,10 @@ impl TextBlink {
 
     pub fn label(self) -> &'static str {
         match self {
-            TextBlink::Never => "Never",
-            TextBlink::Focused => "When focused",
-            TextBlink::Unfocused => "When unfocused",
-            TextBlink::Always => "Always",
+            TextBlink::Never => tr("Never"),
+            TextBlink::Focused => tr("When focused"),
+            TextBlink::Unfocused => tr("When unfocused"),
+            TextBlink::Always => tr("Always"),
         }
     }
 }
@@ -337,9 +339,9 @@ impl CursorShape {
 
     pub fn label(self) -> &'static str {
         match self {
-            CursorShape::Block => "Block",
-            CursorShape::Ibeam => "I-beam",
-            CursorShape::Underline => "Underline",
+            CursorShape::Block => tr("Block"),
+            CursorShape::Ibeam => tr("I-beam"),
+            CursorShape::Underline => tr("Underline"),
         }
     }
 }
@@ -359,9 +361,9 @@ impl CursorBlink {
 
     pub fn label(self) -> &'static str {
         match self {
-            CursorBlink::System => "Follow system",
-            CursorBlink::On => "On",
-            CursorBlink::Off => "Off",
+            CursorBlink::System => tr("Follow system"),
+            CursorBlink::On => tr("On"),
+            CursorBlink::Off => tr("Off"),
         }
     }
 }
@@ -388,10 +390,10 @@ impl BellMode {
 
     pub fn label(self) -> &'static str {
         match self {
-            BellMode::None => "None",
-            BellMode::Sound => "Sound",
-            BellMode::Icon => "Icon",
-            BellMode::IconSound => "Icon and sound",
+            BellMode::None => tr("None"),
+            BellMode::Sound => tr("Sound"),
+            BellMode::Icon => tr("Icon"),
+            BellMode::IconSound => tr("Icon and sound"),
         }
     }
 
@@ -423,9 +425,9 @@ impl ExitAction {
 
     pub fn label(self) -> &'static str {
         match self {
-            ExitAction::Close => "Close the terminal",
-            ExitAction::Restart => "Restart the command",
-            ExitAction::Hold => "Hold the terminal open",
+            ExitAction::Close => tr("Close the terminal"),
+            ExitAction::Restart => tr("Restart the command"),
+            ExitAction::Hold => tr("Hold the terminal open"),
         }
     }
 }

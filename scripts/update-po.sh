@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 # shellcheck disable=SC2046 # one argument per source file is the point
 LC_ALL=C.UTF-8 xgettext \
     --language=Rust --from-code=UTF-8 \
-    --keyword= --keyword=tr --keyword=trn:1,2 --keyword=tr_args \
+    --keyword= --keyword=tr --keyword=trn:1,2 --keyword=tr_args --keyword=n_ \
     --add-comments=TRANSLATORS \
     --package-name=Rutile \
     --msgid-bugs-address=https://github.com/yatoub/Rutile/issues \

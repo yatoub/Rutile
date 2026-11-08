@@ -5,6 +5,8 @@ use libadwaita as adw;
 use libadwaita::prelude::*;
 use vte4::TerminalExt;
 
+use crate::i18n::tr;
+
 /// True if `foreground_pgid` names a real, distinct process group from the
 /// shell's own — i.e. a child (editor, long-running command...) currently
 /// owns the terminal foreground, not just the shell idling at its prompt.
@@ -52,11 +54,13 @@ pub fn confirm_close(
     }
 
     let dialog = adw::AlertDialog::new(
-        Some("Close this?"),
-        Some("There is still a process running. Closing will terminate it."),
+        Some(tr("Close this?")),
+        Some(tr(
+            "There is still a process running. Closing will terminate it.",
+        )),
     );
-    dialog.add_response("cancel", "Cancel");
-    dialog.add_response("close", "Close");
+    dialog.add_response("cancel", tr("Cancel"));
+    dialog.add_response("close", tr("Close"));
     dialog.set_response_appearance("close", adw::ResponseAppearance::Destructive);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");

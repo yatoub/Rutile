@@ -6,6 +6,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 
 use crate::cli::LaunchRequest;
+use crate::i18n::tr_args;
 use crate::preferences::{NewInstanceMode, Preferences, ThemeVariant};
 use crate::profile::ProfileStore;
 use crate::window;
@@ -55,12 +56,18 @@ fn validate(request: &LaunchRequest) -> Result<(), String> {
     if let Some(dir) = &request.working_directory
         && !dir.is_dir()
     {
-        return Err(format!("{}: not a directory", dir.display()));
+        return Err(tr_args(
+            "{path}: not a directory",
+            &[("path", &dir.display())],
+        ));
     }
     if let Some(file) = &request.session_file
         && !file.is_file()
     {
-        return Err(format!("{}: no such session file", file.display()));
+        return Err(tr_args(
+            "{path}: no such session file",
+            &[("path", &file.display())],
+        ));
     }
     if let Some(wanted) = &request.profile {
         let store = ProfileStore::load();
@@ -68,9 +75,9 @@ fn validate(request: &LaunchRequest) -> Result<(), String> {
             || store.iter().any(|p| p.name.eq_ignore_ascii_case(wanted));
         if !known {
             let names: Vec<&str> = store.iter().map(|p| p.name.as_str()).collect();
-            return Err(format!(
-                "unknown profile {wanted:?} (profiles: {})",
-                names.join(", ")
+            return Err(tr_args(
+                "unknown profile \u{201c}{name}\u{201d} (profiles: {profiles})",
+                &[("name", wanted), ("profiles", &names.join(", "))],
             ));
         }
     }

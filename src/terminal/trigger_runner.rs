@@ -11,6 +11,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use vte4::TerminalExt;
 
+use crate::i18n::{tr, tr_args};
 use crate::layout::PaneId;
 use crate::terminal::triggers::{
     self, CompiledTrigger, FiringGuard, LineScanner, Screen, StateUpdate, Trigger, TriggerAction,
@@ -199,11 +200,11 @@ impl TriggerRunner {
         }
         if let Some(pattern) = disabled.first() {
             self.show_banner(
-                &format!(
-                    "Trigger \u{201c}{pattern}\u{201d} disabled: it fired more than \
-                     {MAX_FIRINGS_PER_SECOND} times a second"
+                &tr_args(
+                    "Trigger \u{201c}{pattern}\u{201d} disabled: it fired more than {count} times a second",
+                    &[("pattern", pattern), ("count", &MAX_FIRINGS_PER_SECOND)],
                 ),
-                "Re-enable",
+                tr("Re-enable"),
             );
         }
         if changed {
@@ -264,13 +265,13 @@ impl TriggerRunner {
             }
             TriggerAction::ExecuteCommand => {
                 if let Err(error) = self.spawn(terminal, &template, &groups, false) {
-                    self.show_banner(&error, "Dismiss");
+                    self.show_banner(&error, tr("Dismiss"));
                 }
                 false
             }
             TriggerAction::RunProcess => {
                 if let Err(error) = self.spawn(terminal, &template, &groups, true) {
-                    self.show_banner(&error, "Dismiss");
+                    self.show_banner(&error, tr("Dismiss"));
                 }
                 false
             }
@@ -289,8 +290,12 @@ impl TriggerRunner {
         groups: &[String],
         capture: bool,
     ) -> Result<(), String> {
-        let argv = triggers::command_argv(template, groups)
-            .map_err(|error| format!("Trigger command can't be parsed: {error}"))?;
+        let argv = triggers::command_argv(template, groups).map_err(|error| {
+            tr_args(
+                "Trigger command can't be parsed: {error}",
+                &[("error", &error)],
+            )
+        })?;
         let flags = if capture {
             gio::SubprocessFlags::STDOUT_PIPE | gio::SubprocessFlags::STDERR_SILENCE
         } else {
@@ -305,9 +310,12 @@ impl TriggerRunner {
             launcher.set_cwd(dir);
         }
         let args: Vec<&std::ffi::OsStr> = argv.iter().map(std::ffi::OsStr::new).collect();
-        let process = launcher
-            .spawn(&args)
-            .map_err(|err| format!("Trigger command failed to start: {}", err.message()))?;
+        let process = launcher.spawn(&args).map_err(|err| {
+            tr_args(
+                "Trigger command failed to start: {error}",
+                &[("error", &err.message())],
+            )
+        })?;
         if !capture {
             return Ok(());
         }

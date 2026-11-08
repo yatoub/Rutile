@@ -3,8 +3,9 @@
 //! `po/*.po`, compiled into the binary by `build.rs` — nothing to install,
 //! every package (and the standalone binary) is translated the same way.
 //!
-//! Mark strings with `tr("…")`, `trn("one…", "{n}…", n)`, or
-//! `tr_args("… {name} …", &[("name", &value)])` for placeholders —
+//! Mark strings with `tr("…")`, `trn("one…", "{n}…", n)`,
+//! `tr_args("… {name} …", &[("name", &value)])` for placeholders, or
+//! `n_("…")` for a constant translated later by `tr()` —
 //! `xgettext` finds them by these names (`scripts/update-po.sh`). The
 //! language follows the environment like gettext does (`LANGUAGE`,
 //! `LC_ALL`, `LC_MESSAGES`, `LANG`).
@@ -63,8 +64,12 @@ impl Catalog {
 
 include!(concat!(env!("OUT_DIR"), "/catalogs.rs"));
 
-/// The catalog for the user's language, chosen once.
+/// The catalog for the user's language, chosen once. Unit tests always
+/// get English: they compare text, and run in the developer's locale.
 fn active() -> Option<&'static Catalog> {
+    if cfg!(test) {
+        return None;
+    }
     static ACTIVE: OnceLock<Option<usize>> = OnceLock::new();
     let index = *ACTIVE.get_or_init(|| {
         let available: Vec<&str> = CATALOGS.iter().map(|c| c.language).collect();
@@ -111,6 +116,13 @@ fn pick(wanted: &[String], available: &[&str]) -> Option<usize> {
         }
     }
     None
+}
+
+/// Marks a string for translation without translating it — gettext's
+/// `N_()`: for a `const` or a table, translated later by `tr()` where it's
+/// shown (`tr` needs the catalog, chosen at runtime).
+pub const fn n_(msgid: &'static str) -> &'static str {
+    msgid
 }
 
 /// `msgid` in the user's language — `msgid` itself if untranslated.

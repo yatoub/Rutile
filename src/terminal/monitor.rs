@@ -9,6 +9,8 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use vte4::TerminalExt;
 
+use crate::i18n::tr;
+
 /// How often `/proc/<pid>/stat` is polled for CPU-tick deltas — cheap
 /// enough at this cadence to not matter, frequent enough that a command
 /// finishing is still noticed promptly.
@@ -54,7 +56,7 @@ pub fn attach<Pid, Enabled, Silence>(
             if !enabled() || pane_is_active(terminal) {
                 return;
             }
-            notify(&app, terminal, "Bell");
+            notify(&app, terminal, tr("Bell"));
         });
     }
 
@@ -96,7 +98,7 @@ pub fn attach<Pid, Enabled, Silence>(
             && !pane_is_active(&terminal)
         {
             was_busy.set(false);
-            notify(&app, &terminal, "Command finished");
+            notify(&app, &terminal, tr("Command finished"));
         }
 
         glib::ControlFlow::Continue

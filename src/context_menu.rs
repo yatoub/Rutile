@@ -7,6 +7,7 @@ use libadwaita as adw;
 use vte4::TerminalExt;
 
 use crate::dialogs::{bookmark_editor, bookmark_picker, paste};
+use crate::i18n::tr;
 use crate::layout::{Orientation, PaneId};
 use crate::pane_header;
 use crate::preferences::Preferences;
@@ -210,14 +211,14 @@ fn show_menu(
     let has_selection = terminal.has_selection();
     {
         let terminal = terminal.clone();
-        add_action(&menu_box, &popover, "Copier", move || {
+        add_action(&menu_box, &popover, tr("Copy"), move || {
             terminal.copy_clipboard_format(vte4::Format::Text);
         })
         .set_sensitive(has_selection);
     }
     {
         let terminal = terminal.clone();
-        add_action(&menu_box, &popover, "Copier au format HTML", move || {
+        add_action(&menu_box, &popover, tr("Copy as HTML"), move || {
             terminal.copy_clipboard_format(vte4::Format::Html);
         })
         .set_sensitive(has_selection);
@@ -225,13 +226,13 @@ fn show_menu(
     {
         let terminal = terminal.clone();
         let prefs = prefs.clone();
-        add_action(&menu_box, &popover, "Coller", move || {
+        add_action(&menu_box, &popover, tr("Paste"), move || {
             paste::paste_clipboard(&terminal, &prefs);
         });
     }
     {
         let terminal = terminal.clone();
-        add_action(&menu_box, &popover, "Tout sélectionner", move || {
+        add_action(&menu_box, &popover, tr("Select All"), move || {
             terminal.select_all();
         });
     }
@@ -243,7 +244,7 @@ fn show_menu(
         let prefs = prefs.clone();
         let profiles = profiles.clone();
         let app = app.clone();
-        add_action(&menu_box, &popover, "Diviser horizontalement", move || {
+        add_action(&menu_box, &popover, tr("Split horizontally"), move || {
             split_and_wire(
                 &session_view,
                 &prefs,
@@ -260,7 +261,7 @@ fn show_menu(
         let prefs = prefs.clone();
         let profiles = profiles.clone();
         let app = app.clone();
-        add_action(&menu_box, &popover, "Diviser verticalement", move || {
+        add_action(&menu_box, &popover, tr("Split vertically"), move || {
             split_and_wire(
                 &session_view,
                 &prefs,
@@ -277,8 +278,8 @@ fn show_menu(
 
     let current_group = session_view.borrow().broadcast_group();
     for (label, group) in [
-        ("Saisie synchro : aucune", BroadcastGroup::None),
-        ("Saisie synchro : session", BroadcastGroup::Session),
+        (tr("Synchronize input: off"), BroadcastGroup::None),
+        (tr("Synchronize input: session"), BroadcastGroup::Session),
     ] {
         let checked = if group == current_group { "✓ " } else { "" };
         let label = format!("{checked}{label}");
@@ -293,7 +294,7 @@ fn show_menu(
     {
         let terminal = terminal.clone();
         let prefs = prefs.clone();
-        add_action(&menu_box, &popover, "Signets…", move || {
+        add_action(&menu_box, &popover, tr("Bookmarks…"), move || {
             let include_return = prefs.borrow().bookmark_include_return;
             bookmark_picker::pick_and_insert(&terminal, include_return);
         });
@@ -302,7 +303,7 @@ fn show_menu(
         // The selection survives the right-click, so the new bookmark can
         // start from the command line just selected.
         let terminal = terminal.clone();
-        add_action(&menu_box, &popover, "Ajouter un signet…", move || {
+        add_action(&menu_box, &popover, tr("Add Bookmark…"), move || {
             bookmark_editor::add_from_terminal(&terminal);
         });
     }
@@ -313,7 +314,7 @@ fn show_menu(
     // can hide the header bar (`WindowStyle::HideToolbar`/`Borderless`).
     {
         let terminal = terminal.clone();
-        add_action(&menu_box, &popover, "Préférences", move || {
+        add_action(&menu_box, &popover, tr("Preferences"), move || {
             let _ = WidgetExt::activate_action(&terminal, "win.preferences", None);
         });
     }

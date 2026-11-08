@@ -10,6 +10,7 @@ use vte4::TerminalExt;
 use crate::cli::{LaunchRequest, WindowState};
 use crate::context_menu;
 use crate::dialogs::{bookmark_editor, bookmark_picker, confirm_close, paste};
+use crate::i18n::tr;
 use crate::keymap::{self, Action, Keymap};
 use crate::layout::pane_view::LayoutStyle;
 use crate::layout::{Orientation, PaneId};
@@ -773,7 +774,7 @@ fn build_toolbar(
 ) {
     let toggle_sidebar = gtk4::ToggleButton::builder()
         .icon_name("sidebar-show-symbolic")
-        .tooltip_text("Afficher/masquer les sessions")
+        .tooltip_text(tr("View session sidebar"))
         .active(sidebar.widget().is_visible())
         .build();
     {
@@ -785,8 +786,8 @@ fn build_toolbar(
     header_bar.pack_start(&toggle_sidebar);
 
     let split_h = gtk4::Button::builder()
-        .label("Split ↔")
-        .tooltip_text("Diviser horizontalement (Ctrl+Shift+O)")
+        .label(tr("Split ↔"))
+        .tooltip_text(format!("{} (Ctrl+Shift+O)", tr("Split horizontally")))
         .build();
     {
         let session_view = session_view.clone();
@@ -806,8 +807,8 @@ fn build_toolbar(
     header_bar.pack_start(&split_h);
 
     let split_v = gtk4::Button::builder()
-        .label("Split ↕")
-        .tooltip_text("Diviser verticalement (Ctrl+Shift+E)")
+        .label(tr("Split ↕"))
+        .tooltip_text(format!("{} (Ctrl+Shift+E)", tr("Split vertically")))
         .build();
     {
         let session_view = session_view.clone();
@@ -828,26 +829,23 @@ fn build_toolbar(
 
     let menu = gio::Menu::new();
     let session_section = gio::Menu::new();
-    session_section.append(Some("Nouvelle session"), Some("win.new-session"));
-    session_section.append(Some("Fermer la session"), Some("win.close-session"));
+    session_section.append(Some(tr("New Session")), Some("win.new-session"));
+    session_section.append(Some(tr("Close Session")), Some("win.close-session"));
     menu.append_section(None, &session_section);
 
     let persistence_section = gio::Menu::new();
-    persistence_section.append(
-        Some("Enregistrer la session sous…"),
-        Some("win.session-save-as"),
-    );
-    persistence_section.append(Some("Ouvrir une session…"), Some("win.session-open"));
+    persistence_section.append(Some(tr("Save Session As…")), Some("win.session-save-as"));
+    persistence_section.append(Some(tr("Open Session…")), Some("win.session-open"));
     menu.append_section(None, &persistence_section);
 
     let preferences_section = gio::Menu::new();
-    preferences_section.append(Some("Préférences"), Some("win.preferences"));
-    preferences_section.append(Some("À propos de Rutile"), Some("win.about"));
+    preferences_section.append(Some(tr("Preferences")), Some("win.preferences"));
+    preferences_section.append(Some(tr("About Rutile")), Some("win.about"));
     menu.append_section(None, &preferences_section);
 
     let menu_button = gtk4::MenuButton::builder()
         .icon_name("open-menu-symbolic")
-        .tooltip_text("Menu")
+        .tooltip_text(tr("Menu"))
         .menu_model(&menu)
         .build();
     header_bar.pack_end(&menu_button);
@@ -997,14 +995,14 @@ fn auto_save_on_close(
 
 fn session_file_filter() -> gtk4::FileFilter {
     let filter = gtk4::FileFilter::new();
-    filter.set_name(Some("Rutile session (*.rutile-session.toml)"));
+    filter.set_name(Some(tr("Rutile session (*.rutile-session.toml)")));
     filter.add_pattern("*.rutile-session.toml");
     filter
 }
 
 fn save_session_as(window: &adw::ApplicationWindow, saved: SavedWindow) {
     let dialog = gtk4::FileDialog::builder()
-        .title("Enregistrer la session sous")
+        .title(tr("Save Session As"))
         .initial_name("session.rutile-session.toml")
         .default_filter(&session_file_filter())
         .build();
@@ -1027,7 +1025,7 @@ fn open_session(
     resolve_config: impl Fn(&crate::profile::ProfileId) -> TerminalConfig + 'static,
 ) {
     let dialog = gtk4::FileDialog::builder()
-        .title("Ouvrir une session")
+        .title(tr("Open Session"))
         .default_filter(&session_file_filter())
         .build();
 

@@ -2,6 +2,8 @@
 //! Kept separate from GTK wiring so it's testable with plain `cargo test`,
 //! same rationale as `layout/split_tree.rs`/`terminal/broadcast.rs`.
 
+use crate::i18n::tr;
+
 /// Tilix's default profile title format is just the raw window title VTE
 /// picked up via OSC 0/2 — Rutile matches that as the starting point,
 /// falling back to "Terminal" (via `render_template`) when the shell
@@ -24,7 +26,10 @@ pub struct TitleContext<'a> {
 /// escaping/nesting) — matches the scope of Tilix's own title format
 /// strings.
 pub fn render_template(template: &str, ctx: &TitleContext) -> String {
-    let title = ctx.title.filter(|t| !t.is_empty()).unwrap_or("Terminal");
+    let title = ctx
+        .title
+        .filter(|t| !t.is_empty())
+        .unwrap_or(tr("Terminal"));
     template
         .replace("${title}", title)
         .replace("${id}", &ctx.id.to_string())

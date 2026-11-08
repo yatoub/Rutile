@@ -7,6 +7,7 @@ use libadwaita::prelude::*;
 
 use crate::bookmarks::{self, Bookmark, BookmarkStore};
 use crate::dialogs::bookmark_editor;
+use crate::i18n::tr;
 use crate::preferences::config::Preferences;
 
 /// The "Bookmarks" page: the "include return" setting, then one group per
@@ -23,7 +24,7 @@ pub struct BookmarksPage {
 impl BookmarksPage {
     pub fn new(prefs: Rc<RefCell<Preferences>>) -> Rc<Self> {
         let page = adw::PreferencesPage::builder()
-            .title("Bookmarks")
+            .title(tr("Bookmarks"))
             .icon_name("user-bookmarks-symbolic")
             .build();
 
@@ -34,7 +35,7 @@ impl BookmarksPage {
             )
             .build();
         let return_row = adw::SwitchRow::builder()
-            .title("Press Enter after inserting a bookmark")
+            .title(tr("Press Enter after inserting a bookmark"))
             .active(prefs.borrow().bookmark_include_return)
             .build();
         return_row.connect_active_notify(move |row| {
@@ -65,7 +66,7 @@ impl BookmarksPage {
         let store = BookmarkStore::load();
         let add_button = gtk4::Button::builder()
             .icon_name("list-add-symbolic")
-            .tooltip_text("Add Bookmark")
+            .tooltip_text(tr("Add Bookmark"))
             .valign(gtk4::Align::Center)
             .build();
         add_button.add_css_class("flat");
@@ -78,7 +79,7 @@ impl BookmarksPage {
                     command: String::new(),
                     folder: Vec::new(),
                 };
-                bookmark_editor::show(button, "Add Bookmark", empty, move |bookmark| {
+                bookmark_editor::show(button, tr("Add Bookmark"), empty, move |bookmark| {
                     BookmarkStore::load().add(bookmark);
                     if let Some(this) = this.upgrade() {
                         this.rebuild();
@@ -97,7 +98,7 @@ impl BookmarksPage {
                     self.push_group(group);
                 }
                 let title = if bookmark.folder.is_empty() {
-                    "Bookmarks".to_string()
+                    tr("Bookmarks").to_string()
                 } else {
                     bookmarks::format_folder(&bookmark.folder)
                 };
@@ -119,8 +120,8 @@ impl BookmarksPage {
             Some(group) => group.set_header_suffix(Some(&add_button)),
             None => {
                 let group = adw::PreferencesGroup::builder()
-                    .title("Bookmarks")
-                    .description("No bookmarks yet.")
+                    .title(tr("Bookmarks"))
+                    .description(tr("No bookmarks yet."))
                     .build();
                 group.set_header_suffix(Some(&add_button));
                 self.push_group(group);
@@ -142,7 +143,7 @@ impl BookmarksPage {
 
         let edit = gtk4::Button::builder()
             .icon_name("document-edit-symbolic")
-            .tooltip_text("Edit")
+            .tooltip_text(tr("Edit"))
             .valign(gtk4::Align::Center)
             .build();
         edit.add_css_class("flat");
@@ -152,21 +153,26 @@ impl BookmarksPage {
             edit.connect_clicked(move |button| {
                 let this = this.clone();
                 let original = original.clone();
-                bookmark_editor::show(button, "Edit Bookmark", original.clone(), move |edited| {
-                    let mut store = BookmarkStore::load();
-                    if let Some(index) = store.position(&original) {
-                        store.replace(index, edited);
-                    }
-                    if let Some(this) = this.upgrade() {
-                        this.rebuild();
-                    }
-                });
+                bookmark_editor::show(
+                    button,
+                    tr("Edit Bookmark"),
+                    original.clone(),
+                    move |edited| {
+                        let mut store = BookmarkStore::load();
+                        if let Some(index) = store.position(&original) {
+                            store.replace(index, edited);
+                        }
+                        if let Some(this) = this.upgrade() {
+                            this.rebuild();
+                        }
+                    },
+                );
             });
         }
 
         let delete = gtk4::Button::builder()
             .icon_name("user-trash-symbolic")
-            .tooltip_text("Delete")
+            .tooltip_text(tr("Delete"))
             .valign(gtk4::Align::Center)
             .build();
         delete.add_css_class("flat");

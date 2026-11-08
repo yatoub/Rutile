@@ -4,6 +4,7 @@ use std::rc::Rc;
 use gtk4::prelude::*;
 
 use crate::dialogs::confirm_close;
+use crate::i18n::tr;
 use crate::preferences::Preferences;
 use crate::session::SessionView;
 use crate::terminal::broadcast::SessionId;
@@ -310,7 +311,7 @@ fn build_row(
 
     let close_button = gtk4::Button::from_icon_name("window-close-symbolic");
     close_button.add_css_class("flat");
-    close_button.set_tooltip_text(Some("Fermer la session"));
+    close_button.set_tooltip_text(Some(tr("Close session")));
     {
         let session_view = session_view.clone();
         let prefs = prefs.clone();

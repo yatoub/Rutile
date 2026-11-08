@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::tr;
+
 /// Persisted user preferences. Defaults match Tilix's own defaults for the
 /// equivalent settings (both boxes ship checked in Tilix's General page),
 /// since this is meant to be a drop-in replacement.
@@ -123,11 +125,11 @@ impl NewInstanceMode {
 
     pub fn label(self) -> &'static str {
         match self {
-            NewInstanceMode::NewWindow => "Open a new window",
-            NewInstanceMode::NewSession => "Open a new session",
-            NewInstanceMode::SplitRight => "Split right",
-            NewInstanceMode::SplitDown => "Split down",
-            NewInstanceMode::FocusWindow => "Focus the window",
+            NewInstanceMode::NewWindow => tr("Open a new window"),
+            NewInstanceMode::NewSession => tr("Open a new session"),
+            NewInstanceMode::SplitRight => tr("Split right"),
+            NewInstanceMode::SplitDown => tr("Split down"),
+            NewInstanceMode::FocusWindow => tr("Focus the window"),
         }
     }
 }
@@ -153,9 +155,9 @@ impl WindowStyle {
 
     pub fn label(self) -> &'static str {
         match self {
-            WindowStyle::Normal => "Normal",
-            WindowStyle::HideToolbar => "Hide the toolbar",
-            WindowStyle::Borderless => "Borderless",
+            WindowStyle::Normal => tr("Normal"),
+            WindowStyle::HideToolbar => tr("Hide the toolbar"),
+            WindowStyle::Borderless => tr("Borderless"),
         }
     }
 }
@@ -173,8 +175,8 @@ impl SidebarPosition {
 
     pub fn label(self) -> &'static str {
         match self {
-            SidebarPosition::Left => "Left",
-            SidebarPosition::Right => "Right",
+            SidebarPosition::Left => tr("Left"),
+            SidebarPosition::Right => tr("Right"),
         }
     }
 }
@@ -205,10 +207,10 @@ impl BackgroundImageMode {
 
     pub fn label(self) -> &'static str {
         match self {
-            BackgroundImageMode::Scale => "Scale",
-            BackgroundImageMode::Tile => "Tile",
-            BackgroundImageMode::Center => "Center",
-            BackgroundImageMode::Stretch => "Stretch",
+            BackgroundImageMode::Scale => tr("Scale"),
+            BackgroundImageMode::Tile => tr("Tile"),
+            BackgroundImageMode::Center => tr("Center"),
+            BackgroundImageMode::Stretch => tr("Stretch"),
         }
     }
 
@@ -251,9 +253,9 @@ impl ThemeVariant {
 
     pub fn label(self) -> &'static str {
         match self {
-            ThemeVariant::System => "Follow system",
-            ThemeVariant::Light => "Light (Catppuccin Latte)",
-            ThemeVariant::Dark => "Dark (Catppuccin Mocha)",
+            ThemeVariant::System => tr("Follow system"),
+            ThemeVariant::Light => tr("Light (Catppuccin Latte)"),
+            ThemeVariant::Dark => tr("Dark (Catppuccin Mocha)"),
         }
     }
 }
