@@ -284,6 +284,17 @@ installer, aucun `.mo`, aucune dépendance native. Détails et choix dans
   sans ambiguïté plutôt que des mots isolés quand le sens diffère.
 - Typographie du `fr.po` : espace insécable (U+00A0) avant `:` et dans
   `« »`, espace fine insécable (U+202F) avant `?`, `!`, `;`.
+- **Texte tronqué** (vécu sur la #98, déjà présent en anglais, aggravé par
+  le français) : se détecte sans capture d'écran, dans un exemple jetable
+  qui ouvre `preferences::window::build` sous `LANG=fr_FR.UTF-8`, affiche
+  chaque page (et chaque onglet de l'éditeur de profil, via son
+  `AdwViewStack`, pas celui de la fenêtre) puis liste les `gtk4::Label`
+  mappés dont `label.layout().is_ellipsized()`. Deux causes corrigées :
+  la valeur d'une `AdwComboRow` est ellipsée dès que titre + sous-titre
+  sont longs → toute `ComboRow` prend `.factory(&combo_value_factory())`
+  (`preferences/mod.rs`, la valeur entière, le titre passe à la ligne) ;
+  un `AdwViewSwitcher` `Wide` donne à chaque onglet la largeur du plus
+  long → onglets du profil en `Narrow`, dans leur propre barre sous l'en-tête.
 
 ## Triggers (regex → action)
 
