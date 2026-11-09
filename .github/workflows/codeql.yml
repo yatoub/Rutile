@@ -1,0 +1,55 @@
+name: CodeQL
+
+# Static analysis (SAST) of the Rust code, results in the repo's Security tab.
+# Overlaps with the Semgrep rules MegaLinter runs (p/rust): kept anyway,
+# CodeQL's dataflow queries go further than Semgrep's patterns, and it is the
+# SAST tool OpenSSF Scorecard recognises on every commit (Semgrep inside
+# MegaLinter is invisible to it).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "27 4 * * 2"  # weekly, so new queries reach unchanged code too
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write  # upload the SARIF results
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
+
+      # build-mode none still runs rust-analyzer over the crate graph, whose
+      # *-sys build scripts query pkg-config: without the dev packages, the
+      # GTK bindings are extracted only partially.
+      - name: Install GTK4/libadwaita/vte4 dev packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libvte-2.91-gtk4-dev
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066  # v4
+        with:
+          languages: rust
+          build-mode: none
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066  # v4
+        with:
+          category: /language:rust

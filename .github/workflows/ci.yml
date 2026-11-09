@@ -118,9 +118,10 @@ jobs:
     name: MegaLinter
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # No `statuses: write`: per-linter commit statuses are off
+    # (GITHUB_STATUS_REPORTER below), the job's own check is the gate.
     permissions:
       contents: read
-      statuses: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
@@ -131,6 +132,7 @@ jobs:
         uses: oxsecurity/megalinter/flavors/rust@9949bad031045f366be2467e00e8371a7328a2e2  # v10.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_STATUS_REPORTER: false
           # ghcr.io rate-limits anonymous trivy-db pulls from shared runner
           # IPs (TOOMANYREQUESTS, then a fatal "--skip-db-update cannot be
           # specified on the first run"). Aqua's official mirrors first,
