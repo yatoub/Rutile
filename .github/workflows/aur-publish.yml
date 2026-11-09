@@ -1,7 +1,8 @@
 name: Publish to AUR
 
-# Triggered automatically after the Release workflow succeeds,
-# or manually via workflow_dispatch to re-publish an existing tag.
+# Triggered automatically after the Release workflow succeeds, manually via
+# workflow_dispatch to re-publish an existing tag, or called by release.yml's
+# `trigger-aur-publish` job (workflow_call) on a manual Release re-publish.
 #
 # Updates two AUR packages in parallel:
 #   rutile      — builds from the released source tarball
@@ -16,6 +17,19 @@ on:
       tag:
         description: "Tag to re-publish (e.g. v0.1.0)"
         required: true
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to re-publish (e.g. v0.1.0)"
+        type: string
+        required: true
+    secrets:
+      AUR_USERNAME:
+        required: true
+      AUR_EMAIL:
+        required: true
+      AUR_SSH_PRIVATE_KEY:
+        required: true
 
 permissions:
   contents: read
@@ -23,7 +37,7 @@ permissions:
 # A manual re-publish (workflow_dispatch) could otherwise race a run
 # triggered by the Release workflow completing for the same tag.
 concurrency:
-  group: aur-publish-${{ github.event.inputs.tag || github.event.workflow_run.head_sha }}
+  group: aur-publish-${{ inputs.tag || github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 jobs:
@@ -38,12 +52,14 @@ jobs:
       issues: write
     # `workflow_run` only covers a tag-push Release. A manual re-publish of
     # Release (workflow_dispatch, run from `main`) is handed over by its
-    # `trigger-aur-publish` job, which dispatches this workflow with the
-    # tag explicitly: the `workflow_run` it also fires carries `main`'s
-    # head_sha, which no tag points at, so resolve-release-tag would only
-    # fail (v0.8.0's re-publish: "Invalid tag format:").
+    # `trigger-aur-publish` job, which calls this workflow with the tag
+    # explicitly (`inputs.tag`, filled by workflow_call as by
+    # workflow_dispatch): the `workflow_run` that Release run also fires
+    # carries `main`'s head_sha, which no tag points at, so
+    # resolve-release-tag would only fail (v0.8.0's re-publish: "Invalid tag
+    # format:").
     if: >
-      github.event_name == 'workflow_dispatch' ||
+      inputs.tag != '' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
 
@@ -55,7 +71,7 @@ jobs:
         id: ver
         uses: ./.github/actions/resolve-release-tag
         with:
-          input-tag: ${{ github.event.inputs.tag }}
+          input-tag: ${{ inputs.tag }}
           head-sha: ${{ github.event.workflow_run.head_sha }}
           repo: ${{ github.repository }}
 
@@ -106,7 +122,7 @@ jobs:
       contents: read
       issues: write
     if: >
-      github.event_name == 'workflow_dispatch' ||
+      inputs.tag != '' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
 
@@ -118,7 +134,7 @@ jobs:
         id: ver
         uses: ./.github/actions/resolve-release-tag
         with:
-          input-tag: ${{ github.event.inputs.tag }}
+          input-tag: ${{ inputs.tag }}
           head-sha: ${{ github.event.workflow_run.head_sha }}
           repo: ${{ github.repository }}
 

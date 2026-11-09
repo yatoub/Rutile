@@ -34,9 +34,11 @@ on:
   push:
     branches: [main]
 
+# Read-only GITHUB_TOKEN: every write (push, tag, release, PR, auto-merge)
+# goes through RUTILE_RELEASE_TOKEN below, never the built-in token — it
+# only serves the initial checkout.
 permissions:
-  pull-requests: write
-  contents: write
+  contents: read
 
 env:
   RELEASE_PLZ_VERSION: "0.3.160" # matches the version release-plz/action itself pins

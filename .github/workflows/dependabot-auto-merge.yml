@@ -7,8 +7,7 @@ name: Dependabot auto-merge
 on: pull_request
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   auto-merge:
@@ -16,6 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.actor == 'dependabot[bot]'
+    # Enabling auto-merge needs contents: write with the built-in token
+    # (Dependabot-triggered runs can't read Actions secrets, so no PAT).
+    # Scoped to this one job, which runs no repository code.
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Fetch Dependabot metadata
         id: meta

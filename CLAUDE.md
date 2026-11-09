@@ -478,8 +478,26 @@ ne suffit pas — la chaîne de distribution compte tout autant :
   sur push vers `main` + hebdomadaire + sur changement de
   `branch_protection_rule`. Résultats en SARIF uploadés vers l'onglet
   Security de GitHub (`github/codeql-action/upload-sarif`).
+  **Ses alertes `TokenPermissions` visent tout `write` du `GITHUB_TOKEN`,
+  même au niveau d'un job** — d'où le principe suivi dans tous les
+  workflows : en-tête `contents: read`, `write` seulement sur le job qui en
+  a besoin, et aucun `write` sur un job qui n'utilise que
+  `RUTILE_RELEASE_TOKEN` (release-plz, `update-pkgbuild`,
+  `cleanup-branches`). Deux `write` restent légitimes et leurs alertes sont
+  fermées en « won't fix » : `publish` (`release.yml`, téléverser sur la
+  Release) et `dependabot-auto-merge.yml` (activer l'auto-merge ; un run
+  déclenché par Dependabot ne lit pas les secrets Actions, donc pas de
+  PAT). Fermées aussi : CodeReview (mainteneur seul, aucune approbation
+  possible par un second humain), CII Best Practices (inscription manuelle
+  sur bestpractices.dev, pas faite), Fuzzing (voir « pas fait » plus bas).
+  Une alerte fermée qui revient sous un nouveau numéro = la ligne a bougé.
+- **`.github/workflows/codeql.yml`** (CodeQL Rust, `build-mode: none`, PR +
+  push `main` + hebdo) : recouvre en partie le Semgrep de MegaLinter, mais
+  Scorecard (check SAST) ne voit pas ce dernier. Installe quand même les
+  paquets `-dev` GTK : rust-analyzer lance les build scripts `*-sys`, qui
+  interrogent pkg-config.
 - **`SHA256SUMS.txt` généré à chaque release** (`release.yml`, job
-  `checksums`, après `build`/`build-deb`/`build-rpm`) : permet à qui
+  `publish`, après `build`/`build-deb`/`build-rpm`/`smoke-arch`) : permet à qui
   installe le binaire standalone/`.deb`/`.rpm` de vérifier l'intégrité du
   téléchargement. Pas de signature GPG pour l'instant (contrairement aux
   dépôts APT/DNF hébergés de susshi, volontairement pas mis en place ici
@@ -512,8 +530,17 @@ ne suffit pas — la chaîne de distribution compte tout autant :
   — après le smoke test, avant l'upload. Contrairement à `SHA256SUMS.txt`
   (intégrité du téléchargement uniquement), une attestation prouve
   cryptographiquement la provenance (ce repo, ce commit, ce run précis),
-  vérifiable via `gh attestation verify`. Nécessite `id-token: write` +
-  `attestations: write` en plus de `contents: write` sur ces 3 jobs.
+  vérifiable via `gh attestation verify`. **Un seul job écrit : `publish`**
+  (`contents: write` + `id-token: write` + `attestations: write`), qui ne
+  fait ni checkout ni compilation : les jobs de build (token en lecture
+  seule) lui passent leurs fichiers en artifacts `release-*`. Avant, chaque
+  build avait `contents: write`, avec le token persisté par `checkout`
+  pendant que tournaient les `build.rs` des dépendances. Conséquence : rien
+  n'arrive sur la Release avant que tous les smoke tests aient réussi, donc
+  `smoke-arch` prend le binaire dans l'artifact (posé sous le nom local de
+  `source_x86_64`, que `makepkg` utilise sans le télécharger), et
+  `update-pkgbuild`/`trigger-aur-publish` attendent `publish` (ils
+  téléchargent depuis la Release).
 - **Job `coverage` dans `ci.yml`** (`cargo-llvm-cov` → Codecov) —
   **volontairement pas dans `required_status_checks`** de la protection
   de branche (informatif, pas un gate). Exclut du rapport les fichiers
@@ -524,8 +551,7 @@ ne suffit pas — la chaîne de distribution compte tout autant :
   un secret `CODECOV_TOKEN` non configuré pour l'instant (`fail_ci_if_error:
   false`, donc le job ne casse rien tant qu'il n'est pas ajouté).
 - **Explicitement pas fait** (Phase C du plan, à activer seulement sur
-  demande explicite) : CodeQL pour Rust (risque de redondance avec Semgrep
-  déjà dans MegaLinter), fuzzing continu (`cargo-fuzz` sur
+  demande explicite) : fuzzing continu (`cargo-fuzz` sur
   `split_tree.rs`/`broadcast.rs`, bons candidats car purs/sans GTK, mais
   chantier de maintenance à part entière), `cargo-geiger` (métrique de
   code `unsafe`), signature GPG des releases.
@@ -583,11 +609,14 @@ même Release.
 - **Un seul déclencheur AUR par release** : `aur-publish.yml` ne réagit à
   `workflow_run` que pour une release de *tag* (`push`). Une republication
   manuelle de `release.yml` (`workflow_dispatch` depuis `main`) passe par
-  son job `trigger-aur-publish`, qui fournit le tag explicitement : le
-  `workflow_run` qu'elle déclenche aussi porte le `head_sha` de `main`, sur
-  lequel aucun tag ne pointe, et échouait en doublon (`Invalid tag
-  format:` lors de la republication de v0.8.0, probablement aussi les deux
-  échecs AUR du 10 août).
+  son job `trigger-aur-publish`, qui appelle `aur-publish.yml` en workflow
+  réutilisable (`workflow_call`, tag en `inputs.tag`) — pas `gh workflow
+  run`, qui exigeait `actions: write` ; secrets AUR passés un par un, pas
+  `secrets: inherit` (bloqué par Semgrep, et donnerait aussi le PAT). Le
+  `workflow_run` que déclenche aussi la republication porte le `head_sha`
+  de `main`, sur lequel aucun tag ne pointe, et échouait en doublon
+  (`Invalid tag format:` lors de la republication de v0.8.0, probablement
+  aussi les deux échecs AUR du 10 août).
 - **`CHANGELOG.md`** créé avec juste l'en-tête (aucune entrée encore,
   Rutile n'a pas de tag de version) — release-plz y ajoute une section à
   chaque release.
