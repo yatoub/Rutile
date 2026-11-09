@@ -478,22 +478,32 @@ ne suffit pas — la chaîne de distribution compte tout autant :
   sur push vers `main` + hebdomadaire + sur changement de
   `branch_protection_rule`. Résultats en SARIF uploadés vers l'onglet
   Security de GitHub (`github/codeql-action/upload-sarif`).
-  **Ses alertes `TokenPermissions` visent tout `write` du `GITHUB_TOKEN`,
-  même au niveau d'un job** — d'où le principe suivi dans tous les
-  workflows : en-tête `contents: read`, `write` seulement sur le job qui en
-  a besoin, et aucun `write` sur un job qui n'utilise que
-  `RUTILE_RELEASE_TOKEN` (release-plz, `update-pkgbuild`,
-  `cleanup-branches`). Deux `write` restent légitimes et leurs alertes sont
-  fermées en « won't fix » : `publish` (`release.yml`, téléverser sur la
-  Release) et `dependabot-auto-merge.yml` (activer l'auto-merge ; un run
-  déclenché par Dependabot ne lit pas les secrets Actions, donc pas de
-  PAT). Fermées aussi : CodeReview (mainteneur seul, aucune approbation
-  possible par un second humain), CII Best Practices (inscription manuelle
-  sur bestpractices.dev, pas faite), Fuzzing (voir « pas fait » plus bas).
+  **Scorecard ne crée une alerte que pour un check sous 10**, et le
+  détail du check (log du job, `Warn:`/`Info:`) en dit plus que l'onglet
+  Security. Token-Permissions est à 10 : en-tête `contents: read` partout,
+  `write` seulement sur le job qui en a besoin, et aucun `write` sur un job
+  qui n'utilise que `RUTILE_RELEASE_TOKEN` (release-plz, `update-pkgbuild`,
+  `cleanup-branches`). Deux `write` de job restent, légitimes, et ne
+  sortent qu'en `Warn` (pas d'alerte) : `publish` (`release.yml`,
+  téléverser sur la Release) et `dependabot-auto-merge.yml` (activer
+  l'auto-merge ; un run déclenché par Dependabot ne lit pas les secrets
+  Actions, donc pas de PAT). Ce qui mettait le check à 0, c'étaient les
+  `write` en **en-tête** de workflow. Alertes fermées en « won't fix » :
+  CodeReview (mainteneur seul, aucune approbation possible par un second
+  humain), CII Best Practices (inscription manuelle sur
+  bestpractices.dev, pas faite), Fuzzing (voir « pas fait » plus bas).
   Une alerte fermée qui revient sous un nouveau numéro = la ligne a bougé.
+  Sans alerte mais à connaître : **Branch-Protection en erreur (`-1`)** —
+  le `GITHUB_TOKEN` ne lit pas les règles de protection classiques, il
+  faudrait un PAT dédié à Scorecard (`repo_token`) ; **Signed-Releases à
+  0** — les attestations natives GitHub (`gh attestation verify`) ne
+  comptent pas, Scorecard cherche des `.intoto.jsonl`/`.sig` attachés à la
+  Release.
 - **`.github/workflows/codeql.yml`** (CodeQL Rust, `build-mode: none`, PR +
   push `main` + hebdo) : recouvre en partie le Semgrep de MegaLinter, mais
-  Scorecard (check SAST) ne voit pas ce dernier. Installe quand même les
+  Scorecard (check SAST) ne voit pas ce dernier. SAST est remonté de 0 à 7
+  au premier run (3 commits sur 26 analysés) : l'alerte se ferme seule à
+  mesure que les PR passent par CodeQL. Installe quand même les
   paquets `-dev` GTK : rust-analyzer lance les build scripts `*-sys`, qui
   interrogent pkg-config.
 - **`SHA256SUMS.txt` généré à chaque release** (`release.yml`, job
